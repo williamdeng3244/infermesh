@@ -26,11 +26,14 @@ import base64
 import logging
 import struct
 import time
+from collections import deque
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from pydantic import BaseModel
 
 from infermesh import __version__
 from infermesh.api.adapters import AnthropicAdapter, OpenAIAdapter
@@ -68,9 +71,44 @@ def _encode_embedding(vec: list[float], fmt: str):
     return vec
 
 
+# Recent-logs ring buffer feeding the dashboard's Logs view.
+_LOG_BUFFER: deque = deque(maxlen=500)
+
+
+class _RingBufferLogHandler(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__()
+        self._fmt = logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s: %(message)s", "%H:%M:%S"
+        )
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            _LOG_BUFFER.append({"level": record.levelname, "line": self._fmt.format(record)})
+        except Exception:  # noqa: BLE001 - logging must never raise
+            pass
+
+
+def _install_log_capture() -> None:
+    """Capture infermesh.* logs (pool, server, backends) into the ring buffer."""
+    lg = logging.getLogger("infermesh")
+    if lg.level == logging.NOTSET or lg.level > logging.INFO:
+        lg.setLevel(logging.INFO)
+    if not any(isinstance(h, _RingBufferLogHandler) for h in lg.handlers):
+        lg.addHandler(_RingBufferLogHandler())
+
+
+class SettingsPatch(BaseModel):
+    """Runtime-editable settings (host/port/model-dir require a restart)."""
+
+    idle_timeout: Optional[float] = None
+    api_key: Optional[str] = None  # "" clears (auth off); null = leave unchanged
+
+
 def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     """Build the FastAPI app around a (pre-populated) ModelPool."""
     settings = settings or Settings()
+    _install_log_capture()
     openai_adapter = OpenAIAdapter()
     anthropic_adapter = AnthropicAdapter()
 
@@ -78,6 +116,9 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         interval = max(1.0, float(settings.ttl_check_interval))
         while True:
             await asyncio.sleep(interval)
+            # live-checked so PUT /api/settings {idle_timeout} takes effect at runtime
+            if not (settings.idle_timeout and settings.idle_timeout > 0):
+                continue
             try:
                 await pool.check_ttl_expirations(settings.idle_timeout)
             except Exception as exc:  # noqa: BLE001
@@ -85,19 +126,16 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        # Startup: warm pinned models, start the TTL reaper if enabled.
-        ttl_task: Optional[asyncio.Task] = None
+        # Startup: warm pinned models, start the (always-on) TTL reaper.
         try:
             await pool.preload_pinned_models()
         except Exception as exc:  # noqa: BLE001
             logger.error("preload_pinned_models failed: %s", exc)
-        if settings.idle_timeout and settings.idle_timeout > 0:
-            ttl_task = asyncio.create_task(_ttl_loop())
+        ttl_task = asyncio.create_task(_ttl_loop())
         try:
             yield
         finally:
-            if ttl_task is not None:
-                ttl_task.cancel()
+            ttl_task.cancel()
             await pool.shutdown()
 
     app = FastAPI(title="infermesh", version=__version__, lifespan=lifespan)
@@ -327,5 +365,36 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     @app.get("/api/status")
     async def api_status(_: None = Depends(require_auth)):
         return pool.get_status()
+
+    @app.get("/api/logs")
+    async def api_logs(
+        limit: int = Query(default=200, ge=1, le=500),
+        _: None = Depends(require_auth),
+    ):
+        return {"lines": list(_LOG_BUFFER)[-limit:]}
+
+    @app.get("/api/settings")
+    async def api_get_settings(_: None = Depends(require_auth)):
+        data = asdict(settings)
+        data["api_key"] = bool(settings.api_key)  # redact: only expose whether set
+        return data
+
+    @app.put("/api/settings")
+    async def api_put_settings(patch: SettingsPatch, _: None = Depends(require_auth)):
+        changed = []
+        if patch.idle_timeout is not None:
+            settings.idle_timeout = max(0.0, float(patch.idle_timeout))
+            changed.append("idle_timeout")
+        if patch.api_key is not None:
+            settings.api_key = patch.api_key or None
+            changed.append("api_key")
+        if changed:
+            try:
+                settings.save()
+            except OSError as exc:
+                logger.error("settings save failed: %s", exc)
+        data = asdict(settings)
+        data["api_key"] = bool(settings.api_key)
+        return {"updated": changed, "settings": data}
 
     return app
