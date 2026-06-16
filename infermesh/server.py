@@ -30,7 +30,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from infermesh import __version__
 from infermesh.api.adapters import AnthropicAdapter, OpenAIAdapter
@@ -56,6 +56,7 @@ from infermesh.core.pool import (
     PoolError,
 )
 from infermesh.core.settings import Settings
+from infermesh.dashboard import DASHBOARD_HTML
 
 logger = logging.getLogger("infermesh.server")
 
@@ -299,6 +300,25 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             "model": mid,
             "loaded": mid in pool.get_loaded_model_ids(),
         }
+
+    @app.post("/v1/models/{model_id:path}/pin")
+    async def pin_model(model_id: str, _: None = Depends(require_auth)):
+        mid = pool.resolve_model_id(model_id)
+        if not pool.set_pinned(mid, True):
+            raise HTTPException(status_code=404, detail=f"model '{model_id}' not found")
+        return {"model": mid, "pinned": True}
+
+    @app.post("/v1/models/{model_id:path}/unpin")
+    async def unpin_model(model_id: str, _: None = Depends(require_auth)):
+        mid = pool.resolve_model_id(model_id)
+        if not pool.set_pinned(mid, False):
+            raise HTTPException(status_code=404, detail=f"model '{model_id}' not found")
+        return {"model": mid, "pinned": False}
+
+    @app.get("/", include_in_schema=False)
+    @app.get("/admin", include_in_schema=False)
+    async def admin_dashboard():
+        return HTMLResponse(DASHBOARD_HTML)
 
     @app.get("/health")
     async def health():
