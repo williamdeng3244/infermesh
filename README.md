@@ -9,6 +9,10 @@ infermesh reuses oMLX's framework-agnostic protocol layer (OpenAI/Anthropic
 adapters, model-pool orchestration) and replaces its MLX compute/cache layers
 with a single pluggable backend interface.
 
+**Milestones:** **M1** — foundation (pluggable backends, OpenAI + Anthropic chat,
+multi-model LRU/pin/TTL pool). **M2** — embeddings + reranker endpoints. 18 tests
+green on the mock backend (no GPU).
+
 ## The one architectural rule
 
 The control plane (`infermesh/core/`, `infermesh/api/`, `server.py`, `cli.py`)
@@ -83,16 +87,28 @@ curl -s -N http://127.0.0.1:8000/v1/messages \
   -H 'content-type: application/json' \
   -d '{"model":"echo","max_tokens":64,"messages":[{"role":"user","content":"stream me"}],"stream":true}'
 
+# OpenAI-compatible embeddings (deterministic mock vectors)
+curl -s http://127.0.0.1:8000/v1/embeddings \
+  -H 'content-type: application/json' \
+  -d '{"model":"echo","input":["hello world","second text"]}'
+
+# Cohere/Jina-compatible rerank (scored, sorted by query overlap)
+curl -s http://127.0.0.1:8000/v1/rerank \
+  -H 'content-type: application/json' \
+  -d '{"model":"echo","query":"cat dog","documents":["cat dog bird","cat fish","unrelated"]}'
+
 # Pool/memory status
 curl -s http://127.0.0.1:8000/api/status
 ```
 
-### Endpoints (Milestone 1)
+### Endpoints
 
 | Method & path | Behavior |
 |---|---|
 | `POST /v1/chat/completions` | OpenAI adapter; stream + non-stream |
 | `POST /v1/messages` | Anthropic adapter; stream + non-stream |
+| `POST /v1/embeddings` | OpenAI embeddings (float/base64, optional `dimensions`) |
+| `POST /v1/rerank` | Cohere/Jina rerank (`top_n`, `return_documents`, sorted) |
 | `GET  /v1/models` | discovered model ids (OpenAI list shape) |
 | `GET  /v1/models/status` | per-model loaded/pinned/stats |
 | `POST /v1/models/{id}/load` | warm a model (acquire then release) |
@@ -109,9 +125,10 @@ or `x-api-key: KEY`. Off by default.
 uv run pytest          # or:  .venv/bin/pytest
 ```
 
-12 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
+18 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
 installed**: vendor-import guard, pool lifecycle (discovery / LRU eviction /
-pinning / TTL), and the OpenAI + Anthropic endpoints (stream + non-stream).
+pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), and
+the embeddings + rerank endpoints.
 
 ## Run against vLLM (real tokens — manual, needs a GPU + a model)
 
@@ -132,12 +149,13 @@ never evicted). The vendor (`nvidia`/`amd`/`cpu`) is auto-detected.
 ## What is lifted from oMLX vs. written new
 
 **Lifted ~verbatim** from oMLX `omlx/api/` (zero vendor imports) into
-`infermesh/api/` — 12 files, ≈6.9k lines of battle-tested protocol code reused
+`infermesh/api/` — 14 files, ≈7.1k lines of battle-tested protocol code reused
 as-is (imports re-rooted `omlx.*` → `infermesh.*`):
 
 * `adapters/` — `base.py`, `openai.py`, `anthropic.py`, `sse_formatter.py`, `__init__.py`
 * `openai_models.py`, `anthropic_models.py`, `shared_models.py`
 * `tool_calling.py`, `anthropic_utils.py`, `thinking.py`, `utils.py`
+* `embedding_models.py`, `rerank_models.py` (M2)
 
 The only edit beyond import re-rooting: `thinking.py`'s mlx-only
 `ThinkingBudgetProcessor` (a logits processor) was removed — it is compute-layer
@@ -155,7 +173,7 @@ accounting now sums backends' `stats().used_mem_mb` + a `MemoryProbe`.
 * `core/backend.py` — `InferenceBackend` interface + dataclasses
 * `core/factory.py`, `core/registry.py`, `core/memory.py`, `core/settings.py`
 * `backends/mock/mock_backend.py`, `backends/vllm/vllm_backend.py`
-* `server.py` (FastAPI gateway), `cli.py` (`infermesh serve`), `tests/`
+* `server.py` (FastAPI gateway — chat + `/v1/embeddings` + `/v1/rerank`), `cli.py` (`infermesh serve`), `tests/`
 
 ## Project layout
 
