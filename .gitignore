@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtualenvs / tooling
+.venv/
+venv/
+.uv/
+uv.lock
+
+# Test / cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime state (settings + sidecar logs)
+.infermesh/
+
+# OS
+.DS_Store

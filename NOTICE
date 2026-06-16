@@ -1,0 +1,39 @@
+infermesh
+Copyright 2026 infermesh contributors
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this software except in compliance with the License. You may obtain a copy of
+the License at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+================================================================================
+Third-party attributions
+================================================================================
+
+This product includes software adapted from oMLX:
+
+    oMLX — https://github.com/jundot/omlx
+    Licensed under the Apache License, Version 2.0.
+
+The following parts of infermesh are copied verbatim or adapted from oMLX, with
+the original SPDX-License-Identifier headers preserved on each file:
+
+  * infermesh/api/                  — protocol adapters (OpenAI/Anthropic),
+                                       request/response models, tool-call parsing,
+                                       reasoning/thinking helpers, SSE formatting.
+                                       Copied verbatim from oMLX omlx/api/, with
+                                       imports re-rooted omlx.* -> infermesh.* and
+                                       one mlx-only logits-processor class removed
+                                       from thinking.py (unused without an MLX
+                                       compute backend).
+  * infermesh/core/pool.py          — multi-model pool orchestration (LRU
+                                       eviction, pinning, TTL, leasing), adapted
+                                       from oMLX omlx/engine_pool.py with its two
+                                       mlx touchpoints (active-memory probe and
+                                       executor helper) replaced by the
+                                       hardware-neutral MemoryProbe and a
+                                       core async-executor helper.
+
+All other infermesh source files are original works of the infermesh
+contributors, licensed under Apache-2.0.
