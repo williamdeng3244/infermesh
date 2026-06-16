@@ -45,6 +45,18 @@ def test_settings_put_api_key_toggles_auth(client, monkeypatch):
 
 def test_dashboard_has_all_sections(client):
     html = client.get("/admin").text
-    for marker in ("sec-models", "sec-chat", "sec-logs", "sec-settings",
-                   'id="chatInput"', 'id="logs"', 'id="setIdle"'):
+    for marker in ("sec-models", "sec-chat", "sec-logs", "sec-metrics", "sec-settings",
+                   'id="chatInput"', 'id="logs"', 'id="setIdle"', "chartLatency"):
         assert marker in html, marker
+
+
+def test_metrics_records_chat(client):
+    before = len(client.get("/api/metrics").json()["samples"])
+    client.post("/v1/chat/completions", json={
+        "model": "echo-1", "messages": [{"role": "user", "content": "hi there"}],
+    })
+    samples = client.get("/api/metrics").json()["samples"]
+    assert len(samples) > before
+    last = samples[-1]
+    assert {"t", "model", "latency_ms", "tokens", "tps"} <= set(last.keys())
+    assert last["model"] == "echo-1" and last["latency_ms"] >= 0

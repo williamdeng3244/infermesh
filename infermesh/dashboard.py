@@ -114,6 +114,7 @@ tbody tr:hover{background:var(--card2)}
       <button data-sec="models" class="active" aria-label="Models"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/></svg> Models</button>
       <button data-sec="chat" aria-label="Chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat</button>
       <button data-sec="logs" aria-label="Logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Logs</button>
+      <button data-sec="metrics" aria-label="Metrics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg> Metrics</button>
       <button data-sec="settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg> Settings</button>
     </nav>
     <div class="sb-foot">
@@ -167,6 +168,19 @@ tbody tr:hover{background:var(--card2)}
         <div class="logs" id="logs"><div class="muted">loading&hellip;</div></div>
       </section>
 
+      <section class="section" id="sec-metrics">
+        <div class="cards" id="metricCards"></div>
+        <div class="panel" style="padding:18px;margin-bottom:16px">
+          <div class="muted" style="font-size:12px;margin-bottom:10px">Latency per request (ms)</div>
+          <canvas id="chartLatency" style="width:100%;display:block"></canvas>
+        </div>
+        <div class="panel" style="padding:18px">
+          <div class="muted" style="font-size:12px;margin-bottom:10px">Throughput per request (tokens/s)</div>
+          <canvas id="chartTps" style="width:100%;display:block"></canvas>
+        </div>
+        <p class="muted" style="font-size:12px;margin-top:12px">History records one point per chat completion — use the <strong>Chat</strong> tab (or send API requests) to generate data.</p>
+      </section>
+
       <section class="section" id="sec-settings">
         <div class="form">
           <h3>Runtime-editable</h3>
@@ -199,7 +213,7 @@ tbody tr:hover{background:var(--card2)}
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let active='models', logsPaused=false;
-const TITLES={models:'Models',chat:'Chat',logs:'Logs',settings:'Settings'};
+const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',settings:'Settings'};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>(n==null?'—':Number(n).toLocaleString());
 const authHeaders=()=>{const k=$('#apikey').value.trim();return k?{'Authorization':'Bearer '+k}:{}};
@@ -222,6 +236,7 @@ function switchSection(sec){
   if(sec==='chat') loadChatModels();
   if(sec==='logs') refreshLogs();
   if(sec==='settings') loadSettings();
+  if(sec==='metrics') refreshMetrics();
 }
 
 /* Models */
@@ -328,12 +343,44 @@ async function applyKey(){
 $('#saveIdle').onclick=saveIdle;
 $('#applyKey').onclick=applyKey;
 
+/* Metrics */
+function drawChart(id, vals, color, unit){
+  const c=$('#'+id); if(!c) return;
+  const w=c.clientWidth||600, h=130, dpr=window.devicePixelRatio||1;
+  c.width=w*dpr; c.height=h*dpr; const x=c.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0);
+  x.clearRect(0,0,w,h);
+  if(!vals.length){ x.fillStyle='#64748b'; x.font='12px ui-monospace,monospace'; x.fillText('no data yet — generate chat completions',12,h/2); return; }
+  const max=(Math.max.apply(null,vals)||1)*1.15, n=vals.length, padL=42;
+  const px=i=> padL + (w-padL-8)*(n<=1?0.5:i/(n-1));
+  const py=v=> h-8 - (h-26)*(v/max);
+  x.strokeStyle='#1f2a3b'; x.lineWidth=1; x.fillStyle='#64748b'; x.font='10px ui-monospace,monospace';
+  for(let g=0;g<=2;g++){ const yy=py(max*g/2); x.beginPath(); x.moveTo(padL,yy); x.lineTo(w-8,yy); x.stroke(); x.fillText(Math.round(max*g/2),6,yy+3); }
+  x.beginPath(); vals.forEach((v,i)=>{ const X=px(i),Y=py(v); i?x.lineTo(X,Y):x.moveTo(X,Y); });
+  x.strokeStyle=color; x.lineWidth=2; x.stroke();
+  x.lineTo(px(n-1),h-8); x.lineTo(px(0),h-8); x.closePath(); x.fillStyle=color+'22'; x.fill();
+  x.fillStyle=color; x.font='600 12px ui-monospace,monospace'; x.fillText(vals[n-1]+' '+unit, w-118, 16);
+}
+async function refreshMetrics(){
+  try{ const d=await api('/api/metrics'); const s=d.samples||[];
+    const lat=s.map(p=>p.latency_ms), tps=s.map(p=>p.tps);
+    const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+    $('#metricCards').innerHTML=
+      '<div class="card"><div class="k">Requests</div><div class="v">'+s.length+'</div></div>'+
+      '<div class="card"><div class="k">Avg latency</div><div class="v">'+avg(lat).toFixed(0)+'<small> ms</small></div></div>'+
+      '<div class="card"><div class="k">Avg throughput</div><div class="v">'+avg(tps).toFixed(1)+'<small> tok/s</small></div></div>'+
+      '<div class="card"><div class="k">Last latency</div><div class="v">'+(s.length?Math.round(s[s.length-1].latency_ms):'—')+'<small> ms</small></div></div>';
+    drawChart('chartLatency', lat, '#58a6ff', 'ms');
+    drawChart('chartTps', tps, '#22c55e', 'tok/s');
+  }catch(e){}
+}
+
 /* poll */
 $('#refreshBtn').onclick=()=>tick();
 async function tick(){
   try{ const s=await api('/api/status'); setHealth(true); if(active==='models'){ renderModels(s); $('#models-err').textContent=''; } }
   catch(e){ setHealth(false); if(active==='models') $('#models-err').textContent=String(e); }
   if(active==='logs') refreshLogs();
+  if(active==='metrics') refreshMetrics();
 }
 setInterval(tick,2000); tick();
 </script>

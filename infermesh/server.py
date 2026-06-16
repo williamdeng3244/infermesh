@@ -105,6 +105,22 @@ class SettingsPatch(BaseModel):
     api_key: Optional[str] = None  # "" clears (auth off); null = leave unchanged
 
 
+# Rolling per-request metrics for the dashboard's latency/throughput charts.
+_METRICS: deque = deque(maxlen=300)
+
+
+def _record_metric(model: Optional[str], latency_ms: float, completion_tokens: int) -> None:
+    tokens = int(completion_tokens or 0)
+    tps = (tokens / (latency_ms / 1000.0)) if latency_ms > 0 and tokens else 0.0
+    _METRICS.append({
+        "t": time.time(),
+        "model": model or "",
+        "latency_ms": round(latency_ms, 1),
+        "tokens": tokens,
+        "tps": round(tps, 1),
+    })
+
+
 def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     """Build the FastAPI app around a (pre-populated) ModelPool."""
     settings = settings or Settings()
@@ -176,19 +192,26 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                     status_code=503,
                 )
 
+            start = time.monotonic()
+
             async def event_stream():
+                completion = 0
                 try:
                     async for chunk in backend.chat_stream(internal):
+                        if chunk.completion_tokens:
+                            completion = chunk.completion_tokens
                         yield adapter.format_stream_chunk(chunk, request)
                     tail = adapter.format_stream_end(request)
                     if tail:
                         yield tail
                 finally:
                     await pool.release_engine(model_id)
+                    _record_metric(request.model, (time.monotonic() - start) * 1000.0, completion)
 
             return StreamingResponse(event_stream(), media_type="text/event-stream")
 
         # Non-streaming
+        start = time.monotonic()
         try:
             async with pool.acquire(model_id) as backend:
                 response = await backend.chat(internal)
@@ -208,6 +231,7 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                 status_code=500,
             )
 
+        _record_metric(request.model, (time.monotonic() - start) * 1000.0, response.completion_tokens)
         formatted = adapter.format_response(response, request)
         if hasattr(formatted, "model_dump"):
             return JSONResponse(formatted.model_dump(exclude_none=True))
@@ -372,6 +396,10 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         _: None = Depends(require_auth),
     ):
         return {"lines": list(_LOG_BUFFER)[-limit:]}
+
+    @app.get("/api/metrics")
+    async def api_metrics(_: None = Depends(require_auth)):
+        return {"samples": list(_METRICS)}
 
     @app.get("/api/settings")
     async def api_get_settings(_: None = Depends(require_auth)):
