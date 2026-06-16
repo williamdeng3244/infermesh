@@ -22,7 +22,9 @@ would release the lease before the stream is consumed.
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
+import struct
 import time
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -33,7 +35,19 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from infermesh import __version__
 from infermesh.api.adapters import AnthropicAdapter, OpenAIAdapter
 from infermesh.api.anthropic_models import MessagesRequest
+from infermesh.api.embedding_models import (
+    EmbeddingData,
+    EmbeddingRequest,
+    EmbeddingResponse,
+    EmbeddingUsage,
+)
 from infermesh.api.openai_models import ChatCompletionRequest
+from infermesh.api.rerank_models import (
+    RerankRequest,
+    RerankResponse,
+    RerankResult,
+    RerankUsage,
+)
 from infermesh.core.pool import (
     InsufficientMemoryError,
     ModelNotFoundError,
@@ -44,6 +58,13 @@ from infermesh.core.pool import (
 from infermesh.core.settings import Settings
 
 logger = logging.getLogger("infermesh.server")
+
+
+def _encode_embedding(vec: list[float], fmt: str):
+    """OpenAI embeddings encoding: raw float list, or base64 of little-endian f32."""
+    if fmt == "base64":
+        return base64.b64encode(struct.pack(f"<{len(vec)}f", *vec)).decode("ascii")
+    return vec
 
 
 def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
@@ -161,6 +182,76 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     @app.post("/v1/messages")
     async def anthropic_messages(request: MessagesRequest, _: None = Depends(require_auth)):
         return await _handle_chat(request, anthropic_adapter)
+
+    @app.post("/v1/embeddings")
+    async def embeddings(request: EmbeddingRequest, _: None = Depends(require_auth)):
+        if request.items is not None:
+            texts = [(item.text or "") for item in request.items]
+        elif isinstance(request.input, str):
+            texts = [request.input]
+        else:
+            texts = list(request.input or [])
+        model_id = pool.resolve_model_id(request.model)
+        try:
+            async with pool.acquire(model_id) as backend:
+                vectors = await backend.embed(texts)
+        except ModelNotFoundError as exc:
+            return JSONResponse(openai_adapter.create_error_response(str(exc), "model_not_found", 404), status_code=404)
+        except NotImplementedError:
+            return JSONResponse(openai_adapter.create_error_response(
+                f"backend for '{model_id}' does not support embeddings", "unsupported", 501), status_code=501)
+        except (ModelTooLargeError, InsufficientMemoryError) as exc:
+            return JSONResponse(openai_adapter.create_error_response(str(exc), "insufficient_memory", 503), status_code=503)
+        if request.dimensions:
+            vectors = [v[: request.dimensions] for v in vectors]
+        data = [
+            EmbeddingData(index=i, embedding=_encode_embedding(v, request.encoding_format))
+            for i, v in enumerate(vectors)
+        ]
+        tokens = sum(len(t.split()) for t in texts)
+        resp = EmbeddingResponse(
+            data=data, model=request.model,
+            usage=EmbeddingUsage(prompt_tokens=tokens, total_tokens=tokens),
+        )
+        return JSONResponse(resp.model_dump())
+
+    @app.post("/v1/rerank")
+    async def rerank(request: RerankRequest, _: None = Depends(require_auth)):
+        query = request.query if isinstance(request.query, str) else (request.query.get("text") or "")
+        docs = [d if isinstance(d, str) else (d.get("text") or "") for d in request.documents]
+        model_id = pool.resolve_model_id(request.model)
+        try:
+            async with pool.acquire(model_id) as backend:
+                scores = await backend.rerank(query, docs)
+        except ModelNotFoundError as exc:
+            return JSONResponse(openai_adapter.create_error_response(str(exc), "model_not_found", 404), status_code=404)
+        except NotImplementedError:
+            return JSONResponse(openai_adapter.create_error_response(
+                f"backend for '{model_id}' does not support rerank", "unsupported", 501), status_code=501)
+        except (ModelTooLargeError, InsufficientMemoryError) as exc:
+            return JSONResponse(openai_adapter.create_error_response(str(exc), "insufficient_memory", 503), status_code=503)
+        results = sorted(
+            (
+                RerankResult(
+                    index=i,
+                    relevance_score=float(score),
+                    document=(
+                        ({"text": request.documents[i]} if isinstance(request.documents[i], str)
+                         else request.documents[i]) if request.return_documents else None
+                    ),
+                )
+                for i, score in enumerate(scores)
+            ),
+            key=lambda r: r.relevance_score,
+            reverse=True,
+        )
+        if request.top_n is not None:
+            results = results[: request.top_n]
+        tokens = len(query.split()) + sum(len(d.split()) for d in docs)
+        resp = RerankResponse(
+            results=results, model=request.model, usage=RerankUsage(total_tokens=tokens),
+        )
+        return JSONResponse(resp.model_dump())
 
     @app.get("/v1/models")
     async def list_models(_: None = Depends(require_auth)):
