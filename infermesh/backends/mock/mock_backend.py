@@ -9,6 +9,8 @@ exercisable without hardware. This is what CI runs.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import math
 from typing import AsyncIterator, Optional
 
 from infermesh.api.adapters.base import InternalRequest, StreamChunk
@@ -20,6 +22,22 @@ from infermesh.core.backend import (
     InferenceBackend,
     ModelSpec,
 )
+
+
+def _hash_embed(text: str, dim: int = 16) -> list[float]:
+    """A deterministic, L2-normalized pseudo-embedding (sha256-derived).
+
+    Stable across processes (unlike the salted built-in ``hash()``), so tests can
+    assert exact vectors. Carries no real semantics — it is a stand-in so the
+    embeddings path is exercisable with no model.
+    """
+    vec = [
+        int.from_bytes(hashlib.sha256(f"{i}:{text}".encode("utf-8")).digest()[:4], "big")
+        / 2**32 * 2 - 1  # -> [-1, 1)
+        for i in range(dim)
+    ]
+    norm = math.sqrt(sum(x * x for x in vec)) or 1.0
+    return [x / norm for x in vec]
 
 
 class MockEchoBackend(InferenceBackend):
@@ -35,7 +53,7 @@ class MockEchoBackend(InferenceBackend):
         return "mock"
 
     def capabilities(self) -> BackendCaps:
-        return BackendCaps(streaming=True, tool_calling=True)
+        return BackendCaps(streaming=True, tool_calling=True, embeddings=True, rerank=True)
 
     def hardware(self) -> HardwareInfo:
         return HardwareInfo(vendor="cpu", device_count=0, mem_per_device_mb=0,
@@ -84,6 +102,22 @@ class MockEchoBackend(InferenceBackend):
                 prompt_tokens=prompt_tokens if is_last else 0,
                 completion_tokens=n if is_last else 0,
             )
+
+    # ---- embeddings & rerank (deterministic, no GPU) ----
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        dim = int(self._spec.extra.get("embed_dim", 16)) if self._spec else 16
+        return [_hash_embed(t, dim) for t in texts]
+
+    async def rerank(self, query: str, docs: list[str]) -> list[float]:
+        # Jaccard token overlap in [0, 1]: deterministic and intuitive — a doc
+        # sharing more words with the query scores higher.
+        q = set(query.lower().split())
+        scores: list[float] = []
+        for doc in docs:
+            d = set(doc.lower().split())
+            union = q | d
+            scores.append(len(q & d) / len(union) if union else 0.0)
+        return scores
 
     def stats(self) -> EngineStats:
         return EngineStats(
