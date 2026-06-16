@@ -92,6 +92,8 @@ class VLLMBackend(InferenceBackend):
         return BackendCaps(
             streaming=True,
             tool_calling=True,
+            embeddings=True,
+            rerank=True,
             tensor_parallel=True,
             tiered_kv=False,
         )
@@ -310,6 +312,43 @@ class VLLMBackend(InferenceBackend):
             completion_tokens=completion_tokens,
             cached_tokens=cached_tokens,
         )
+
+    # --------------------------- embeddings / rerank ----------------------- #
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        if not self._loaded or not self._base_url:
+            raise RuntimeError("VLLMBackend.embed() called before load()")
+        body = {
+            "model": self._spec.model_id if self._spec else "",
+            "input": texts,
+            "encoding_format": "float",
+        }
+        async with httpx.AsyncClient(timeout=None) as client:
+            resp = await client.post(f"{self._base_url}/v1/embeddings", json=body)
+            resp.raise_for_status()
+            payload = resp.json()
+        items = sorted(payload.get("data", []), key=lambda d: d.get("index", 0))
+        return [list(item["embedding"]) for item in items]
+
+    async def rerank(self, query: str, docs: list[str]) -> list[float]:
+        # Uses vLLM's Jina-compatible /rerank (available for cross-encoder/
+        # reranker models); the sidecar errors if the loaded model can't rerank.
+        if not self._loaded or not self._base_url:
+            raise RuntimeError("VLLMBackend.rerank() called before load()")
+        body = {
+            "model": self._spec.model_id if self._spec else "",
+            "query": query,
+            "documents": docs,
+        }
+        async with httpx.AsyncClient(timeout=None) as client:
+            resp = await client.post(f"{self._base_url}/rerank", json=body)
+            resp.raise_for_status()
+            payload = resp.json()
+        scores = [0.0] * len(docs)
+        for result in payload.get("results", []):
+            idx = result.get("index")
+            if isinstance(idx, int) and 0 <= idx < len(docs):
+                scores[idx] = float(result.get("relevance_score", 0.0))
+        return scores
 
     # ------------------------------ stats ---------------------------------- #
     def stats(self) -> EngineStats:
