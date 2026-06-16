@@ -11,7 +11,8 @@ with a single pluggable backend interface.
 
 **Milestones:** **M1** — foundation (pluggable backends, OpenAI + Anthropic chat,
 multi-model LRU/pin/TTL pool). **M2** — embeddings + reranker endpoints. **M3** —
-admin dashboard. 21 tests green on the mock backend (no GPU).
+admin dashboard. **M4** — furnished dashboard (Chat / Logs / Settings) + runtime
+config. 26 tests green on the mock backend (no GPU).
 
 ## The one architectural rule
 
@@ -117,17 +118,25 @@ curl -s http://127.0.0.1:8000/api/status
 | `GET  / · /admin` | admin dashboard (HTML) |
 | `GET  /health` | liveness |
 | `GET  /api/status` | pool status (loaded models, memory, tps) |
+| `GET  /api/logs` | recent server logs (in-memory ring buffer) |
+| `GET · PUT /api/settings` | view / live-edit settings (idle_timeout, api_key) |
 
 Optional single API key: pass `--api-key KEY`, then send `Authorization: Bearer KEY`
 or `x-api-key: KEY`. Off by default.
 
 ## Admin dashboard
 
-Open **http://127.0.0.1:8000/** (or `/admin`) in a browser while the server runs.
-It is a self-contained dark page (no build step, no JS deps) that auto-refreshes
-`/api/status` every 2s: a memory gauge, per-model status / leases / throughput,
-and **Load / Unload / Pin / Unpin** buttons. If an API key is enabled, paste it
-into the field in the header and the page sends it with every request.
+Open **http://127.0.0.1:8000/** (or `/admin`) in a browser while the server runs —
+a self-contained dark panel (no build step, no JS deps, no CDN) with a sidebar and
+four sections:
+
+- **Models** — memory gauge + live table with **Load / Unload / Pin / Unpin**
+- **Chat** — pick a model and stream a completion in a chat playground
+- **Logs** — live tail of the server's ring-buffered logs, level-colored
+- **Settings** — view all settings and live-edit idle-timeout / API key
+
+If an API key is enabled, paste it into the header field (or set it from the
+Settings tab) and the page sends it with every request.
 
 ## Run the tests
 
@@ -135,10 +144,11 @@ into the field in the header and the page sends it with every request.
 uv run pytest          # or:  .venv/bin/pytest
 ```
 
-21 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
+26 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
 installed**: vendor-import guard, pool lifecycle (discovery / LRU eviction /
 pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), the
-embeddings + rerank endpoints, and the admin dashboard + pin/unpin.
+embeddings + rerank endpoints, the admin dashboard + pin/unpin, and the
+logs/settings endpoints.
 
 ## Run against vLLM (real tokens — manual, needs a GPU + a model)
 
@@ -183,7 +193,7 @@ accounting now sums backends' `stats().used_mem_mb` + a `MemoryProbe`.
 * `core/backend.py` — `InferenceBackend` interface + dataclasses
 * `core/factory.py`, `core/registry.py`, `core/memory.py`, `core/settings.py`
 * `backends/mock/mock_backend.py`, `backends/vllm/vllm_backend.py`
-* `server.py` (FastAPI gateway — chat + embeddings + rerank), `dashboard.py` (admin UI), `cli.py` (`infermesh serve`), `tests/`
+* `server.py` (FastAPI gateway — chat + embeddings + rerank + logs/settings), `dashboard.py` (multi-section admin UI), `cli.py` (`infermesh serve`), `tests/`
 
 ## Project layout
 
