@@ -10,8 +10,8 @@ adapters, model-pool orchestration) and replaces its MLX compute/cache layers
 with a single pluggable backend interface.
 
 **Milestones:** **M1** — foundation (pluggable backends, OpenAI + Anthropic chat,
-multi-model LRU/pin/TTL pool). **M2** — embeddings + reranker endpoints. 18 tests
-green on the mock backend (no GPU).
+multi-model LRU/pin/TTL pool). **M2** — embeddings + reranker endpoints. **M3** —
+admin dashboard. 21 tests green on the mock backend (no GPU).
 
 ## The one architectural rule
 
@@ -113,11 +113,21 @@ curl -s http://127.0.0.1:8000/api/status
 | `GET  /v1/models/status` | per-model loaded/pinned/stats |
 | `POST /v1/models/{id}/load` | warm a model (acquire then release) |
 | `POST /v1/models/{id}/unload` | unload if idle+unpinned (`?force=true` to force) |
+| `POST /v1/models/{id}/pin` · `/unpin` | pin (never evict) / unpin |
+| `GET  / · /admin` | admin dashboard (HTML) |
 | `GET  /health` | liveness |
 | `GET  /api/status` | pool status (loaded models, memory, tps) |
 
 Optional single API key: pass `--api-key KEY`, then send `Authorization: Bearer KEY`
 or `x-api-key: KEY`. Off by default.
+
+## Admin dashboard
+
+Open **http://127.0.0.1:8000/** (or `/admin`) in a browser while the server runs.
+It is a self-contained dark page (no build step, no JS deps) that auto-refreshes
+`/api/status` every 2s: a memory gauge, per-model status / leases / throughput,
+and **Load / Unload / Pin / Unpin** buttons. If an API key is enabled, paste it
+into the field in the header and the page sends it with every request.
 
 ## Run the tests
 
@@ -125,10 +135,10 @@ or `x-api-key: KEY`. Off by default.
 uv run pytest          # or:  .venv/bin/pytest
 ```
 
-18 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
+21 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
 installed**: vendor-import guard, pool lifecycle (discovery / LRU eviction /
-pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), and
-the embeddings + rerank endpoints.
+pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), the
+embeddings + rerank endpoints, and the admin dashboard + pin/unpin.
 
 ## Run against vLLM (real tokens — manual, needs a GPU + a model)
 
@@ -173,7 +183,7 @@ accounting now sums backends' `stats().used_mem_mb` + a `MemoryProbe`.
 * `core/backend.py` — `InferenceBackend` interface + dataclasses
 * `core/factory.py`, `core/registry.py`, `core/memory.py`, `core/settings.py`
 * `backends/mock/mock_backend.py`, `backends/vllm/vllm_backend.py`
-* `server.py` (FastAPI gateway — chat + `/v1/embeddings` + `/v1/rerank`), `cli.py` (`infermesh serve`), `tests/`
+* `server.py` (FastAPI gateway — chat + embeddings + rerank), `dashboard.py` (admin UI), `cli.py` (`infermesh serve`), `tests/`
 
 ## Project layout
 
