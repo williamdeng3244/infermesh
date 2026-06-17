@@ -121,6 +121,7 @@ class BenchmarkRequest(BaseModel):
     concurrency: int = 4
     max_tokens: int = 64
     prompt: str = "Write one concise sentence about distributed systems."
+    mode: str = "same"  # "same" (shared prompt, prefix-cacheable) | "different"
 
 
 # Rolling per-request metrics for the dashboard's latency/throughput charts.
@@ -487,7 +488,8 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         c = max(1, min(req.concurrency, 32))
         mt = max(1, min(req.max_tokens, 1024))
         try:
-            result = await run_benchmark(pool, model_id, requests=n, concurrency=c, max_tokens=mt, prompt=req.prompt)
+            result = await run_benchmark(pool, model_id, requests=n, concurrency=c,
+                                         max_tokens=mt, prompt=req.prompt, mode=req.mode)
         except (ModelTooLargeError, InsufficientMemoryError) as exc:
             return JSONResponse(
                 openai_adapter.create_error_response(str(exc), "insufficient_memory", 503),
