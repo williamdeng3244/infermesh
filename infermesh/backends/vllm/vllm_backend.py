@@ -121,6 +121,32 @@ class VLLMBackend(InferenceBackend):
         return HardwareInfo(vendor="cpu", device_count=0)
 
     # ------------------------------ lifecycle ------------------------------ #
+    @staticmethod
+    def _build_launch_cmd(spec: ModelSpec, port: int) -> list[str]:
+        """Assemble the vLLM openai api_server argv from a ModelSpec.
+
+        ``vllm_args`` booleans are store_true flags (True -> "--flag"; False/None
+        -> omitted); other values become "--key value".
+        """
+        cmd = [
+            sys.executable, "-m", "vllm.entrypoints.openai.api_server",
+            "--model", spec.source,
+            "--port", str(port),
+            "--served-model-name", spec.model_id,
+        ]
+        if spec.max_context:
+            cmd += ["--max-model-len", str(spec.max_context)]
+        if spec.quantization:
+            cmd += ["--quantization", spec.quantization]
+        for key, value in (spec.extra.get("vllm_args") or {}).items():
+            if value is True:
+                cmd.append(f"--{key}")
+            elif value is False or value is None:
+                continue
+            else:
+                cmd += [f"--{key}", str(value)]
+        return cmd
+
     async def load(self, spec: ModelSpec) -> None:
         self._spec = spec
         if importlib.util.find_spec("vllm") is None:
@@ -136,26 +162,19 @@ class VLLMBackend(InferenceBackend):
         safe_id = spec.model_id.replace("/", "_")
         self._log_path = LOG_DIR / f"vllm-{safe_id}-{self._port}.log"
 
-        cmd = [
-            sys.executable, "-m", "vllm.entrypoints.openai.api_server",
-            "--model", spec.source,
-            "--port", str(self._port),
-            "--served-model-name", spec.model_id,
-        ]
-        if spec.max_context:
-            cmd += ["--max-model-len", str(spec.max_context)]
-        if spec.quantization:
-            cmd += ["--quantization", spec.quantization]
-        # Arbitrary passthrough flags, e.g. extra={"vllm_args": {"tensor-parallel-size": 2}}
-        for key, value in (spec.extra.get("vllm_args") or {}).items():
-            cmd += [f"--{key}", str(value)]
+        cmd = self._build_launch_cmd(spec, self._port)
 
         logger.info("Spawning vLLM sidecar: %s (logs -> %s)", " ".join(cmd), self._log_path)
         self._log_file = open(self._log_path, "ab")
+        # Per-model sidecar env overrides, e.g. extra={"env": {"VLLM_USE_FLASHINFER_SAMPLER": "0"}}
+        # on hosts with only the CUDA runtime (no nvcc): vLLM then uses its native
+        # sampler instead of JIT-compiling FlashInfer kernels.
+        sidecar_env = {**os.environ, **{str(k): str(v) for k, v in (spec.extra.get("env") or {}).items()}}
         # start_new_session detaches into its own process group so unload() can
         # signal the whole group (vLLM spawns workers).
         self._proc = subprocess.Popen(
-            cmd, stdout=self._log_file, stderr=subprocess.STDOUT, start_new_session=True
+            cmd, stdout=self._log_file, stderr=subprocess.STDOUT,
+            start_new_session=True, env=sidecar_env,
         )
 
         timeout = float(spec.extra.get("startup_timeout", 300.0))
