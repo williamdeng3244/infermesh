@@ -12,7 +12,7 @@ with a single pluggable backend interface.
 **Milestones:** **M1** — foundation (pluggable backends, OpenAI + Anthropic chat,
 multi-model LRU/pin/TTL pool). **M2** — embeddings + reranker endpoints. **M3** —
 admin dashboard. **M4** — furnished dashboard (Chat / Logs / Settings) + runtime
-config. 26 tests green on the mock backend (no GPU).
+config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. 29 tests green on the mock backend (no GPU).
 
 ## The one architectural rule
 
@@ -120,6 +120,7 @@ curl -s http://127.0.0.1:8000/api/status
 | `GET  /api/status` | pool status (loaded models, memory, tps) |
 | `GET  /api/logs` | recent server logs (in-memory ring buffer) |
 | `GET · PUT /api/settings` | view / live-edit settings (idle_timeout, api_key) |
+| `GET  /api/metrics` | recent per-request latency/throughput samples |
 
 Optional single API key: pass `--api-key KEY`, then send `Authorization: Bearer KEY`
 or `x-api-key: KEY`. Off by default.
@@ -128,11 +129,12 @@ or `x-api-key: KEY`. Off by default.
 
 Open **http://127.0.0.1:8000/** (or `/admin`) in a browser while the server runs —
 a self-contained dark panel (no build step, no JS deps, no CDN) with a sidebar and
-four sections:
+five sections:
 
 - **Models** — memory gauge + live table with **Load / Unload / Pin / Unpin**
 - **Chat** — pick a model and stream a completion in a chat playground
 - **Logs** — live tail of the server's ring-buffered logs, level-colored
+- **Metrics** — latency + throughput sparkline charts (canvas, no chart lib)
 - **Settings** — view all settings and live-edit idle-timeout / API key
 
 If an API key is enabled, paste it into the header field (or set it from the
@@ -144,27 +146,36 @@ Settings tab) and the page sends it with every request.
 uv run pytest          # or:  .venv/bin/pytest
 ```
 
-26 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
+29 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
 installed**: vendor-import guard, pool lifecycle (discovery / LRU eviction /
 pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), the
-embeddings + rerank endpoints, the admin dashboard + pin/unpin, and the
-logs/settings endpoints.
+embeddings + rerank endpoints, the admin dashboard + pin/unpin, the logs / settings
+/ metrics endpoints, and the vLLM launch-arg builder.
 
-## Run against vLLM (real tokens — manual, needs a GPU + a model)
+## Run against vLLM (real tokens on a GPU)
 
-Not gated in CI. vLLM serves one model per process and has no Anthropic API and
-no multi-model management; infermesh's control plane adds exactly that on top.
+**Verified** end-to-end on an NVIDIA RTX 5070 Laptop GPU (Blackwell, sm_120, 8 GB):
+infermesh loaded `Qwen2.5-0.5B-Instruct` and streamed real tokens at ~60 tok/s.
+vLLM serves one model per process and has no Anthropic API and no multi-model
+management; infermesh's control plane adds exactly that on top.
 
 ```bash
 pip install '.[vllm]'
 infermesh serve --backend vllm --model-dir /path/to/models --max-process-memory 80%
 ```
 
-`load()` spawns `python -m vllm.entrypoints.openai.api_server --model <dir> --port <free>`,
-polls its `/health` until ready (logs under `~/.infermesh/logs/`), then streams
-real tokens through `/v1/chat/completions` and `/v1/messages`. Loading a second
-model when memory is tight triggers LRU eviction of the first (pinned models are
-never evicted). The vendor (`nvidia`/`amd`/`cpu`) is auto-detected.
+`load()` spawns `python -m vllm.entrypoints.openai.api_server` per model, polls its
+`/health` (logs under `~/.infermesh/logs/`), then streams real tokens through
+`/v1/chat/completions` and `/v1/messages`; the **Metrics** tab fills in with real
+latency/throughput. Loading a second model under memory pressure LRU-evicts the
+first (pinned never evicted); vendor (`nvidia`/`amd`/`cpu`) is auto-detected.
+
+Per-model tuning rides on `ModelSpec.extra`: `vllm_args` (e.g.
+`{"enforce-eager": true, "gpu-memory-utilization": 0.8, "max-model-len": 4096}`)
+and `env` for the sidecar's environment. On a host with only the CUDA **runtime**
+(no toolkit): install a C compiler (`build-essential python3-dev`) so Triton can
+JIT, and set `env={"VLLM_USE_FLASHINFER_SAMPLER": "0"}` so vLLM uses its native
+sampler instead of JIT-compiling FlashInfer kernels (which needs `nvcc`).
 
 ## What is lifted from oMLX vs. written new
 
@@ -193,7 +204,7 @@ accounting now sums backends' `stats().used_mem_mb` + a `MemoryProbe`.
 * `core/backend.py` — `InferenceBackend` interface + dataclasses
 * `core/factory.py`, `core/registry.py`, `core/memory.py`, `core/settings.py`
 * `backends/mock/mock_backend.py`, `backends/vllm/vllm_backend.py`
-* `server.py` (FastAPI gateway — chat + embeddings + rerank + logs/settings), `dashboard.py` (multi-section admin UI), `cli.py` (`infermesh serve`), `tests/`
+* `server.py` (FastAPI gateway — chat + embeddings + rerank + logs/settings/metrics), `dashboard.py` (5-section admin UI), `cli.py` (`infermesh serve`), `tests/`
 
 ## Project layout
 
