@@ -22,6 +22,7 @@ class BackendFactory:
     _LAZY: dict[str, tuple[str, str]] = {
         "mock": ("infermesh.backends.mock.mock_backend", "MockEchoBackend"),
         "vllm": ("infermesh.backends.vllm.vllm_backend", "VLLMBackend"),
+        "openai": ("infermesh.backends.openai.openai_backend", "OpenAICompatBackend"),
     }
 
     # Eagerly-registered classes (via register()) take precedence over _LAZY.
