@@ -12,7 +12,7 @@ with a single pluggable backend interface.
 **Milestones:** **M1** — foundation (pluggable backends, OpenAI + Anthropic chat,
 multi-model LRU/pin/TTL pool). **M2** — embeddings + reranker endpoints. **M3** —
 admin dashboard. **M4** — furnished dashboard (Chat / Logs / Settings) + runtime
-config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. **M7** — benchmark suite (latency percentiles · TTFT · throughput). **M8** — hosted-model proxy backend: register OpenAI / Anthropic / OpenRouter / any OpenAI-compatible endpoint via `--providers`, so remote models join the same pool, dashboard, and OpenAI+Anthropic gateway as local vLLM models. 37 tests green on the mock backend (no GPU).
+config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. **M7** — benchmark suite (latency percentiles · TTFT · throughput). **M8** — hosted-model proxy backend: register OpenAI / Anthropic / OpenRouter / any OpenAI-compatible endpoint via `--providers`, so remote models join the same pool, dashboard, and OpenAI+Anthropic gateway as local vLLM models. **M9** — Claude Code hardening: SSE keep-alives during long prefill, `response_format` parity on the hosted path, and cross-platform background service management (`start` / `stop` / `restart` / `status`). 44 tests green on the mock backend (no GPU).
 
 ## The one architectural rule
 
@@ -126,6 +126,28 @@ curl -s http://127.0.0.1:8000/api/status
 Optional single API key: pass `--api-key KEY`, then send `Authorization: Bearer KEY`
 or `x-api-key: KEY`. Off by default.
 
+## Run as a background service
+
+`serve` runs in the foreground; `start` runs the same gateway detached and writes a
+pidfile + log under `~/.infermesh/`. Works the same on WSL/Linux and Windows
+(dependency-free: POSIX signals or `taskkill`; no systemd/launchd required).
+
+```bash
+infermesh start --backend vllm --model-dir ~/models --port 8000   # spawn, wait for /health
+infermesh status     # -> running (pid 12345) on 127.0.0.1:8000 [health: ok]
+infermesh restart    # stop (if running) then start with the same flags
+infermesh stop       # SIGTERM, escalate to SIGKILL after ~5s, remove pidfile
+```
+
+`start`/`restart` take all the `serve` flags and forward them to the child. Logs
+stream to `~/.infermesh/logs/server-<port>.log`.
+
+### Long-prefill keep-alives (for Claude Code and other long-lived clients)
+
+While a big model is still prefilling and hasn't emitted a token, the stream sends
+periodic `: keep-alive` SSE comments so clients (Claude Code especially) don't hit a
+read timeout. Tune with `--sse-keepalive SECONDS` (default 15; `0` disables).
+
 ## Admin dashboard
 
 Open **http://127.0.0.1:8000/** (or `/admin`) in a browser while the server runs —
@@ -149,12 +171,14 @@ header toggles **light / dark** mode (persisted in the browser; defaults dark).
 uv run pytest          # or:  .venv/bin/pytest
 ```
 
-37 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
+44 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
 installed**: vendor-import guard, pool lifecycle (discovery / LRU eviction /
 pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), the
 embeddings + rerank endpoints, the admin dashboard + pin/unpin, the logs / settings
-/ metrics endpoints, the vLLM launch-arg builder, the benchmark runner, and the
-OpenAI-compat proxy backend (key resolution / request body / provider-file registration).
+/ metrics endpoints, the vLLM launch-arg builder, the benchmark runner, the
+OpenAI-compat proxy backend (key resolution / request body / provider-file registration),
+SSE keep-alives during prefill, `response_format` forwarding, and the background-service
+helpers (arg forwarding / pidfile / liveness / status).
 
 ## Run against vLLM (real tokens on a GPU)
 
