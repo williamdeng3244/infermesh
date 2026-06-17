@@ -12,7 +12,7 @@ with a single pluggable backend interface.
 **Milestones:** **M1** — foundation (pluggable backends, OpenAI + Anthropic chat,
 multi-model LRU/pin/TTL pool). **M2** — embeddings + reranker endpoints. **M3** —
 admin dashboard. **M4** — furnished dashboard (Chat / Logs / Settings) + runtime
-config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. **M7** — benchmark suite (latency percentiles · TTFT · throughput). 33 tests green on the mock backend (no GPU).
+config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. **M7** — benchmark suite (latency percentiles · TTFT · throughput). **M8** — hosted-model proxy backend: register OpenAI / Anthropic / OpenRouter / any OpenAI-compatible endpoint via `--providers`, so remote models join the same pool, dashboard, and OpenAI+Anthropic gateway as local vLLM models. 37 tests green on the mock backend (no GPU).
 
 ## The one architectural rule
 
@@ -149,11 +149,12 @@ header toggles **light / dark** mode (persisted in the browser; defaults dark).
 uv run pytest          # or:  .venv/bin/pytest
 ```
 
-29 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
+37 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
 installed**: vendor-import guard, pool lifecycle (discovery / LRU eviction /
 pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), the
 embeddings + rerank endpoints, the admin dashboard + pin/unpin, the logs / settings
-/ metrics endpoints, the vLLM launch-arg builder, and the benchmark runner.
+/ metrics endpoints, the vLLM launch-arg builder, the benchmark runner, and the
+OpenAI-compat proxy backend (key resolution / request body / provider-file registration).
 
 ## Run against vLLM (real tokens on a GPU)
 
@@ -182,6 +183,56 @@ and `env` for the sidecar's environment. On a host with only the CUDA **runtime*
 JIT, and set `env={"VLLM_USE_FLASHINFER_SAMPLER": "0"}` so vLLM uses its native
 sampler instead of JIT-compiling FlashInfer kernels (which needs `nvcc`).
 
+## Connect hosted models (OpenAI / Anthropic / OpenRouter / …)
+
+The `openai` backend is a **proxy**: instead of running a model locally it forwards
+each request to any OpenAI-compatible HTTP API. Hosted models then live in the same
+pool, dashboard, and OpenAI + Anthropic gateway as local vLLM models — and since
+they use no local VRAM, they're registered at **0 MB** and never evict (or get
+evicted by) a GPU model.
+
+Register them with a `--providers` JSON file:
+
+```json
+{
+  "models": [
+    { "id": "gpt-4o-mini",
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "env:OPENAI_API_KEY" },
+
+    { "id": "claude-3-5-sonnet",
+      "base_url": "https://api.anthropic.com/v1",
+      "upstream_model": "claude-3-5-sonnet-20241022",
+      "api_key": "env:ANTHROPIC_API_KEY" },
+
+    { "id": "llama-3.3-70b",
+      "base_url": "https://openrouter.ai/api/v1",
+      "upstream_model": "meta-llama/llama-3.3-70b-instruct",
+      "api_key": "env:OPENROUTER_API_KEY" }
+  ]
+}
+```
+
+* `id` — the model id clients use against infermesh (in `/v1/chat/completions`, the dashboard, etc.).
+* `base_url` — the provider's OpenAI-compatible root (default `https://api.openai.com/v1`). Anthropic exposes one at `https://api.anthropic.com/v1`. A local server (e.g. another vLLM) works too.
+* `upstream_model` — the provider's own model name (defaults to `id`).
+* `api_key` — `"env:VAR"` reads `VAR` from the environment, so **keys never live in the file or in git**. A literal string also works but isn't recommended.
+
+```bash
+export OPENAI_API_KEY=sk-...           # keys stay in your shell, never committed
+export ANTHROPIC_API_KEY=sk-ant-...
+# mix local GPU models and hosted models in one gateway:
+infermesh serve --backend vllm --model-dir /path/to/models --providers ~/providers.json
+# or hosted-only, no GPU needed:
+infermesh serve --providers ~/providers.json
+```
+
+Now `curl http://127.0.0.1:8000/v1/models` lists local and hosted models together,
+the dashboard's **Chat** tab can talk to `gpt-4o-mini`, and both the OpenAI
+(`/v1/chat/completions`) and Anthropic (`/v1/messages`) endpoints route to whichever
+backend the chosen model uses. Streaming, usage tokens, and embeddings are
+forwarded; the control plane still imports no vendor SDK (the proxy is just `httpx`).
+
 ## What is lifted from oMLX vs. written new
 
 **Lifted ~verbatim** from oMLX `omlx/api/` (zero vendor imports) into
@@ -208,7 +259,7 @@ accounting now sums backends' `stats().used_mem_mb` + a `MemoryProbe`.
 
 * `core/backend.py` — `InferenceBackend` interface + dataclasses
 * `core/factory.py`, `core/registry.py`, `core/memory.py`, `core/settings.py`
-* `backends/mock/mock_backend.py`, `backends/vllm/vllm_backend.py`
+* `backends/mock/mock_backend.py`, `backends/vllm/vllm_backend.py`, `backends/openai/openai_backend.py` (hosted-model proxy)
 * `server.py` (FastAPI gateway — chat + embeddings + rerank + logs/settings/metrics/benchmark), `dashboard.py` (6-section admin UI), `core/benchmark.py`, `cli.py` (`infermesh serve`), `tests/`
 
 ## Project layout
@@ -220,9 +271,10 @@ infermesh/
 │   │   ├── backend.py factory.py registry.py pool.py memory.py settings.py
 │   ├── api/         # protocol layer lifted from oMLX (ZERO vendor imports)
 │   │   ├── adapters/ openai_models.py anthropic_models.py tool_calling.py …
-│   ├── backends/    # ALL hardware-specific code
+│   ├── backends/    # ALL hardware-specific (and remote-provider) code
 │   │   ├── mock/mock_backend.py
-│   │   └── vllm/vllm_backend.py
+│   │   ├── vllm/vllm_backend.py
+│   │   └── openai/openai_backend.py   # proxy to OpenAI/Anthropic/… (httpx, no SDK)
 │   ├── server.py    # FastAPI app + routes
 │   └── cli.py       # `infermesh serve …`
 └── tests/           # green with the mock backend (no GPU)
