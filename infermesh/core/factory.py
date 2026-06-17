@@ -23,6 +23,7 @@ class BackendFactory:
         "mock": ("infermesh.backends.mock.mock_backend", "MockEchoBackend"),
         "vllm": ("infermesh.backends.vllm.vllm_backend", "VLLMBackend"),
         "openai": ("infermesh.backends.openai.openai_backend", "OpenAICompatBackend"),
+        "transformers": ("infermesh.backends.transformers.transformers_backend", "TransformersBackend"),
     }
 
     # Eagerly-registered classes (via register()) take precedence over _LAZY.

@@ -31,6 +31,7 @@ dependencies = [
 # Hardware/engine backends declare their own heavy deps as extras so the
 # control plane installs (and imports) without them.
 vllm = ["vllm", "httpx"]
+transformers = ["transformers>=4.40", "torch", "accelerate", "httpx"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 
 [project.scripts]
