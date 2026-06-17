@@ -32,6 +32,7 @@ class Settings:
     max_process_memory: str = "80%"       # "80%" | "12GB" | "512MB" | bare MB
     api_key: Optional[str] = None         # optional single bearer/x-api-key; None => auth off
     ttl_check_interval: float = 30.0      # seconds between pool.check_ttl_expirations()
+    sse_keepalive_interval: float = 15.0  # emit ': keep-alive' SSE comment if no token for N s (0 => off)
 
     @classmethod
     def load(cls, path: Path = SETTINGS_PATH) -> "Settings":

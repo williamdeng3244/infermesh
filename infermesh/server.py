@@ -203,18 +203,54 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                 )
 
             start = time.monotonic()
+            keepalive = max(0.0, float(getattr(settings, "sse_keepalive_interval", 0.0)))
 
             async def event_stream():
+                # Produce formatted SSE chunks on a background task and drain them
+                # with a timeout, so a slow first token (long prefill on a big model)
+                # emits ': keep-alive' comments instead of letting the client read-time-out.
                 completion = 0
+                queue: asyncio.Queue = asyncio.Queue()
+                _DONE = object()
+
+                async def produce():
+                    nonlocal completion
+                    try:
+                        async for chunk in backend.chat_stream(internal):
+                            if chunk.completion_tokens:
+                                completion = chunk.completion_tokens
+                            await queue.put(adapter.format_stream_chunk(chunk, request))
+                        tail = adapter.format_stream_end(request)
+                        if tail:
+                            await queue.put(tail)
+                    except Exception as exc:  # surface to consumer, then close cleanly
+                        await queue.put(exc)
+                    finally:
+                        await queue.put(_DONE)
+
+                task = asyncio.ensure_future(produce())
                 try:
-                    async for chunk in backend.chat_stream(internal):
-                        if chunk.completion_tokens:
-                            completion = chunk.completion_tokens
-                        yield adapter.format_stream_chunk(chunk, request)
-                    tail = adapter.format_stream_end(request)
-                    if tail:
-                        yield tail
+                    while True:
+                        if keepalive > 0:
+                            try:
+                                item = await asyncio.wait_for(queue.get(), timeout=keepalive)
+                            except asyncio.TimeoutError:
+                                yield ": keep-alive\n\n"  # SSE comment line; ignored by clients
+                                continue
+                        else:
+                            item = await queue.get()
+                        if item is _DONE:
+                            break
+                        if isinstance(item, Exception):
+                            logger.warning("streaming generation error: %s", item)
+                            break
+                        yield item
                 finally:
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
                     await pool.release_engine(model_id)
                     _record_metric(request.model, (time.monotonic() - start) * 1000.0, completion)
 
