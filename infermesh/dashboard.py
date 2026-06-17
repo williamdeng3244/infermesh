@@ -330,7 +330,13 @@ async function sendChat(){
   try{
     const r=await fetch('/v1/chat/completions',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},authHeaders()),
       body:JSON.stringify({model:model,messages:[{role:'user',content:text}],stream:true})});
-    if(!r.ok){ body.textContent='error: HTTP '+r.status; return; }
+    if(!r.ok){
+      let detail=''; try{ const e=await r.json(); detail=(e&&e.error&&e.error.message)||''; }catch(_){}
+      body.textContent = r.status===503
+        ? '⚠ GPU busy — '+(detail||'cannot load this model while another model is in use')+'. Wait for the in-flight request to finish, or Unload/Pin from the Models tab, then resend.'
+        : 'error: HTTP '+r.status+(detail?' · '+detail:'');
+      return;
+    }
     const reader=r.body.getReader(), dec=new TextDecoder(); let buf='';
     while(true){
       const {done,value}=await reader.read(); if(done) break;
