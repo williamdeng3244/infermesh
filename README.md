@@ -12,7 +12,7 @@ with a single pluggable backend interface.
 **Milestones:** **M1** — foundation (pluggable backends, OpenAI + Anthropic chat,
 multi-model LRU/pin/TTL pool). **M2** — embeddings + reranker endpoints. **M3** —
 admin dashboard. **M4** — furnished dashboard (Chat / Logs / Settings) + runtime
-config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. 29 tests green on the mock backend (no GPU).
+config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. 29 tests green on the mock backend (no GPU).
 
 ## The one architectural rule
 
@@ -138,7 +138,8 @@ five sections:
 - **Settings** — view all settings and live-edit idle-timeout / API key
 
 If an API key is enabled, paste it into the header field (or set it from the
-Settings tab) and the page sends it with every request.
+Settings tab) and the page sends it with every request. A sun/moon button in the
+header toggles **light / dark** mode (persisted in the browser; defaults dark).
 
 ## Run the tests
 
@@ -155,7 +156,9 @@ embeddings + rerank endpoints, the admin dashboard + pin/unpin, the logs / setti
 ## Run against vLLM (real tokens on a GPU)
 
 **Verified** end-to-end on an NVIDIA RTX 5070 Laptop GPU (Blackwell, sm_120, 8 GB):
-infermesh loaded `Qwen2.5-0.5B-Instruct` and streamed real tokens at ~60 tok/s.
+infermesh loaded `Qwen2.5-0.5B-Instruct` (real tokens at ~60 tok/s) and demonstrated
+**LRU eviction** — loading `Qwen2.5-1.5B-Instruct` evicts the 0.5B, since 8 GB holds
+one at a time, then serves the bigger model. Pinned models are never evicted.
 vLLM serves one model per process and has no Anthropic API and no multi-model
 management; infermesh's control plane adds exactly that on top.
 
