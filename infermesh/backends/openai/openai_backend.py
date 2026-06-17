@@ -109,6 +109,8 @@ class OpenAICompatBackend(InferenceBackend):
             body["tools"] = req.tools
         if req.tool_choice:
             body["tool_choice"] = req.tool_choice
+        if req.response_format:
+            body["response_format"] = req.response_format
         return body
 
     async def chat_stream(self, req: InternalRequest) -> AsyncIterator[StreamChunk]:

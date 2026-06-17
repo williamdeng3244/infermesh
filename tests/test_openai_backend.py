@@ -40,6 +40,17 @@ def test_factory_resolves_openai():
     assert b.backend_name == "openai"
 
 
+async def test_build_body_forwards_response_format():
+    b = OpenAICompatBackend()
+    await b.load(ModelSpec(model_id="gpt", source="gpt", backend="openai",
+                           extra={"base_url": "https://api.openai.com/v1"}))
+    rf = {"type": "json_schema",
+          "json_schema": {"name": "x", "schema": {"type": "object"}}}
+    body = b._build_body(InternalRequest(
+        messages=[InternalMessage(role="user", content="hi")], max_tokens=10, response_format=rf))
+    assert body["response_format"] == rf
+
+
 def test_load_providers_file(tmp_path):
     from infermesh.cli import _load_providers
     f = tmp_path / "providers.json"
