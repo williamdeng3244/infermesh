@@ -59,6 +59,14 @@ from infermesh.core.pool import (
     PoolError,
 )
 from infermesh.core.settings import Settings
+from infermesh.core.devices import enumerate_devices
+from infermesh.core.history import (
+    append_benchmark,
+    append_metric,
+    load_benchmarks,
+    load_metrics,
+    truncate_on_startup,
+)
 from infermesh.dashboard import DASHBOARD_HTML
 
 logger = logging.getLogger("infermesh.server")
@@ -122,13 +130,15 @@ _METRICS: deque = deque(maxlen=300)
 def _record_metric(model: Optional[str], latency_ms: float, completion_tokens: int) -> None:
     tokens = int(completion_tokens or 0)
     tps = (tokens / (latency_ms / 1000.0)) if latency_ms > 0 and tokens else 0.0
-    _METRICS.append({
+    record = {
         "t": time.time(),
         "model": model or "",
         "latency_ms": round(latency_ms, 1),
         "tokens": tokens,
         "tps": round(tps, 1),
-    })
+    }
+    _METRICS.append(record)
+    append_metric(record)
 
 
 def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
@@ -152,7 +162,10 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        # Startup: warm pinned models, start the (always-on) TTL reaper.
+        # Startup: reload persisted metrics, warm pinned models, start TTL reaper.
+        truncate_on_startup()
+        for sample in load_metrics(_METRICS.maxlen or 300):
+            _METRICS.append(sample)
         try:
             await pool.preload_pinned_models()
         except Exception as exc:  # noqa: BLE001
@@ -378,8 +391,14 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         return pool.get_status()
 
     @app.post("/v1/models/{model_id:path}/load")
-    async def load_model(model_id: str, _: None = Depends(require_auth)):
+    async def load_model(
+        model_id: str,
+        device: Optional[str] = Query(default=None),
+        _: None = Depends(require_auth),
+    ):
         mid = pool.resolve_model_id(model_id)
+        if device:
+            pool.set_device(mid, device)
         try:
             async with pool.acquire(mid):
                 pass  # acquire warms (loads) the model; release on block exit
@@ -447,6 +466,14 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     async def api_metrics(_: None = Depends(require_auth)):
         return {"samples": list(_METRICS)}
 
+    @app.get("/api/devices")
+    async def api_devices(_: None = Depends(require_auth)):
+        return {"devices": enumerate_devices()}
+
+    @app.get("/api/history")
+    async def api_history(_: None = Depends(require_auth)):
+        return {"benchmarks": load_benchmarks(), "metrics": load_metrics()}
+
     @app.post("/api/benchmark")
     async def api_benchmark(req: BenchmarkRequest, _: None = Depends(require_auth)):
         from infermesh.core.benchmark import run_benchmark
@@ -460,12 +487,18 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         c = max(1, min(req.concurrency, 32))
         mt = max(1, min(req.max_tokens, 1024))
         try:
-            return await run_benchmark(pool, model_id, requests=n, concurrency=c, max_tokens=mt, prompt=req.prompt)
+            result = await run_benchmark(pool, model_id, requests=n, concurrency=c, max_tokens=mt, prompt=req.prompt)
         except (ModelTooLargeError, InsufficientMemoryError) as exc:
             return JSONResponse(
                 openai_adapter.create_error_response(str(exc), "insufficient_memory", 503),
                 status_code=503,
             )
+        append_benchmark({
+            "t": time.time(), "model": model_id,
+            "params": {"requests": n, "concurrency": c, "max_tokens": mt},
+            "result": result,
+        })
+        return result
 
     @app.get("/api/settings")
     async def api_get_settings(_: None = Depends(require_auth)):
