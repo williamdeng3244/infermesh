@@ -2,7 +2,7 @@
 """Self-contained admin dashboard (single HTML page, no build step, no CDN, no deps).
 
 Served by the gateway at ``GET /`` and ``GET /admin``. Four sections via a left
-sidebar — Models, Chat, Logs, Settings — driven entirely by the public HTTP API
+sidebar — Models, Chat, Logs, Metrics, Devices, Benchmark, Settings — driven by the public HTTP API
 (``/api/status``, ``/api/logs``, ``/api/settings``, ``/v1/*``). Dark "developer
 tool" palette; system mono/sans stacks (Fira Code / Inter approximations) so it
 renders offline.
@@ -130,7 +130,7 @@ tbody tr:hover{background:var(--card2)}
     </nav>
     <div class="sb-foot">
       <span id="sb-health" class="pill"><span class="dot"></span> connecting</span>
-      <span>v0.1.0 · mock / vllm</span>
+      <span id="sb-ver">v0.2.0 · mock / vllm / openai / transformers</span>
     </div>
   </aside>
 
@@ -547,6 +547,7 @@ async function refreshBenchHistory(){
 /* poll */
 $('#refreshBtn').onclick=()=>tick();
 loadDevicePicker();
+fetch('/health').then(r=>r.json()).then(h=>{ if(h&&h.version) $('#sb-ver').textContent='v'+h.version+' · mock / vllm / openai / transformers'; }).catch(()=>{});
 async function tick(){
   try{ const s=await api('/api/status'); setHealth(true); if(active==='models'){ renderModels(s); $('#models-err').textContent=''; } }
   catch(e){ setHealth(false); if(active==='models') $('#models-err').textContent=String(e); }

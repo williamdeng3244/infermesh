@@ -450,7 +450,7 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/health")
     async def health():
-        return {"status": "ok", "loaded_models": pool.get_loaded_model_ids()}
+        return {"status": "ok", "version": __version__, "loaded_models": pool.get_loaded_model_ids()}
 
     @app.get("/api/status")
     async def api_status(_: None = Depends(require_auth)):
