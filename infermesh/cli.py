@@ -10,9 +10,12 @@ serve command so ``infermesh --help`` stays light.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
+from pathlib import Path
 from typing import Optional, Sequence
 
+from infermesh.core.backend import ModelSpec
 from infermesh.core.factory import BackendFactory
 from infermesh.core.memory import SystemMemoryProbe
 from infermesh.core.pool import ModelPool
@@ -44,7 +47,37 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Optional single API key (Authorization: Bearer / x-api-key)")
     serve.add_argument("--pin", action="append", default=None, metavar="MODEL_ID",
                        help="Pin a model so it is preloaded and never evicted (repeatable)")
+    serve.add_argument("--providers", default=None, metavar="FILE",
+                       help="JSON file of remote OpenAI-compatible models to register "
+                            "(OpenAI / Anthropic / OpenRouter / a local server). See README.")
     return parser
+
+
+def _load_providers(path: object) -> list[ModelSpec]:
+    """Parse a providers JSON file into OpenAI-compat-backed ModelSpecs.
+
+    File shape: ``{"models": [{"id", "base_url", "api_key", "upstream_model"}, ...]}``
+    (a bare list is also accepted). ``api_key`` may be ``"env:VAR"`` so secrets
+    stay out of the file. Remote models are registered at 0 MB so they never count
+    against the VRAM ceiling or evict a local model.
+    """
+    data = json.loads(Path(str(path)).expanduser().read_text())
+    entries = data.get("models", []) if isinstance(data, dict) else data
+    specs: list[ModelSpec] = []
+    for e in entries:
+        base_url = e.get("base_url") or "https://api.openai.com/v1"
+        specs.append(ModelSpec(
+            model_id=e["id"],
+            source=base_url,
+            backend="openai",
+            extra={
+                "base_url": base_url,
+                "api_key": e.get("api_key"),
+                "upstream_model": e.get("upstream_model") or e["id"],
+                "estimated_mb": 0,
+            },
+        ))
+    return specs
 
 
 def _resolve_settings(args: argparse.Namespace) -> Settings:
@@ -81,17 +114,22 @@ def cmd_serve(args: argparse.Namespace) -> int:
     )
 
     registry = ModelRegistry(default_backend=settings.backend)
+    log = logging.getLogger("infermesh.cli")
+    specs: list[ModelSpec] = []
     if settings.model_dir:
-        specs = registry.discover(settings.model_dir)
+        local = registry.discover(settings.model_dir)
+        specs.extend(local)
+        log.info("Discovered %d local models under %s (backend=%s)",
+                 len(local), settings.model_dir, settings.backend)
+    if getattr(args, "providers", None):
+        remote = _load_providers(args.providers)
+        specs.extend(remote)
+        log.info("Registered %d remote provider models from %s", len(remote), args.providers)
+    if specs:
         pool.discover_models(specs, pinned=args.pin)
-        logging.getLogger("infermesh.cli").info(
-            "Discovered %d models under %s (backend=%s, ceiling=%d MB)",
-            len(specs), settings.model_dir, settings.backend, ceiling_mb,
-        )
+        log.info("Pool ready: %d models, ceiling=%d MB", len(specs), ceiling_mb)
     else:
-        logging.getLogger("infermesh.cli").warning(
-            "No --model-dir given; serving with an empty model pool."
-        )
+        log.warning("No --model-dir or --providers given; serving with an empty model pool.")
 
     # Lazy imports: keep `infermesh --help` from importing the web stack.
     import uvicorn
