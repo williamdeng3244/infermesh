@@ -124,6 +124,7 @@ tbody tr:hover{background:var(--card2)}
       <button data-sec="chat" aria-label="Chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat</button>
       <button data-sec="logs" aria-label="Logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Logs</button>
       <button data-sec="metrics" aria-label="Metrics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg> Metrics</button>
+      <button data-sec="devices" aria-label="Devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="5" rx="1"/><rect x="2" y="13" width="20" height="5" rx="1"/><line x1="6" y1="8.5" x2="6.01" y2="8.5"/><line x1="6" y1="15.5" x2="6.01" y2="15.5"/></svg> Devices</button>
       <button data-sec="benchmark" aria-label="Benchmark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19a9 9 0 1 1 15 0"/><path d="M12 14l3.5-3.5"/></svg> Benchmark</button>
       <button data-sec="settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg> Settings</button>
     </nav>
@@ -145,6 +146,11 @@ tbody tr:hover{background:var(--card2)}
 
       <section class="section active" id="sec-models">
         <div class="cards" id="cards"></div>
+        <div class="chat-bar" style="margin-bottom:12px">
+          <label class="muted" style="font-size:12px">Load on device</label>
+          <select id="devSel" style="min-width:220px"><option value="">auto</option></select>
+          <span class="muted" style="font-size:11px">applies to the next Load (Transformers backend)</span>
+        </div>
         <div class="panel">
           <table>
             <thead><tr><th>Model</th><th>Type</th><th>Backend</th><th>Status</th><th>Mem MB</th><th>Gen tps</th><th>Leases</th><th>Actions</th></tr></thead>
@@ -192,6 +198,20 @@ tbody tr:hover{background:var(--card2)}
         <p class="muted" style="font-size:12px;margin-top:12px">History records one point per chat completion — use the <strong>Chat</strong> tab (or send API requests) to generate data.</p>
       </section>
 
+      <section class="section" id="sec-devices">
+        <div class="chat-bar" style="margin-bottom:12px">
+          <span class="muted" style="font-size:12px">Detected compute devices &mdash; pick one per model on the Models tab</span>
+          <span class="spacer"></span>
+          <button class="btn sm" id="devRefresh">&#8635; Refresh</button>
+        </div>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Device</th><th>Vendor</th><th>Name</th><th>VRAM used</th><th>VRAM free</th><th>VRAM total</th></tr></thead>
+            <tbody id="devRows"><tr><td colspan="6" class="muted">loading&hellip;</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="section" id="sec-benchmark">
         <div class="controls" style="flex-wrap:wrap;gap:12px">
           <label class="muted" style="font-size:12px">Model</label>
@@ -213,6 +233,13 @@ tbody tr:hover{background:var(--card2)}
           </div>
           <div class="muted" style="font-size:12px;margin:18px 0 8px">Latency percentiles</div>
           <canvas id="bmChart" style="width:100%;display:block"></canvas>
+        </div>
+        <div class="panel" style="margin-top:16px">
+          <div class="chat-bar" style="padding:12px 14px 0"><span class="muted" style="font-size:12px">Past runs &mdash; persisted across restarts</span></div>
+          <table>
+            <thead><tr><th>When</th><th>Model</th><th>Req&times;Conc</th><th>req/s</th><th>tok/s</th><th>p50 ms</th><th>p99 ms</th></tr></thead>
+            <tbody id="bmHist"><tr><td colspan="7" class="muted">no past runs</td></tr></tbody>
+          </table>
         </div>
         <p id="bm-err" class="err"></p>
       </section>
@@ -249,7 +276,7 @@ tbody tr:hover{background:var(--card2)}
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let active='models', logsPaused=false;
-const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',benchmark:'Benchmark',settings:'Settings'};
+const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',devices:'Devices',benchmark:'Benchmark',settings:'Settings'};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>(n==null?'—':Number(n).toLocaleString());
 const authHeaders=()=>{const k=$('#apikey').value.trim();return k?{'Authorization':'Bearer '+k}:{}};
@@ -278,7 +305,9 @@ function switchSection(sec){
   if(sec==='logs') refreshLogs();
   if(sec==='settings') loadSettings();
   if(sec==='metrics') refreshMetrics();
-  if(sec==='benchmark') loadBenchModels();
+  if(sec==='benchmark'){ loadBenchModels(); refreshBenchHistory(); }
+  if(sec==='devices') refreshDevices();
+  if(sec==='models') loadDevicePicker();
 }
 
 /* Models */
@@ -304,7 +333,9 @@ function renderModels(s){
 }
 $('#rows').addEventListener('click',async e=>{
   const b=e.target.closest('button[data-act]'); if(!b) return;
-  try{ await api('/v1/models/'+b.dataset.id+'/'+b.dataset.act,'POST'); }
+  let act=b.dataset.act;
+  if(act==='load'){ const dev=$('#devSel')&&$('#devSel').value; if(dev) act='load?device='+encodeURIComponent(dev); }
+  try{ await api('/v1/models/'+b.dataset.id+'/'+act,'POST'); }
   catch(err){ $('#models-err').textContent=String(err); }
   tick();
 });
@@ -452,6 +483,7 @@ async function runBenchmark(){
     $('#bmTtft').innerHTML=['mean','p50','p90'].map(k=>'<dt>'+k+'</dt><dd>'+T[k]+'</dd>').join('');
     $('#bmDetail').style.display='block';
     drawBars('bmChart', [['p50',L.p50],['p90',L.p90],['p99',L.p99],['max',L.max]]);
+    refreshBenchHistory();
   }catch(e){ $('#bm-err').textContent=String(e); $('#bmStatus').textContent=''; }
   finally{ $('#bmRun').disabled=false; }
 }
@@ -469,8 +501,33 @@ function drawBars(id, pairs){
 }
 $('#bmRun').onclick=runBenchmark;
 
+/* Devices */
+function devCell(n){ return n ? (fmt(n)+' MB') : '—'; }
+async function refreshDevices(){
+  try{ const d=await api('/api/devices');
+    $('#devRows').innerHTML=(d.devices||[]).map(x=>'<tr><td class="mono">'+esc(x.id)+'</td><td>'+esc(x.vendor)+'</td><td>'+esc(x.name)+'</td><td class="num">'+devCell(x.mem_used_mb)+'</td><td class="num">'+devCell(x.mem_free_mb)+'</td><td class="num">'+devCell(x.mem_total_mb)+'</td></tr>').join('')||'<tr><td colspan="6" class="muted">none</td></tr>';
+  }catch(e){ $('#devRows').innerHTML='<tr><td colspan="6" class="err">'+esc(String(e))+'</td></tr>'; }
+}
+async function loadDevicePicker(){
+  const sel=$('#devSel'); if(!sel) return;
+  try{ const d=await api('/api/devices'); const cur=sel.value;
+    sel.innerHTML='<option value="">auto</option>'+(d.devices||[]).map(x=>'<option value="'+esc(x.id)+'">'+esc(x.id)+' · '+esc(x.name)+'</option>').join('');
+    if(cur) sel.value=cur;
+  }catch(e){}
+}
+$('#devRefresh').onclick=refreshDevices;
+/* Benchmark history */
+async function refreshBenchHistory(){
+  try{ const h=await api('/api/history'); const rows=(h.benchmarks||[]).slice().reverse();
+    $('#bmHist').innerHTML=rows.map(x=>{ const r=x.result||{}, L=r.latency_ms||{}, p=x.params||{};
+      let when=''; try{ when=new Date((x.t||0)*1000).toLocaleString(); }catch(_){ }
+      return '<tr><td class="muted">'+esc(when)+'</td><td><strong>'+esc(x.model||'')+'</strong></td><td class="num">'+(p.requests||'?')+'&times;'+(p.concurrency||'?')+'</td><td class="num">'+(r.requests_per_sec!=null?r.requests_per_sec:'—')+'</td><td class="num">'+(r.output_tokens_per_sec!=null?r.output_tokens_per_sec:'—')+'</td><td class="num">'+(L.p50!=null?L.p50:'—')+'</td><td class="num">'+(L.p99!=null?L.p99:'—')+'</td></tr>';
+    }).join('')||'<tr><td colspan="7" class="muted">no past runs</td></tr>';
+  }catch(e){}
+}
 /* poll */
 $('#refreshBtn').onclick=()=>tick();
+loadDevicePicker();
 async function tick(){
   try{ const s=await api('/api/status'); setHealth(true); if(active==='models'){ renderModels(s); $('#models-err').textContent=''; } }
   catch(e){ setHealth(false); if(active==='models') $('#models-err').textContent=String(e); }
