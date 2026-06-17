@@ -12,7 +12,7 @@ with a single pluggable backend interface.
 **Milestones:** **M1** — foundation (pluggable backends, OpenAI + Anthropic chat,
 multi-model LRU/pin/TTL pool). **M2** — embeddings + reranker endpoints. **M3** —
 admin dashboard. **M4** — furnished dashboard (Chat / Logs / Settings) + runtime
-config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. 29 tests green on the mock backend (no GPU).
+config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. **M7** — benchmark suite (latency percentiles · TTFT · throughput). 33 tests green on the mock backend (no GPU).
 
 ## The one architectural rule
 
@@ -121,6 +121,7 @@ curl -s http://127.0.0.1:8000/api/status
 | `GET  /api/logs` | recent server logs (in-memory ring buffer) |
 | `GET · PUT /api/settings` | view / live-edit settings (idle_timeout, api_key) |
 | `GET  /api/metrics` | recent per-request latency/throughput samples |
+| `POST /api/benchmark` | run a load benchmark (latency percentiles, TTFT, tok/s) |
 
 Optional single API key: pass `--api-key KEY`, then send `Authorization: Bearer KEY`
 or `x-api-key: KEY`. Off by default.
@@ -129,12 +130,13 @@ or `x-api-key: KEY`. Off by default.
 
 Open **http://127.0.0.1:8000/** (or `/admin`) in a browser while the server runs —
 a self-contained dark panel (no build step, no JS deps, no CDN) with a sidebar and
-five sections:
+six sections:
 
 - **Models** — memory gauge + live table with **Load / Unload / Pin / Unpin**
 - **Chat** — pick a model and stream a completion in a chat playground
 - **Logs** — live tail of the server's ring-buffered logs, level-colored
 - **Metrics** — latency + throughput sparkline charts (canvas, no chart lib)
+- **Benchmark** — run a load test → latency percentiles, TTFT, and throughput
 - **Settings** — view all settings and live-edit idle-timeout / API key
 
 If an API key is enabled, paste it into the header field (or set it from the
@@ -151,7 +153,7 @@ uv run pytest          # or:  .venv/bin/pytest
 installed**: vendor-import guard, pool lifecycle (discovery / LRU eviction /
 pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), the
 embeddings + rerank endpoints, the admin dashboard + pin/unpin, the logs / settings
-/ metrics endpoints, and the vLLM launch-arg builder.
+/ metrics endpoints, the vLLM launch-arg builder, and the benchmark runner.
 
 ## Run against vLLM (real tokens on a GPU)
 
@@ -207,7 +209,7 @@ accounting now sums backends' `stats().used_mem_mb` + a `MemoryProbe`.
 * `core/backend.py` — `InferenceBackend` interface + dataclasses
 * `core/factory.py`, `core/registry.py`, `core/memory.py`, `core/settings.py`
 * `backends/mock/mock_backend.py`, `backends/vllm/vllm_backend.py`
-* `server.py` (FastAPI gateway — chat + embeddings + rerank + logs/settings/metrics), `dashboard.py` (5-section admin UI), `cli.py` (`infermesh serve`), `tests/`
+* `server.py` (FastAPI gateway — chat + embeddings + rerank + logs/settings/metrics/benchmark), `dashboard.py` (6-section admin UI), `core/benchmark.py`, `cli.py` (`infermesh serve`), `tests/`
 
 ## Project layout
 
