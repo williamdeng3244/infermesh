@@ -124,6 +124,7 @@ tbody tr:hover{background:var(--card2)}
       <button data-sec="chat" aria-label="Chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat</button>
       <button data-sec="logs" aria-label="Logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Logs</button>
       <button data-sec="metrics" aria-label="Metrics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg> Metrics</button>
+      <button data-sec="benchmark" aria-label="Benchmark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19a9 9 0 1 1 15 0"/><path d="M12 14l3.5-3.5"/></svg> Benchmark</button>
       <button data-sec="settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg> Settings</button>
     </nav>
     <div class="sb-foot">
@@ -191,6 +192,31 @@ tbody tr:hover{background:var(--card2)}
         <p class="muted" style="font-size:12px;margin-top:12px">History records one point per chat completion — use the <strong>Chat</strong> tab (or send API requests) to generate data.</p>
       </section>
 
+      <section class="section" id="sec-benchmark">
+        <div class="controls" style="flex-wrap:wrap;gap:12px">
+          <label class="muted" style="font-size:12px">Model</label>
+          <select id="bmModel" style="min-width:180px"></select>
+          <label class="muted" style="font-size:12px">Requests</label>
+          <input id="bmReq" type="number" min="1" max="200" value="20" style="width:78px"/>
+          <label class="muted" style="font-size:12px">Concurrency</label>
+          <input id="bmConc" type="number" min="1" max="32" value="4" style="width:70px"/>
+          <label class="muted" style="font-size:12px">Max tokens</label>
+          <input id="bmTok" type="number" min="1" max="1024" value="64" style="width:78px"/>
+          <button class="btn primary" id="bmRun">Run benchmark</button>
+          <span id="bmStatus" class="muted" style="font-size:12px"></span>
+        </div>
+        <div class="cards" id="bmCards"></div>
+        <div class="panel" id="bmDetail" style="display:none;padding:18px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+            <div><div class="muted" style="font-size:12px;margin-bottom:8px">Latency (ms)</div><dl class="kv" id="bmLatency"></dl></div>
+            <div><div class="muted" style="font-size:12px;margin-bottom:8px">Time to first token (ms)</div><dl class="kv" id="bmTtft"></dl></div>
+          </div>
+          <div class="muted" style="font-size:12px;margin:18px 0 8px">Latency percentiles</div>
+          <canvas id="bmChart" style="width:100%;display:block"></canvas>
+        </div>
+        <p id="bm-err" class="err"></p>
+      </section>
+
       <section class="section" id="sec-settings">
         <div class="form">
           <h3>Runtime-editable</h3>
@@ -223,7 +249,7 @@ tbody tr:hover{background:var(--card2)}
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let active='models', logsPaused=false;
-const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',settings:'Settings'};
+const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',benchmark:'Benchmark',settings:'Settings'};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>(n==null?'—':Number(n).toLocaleString());
 const authHeaders=()=>{const k=$('#apikey').value.trim();return k?{'Authorization':'Bearer '+k}:{}};
@@ -252,6 +278,7 @@ function switchSection(sec){
   if(sec==='logs') refreshLogs();
   if(sec==='settings') loadSettings();
   if(sec==='metrics') refreshMetrics();
+  if(sec==='benchmark') loadBenchModels();
 }
 
 /* Models */
@@ -392,6 +419,49 @@ async function refreshMetrics(){
     drawChart('chartTps', tps, cGreen, 'tok/s');
   }catch(e){}
 }
+
+/* Benchmark */
+async function loadBenchModels(){
+  try{ const d=await api('/v1/models'); const sel=$('#bmModel'); const cur=sel.value;
+    sel.innerHTML=d.data.map(m=>'<option value="'+esc(m.id)+'">'+esc(m.id)+'</option>').join('');
+    if(cur&&d.data.some(m=>m.id===cur)) sel.value=cur;
+  }catch(e){}
+}
+async function runBenchmark(){
+  const model=$('#bmModel').value;
+  if(!model){ $('#bm-err').textContent='pick a model'; return; }
+  const body={model:model, requests:(+$('#bmReq').value||20), concurrency:(+$('#bmConc').value||4), max_tokens:(+$('#bmTok').value||64)};
+  $('#bm-err').textContent=''; $('#bmStatus').textContent='running '+body.requests+' req @ conc '+body.concurrency+'… (real models take a few s)';
+  $('#bmRun').disabled=true;
+  try{
+    const r=await api('/api/benchmark','POST',body);
+    $('#bmStatus').textContent='done in '+r.wall_time_s+'s';
+    $('#bmCards').innerHTML=
+      '<div class="card"><div class="k">Throughput</div><div class="v">'+r.requests_per_sec+'<small> req/s</small></div></div>'+
+      '<div class="card"><div class="k">Output</div><div class="v">'+r.output_tokens_per_sec+'<small> tok/s</small></div></div>'+
+      '<div class="card"><div class="k">Latency p50</div><div class="v">'+r.latency_ms.p50+'<small> ms</small></div></div>'+
+      '<div class="card"><div class="k">Succeeded</div><div class="v">'+r.succeeded+'<small> / '+(r.succeeded+r.failed)+'</small></div></div>';
+    const L=r.latency_ms, T=r.ttft_ms;
+    $('#bmLatency').innerHTML=['mean','p50','p90','p99','min','max'].map(k=>'<dt>'+k+'</dt><dd>'+L[k]+'</dd>').join('');
+    $('#bmTtft').innerHTML=['mean','p50','p90'].map(k=>'<dt>'+k+'</dt><dd>'+T[k]+'</dd>').join('');
+    $('#bmDetail').style.display='block';
+    drawBars('bmChart', [['p50',L.p50],['p90',L.p90],['p99',L.p99],['max',L.max]]);
+  }catch(e){ $('#bm-err').textContent=String(e); $('#bmStatus').textContent=''; }
+  finally{ $('#bmRun').disabled=false; }
+}
+function drawBars(id, pairs){
+  const c=$('#'+id); if(!c) return;
+  const w=c.clientWidth||600, h=160, dpr=window.devicePixelRatio||1;
+  c.width=w*dpr; c.height=h*dpr; const x=c.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); x.clearRect(0,0,w,h);
+  const cs=getComputedStyle(document.documentElement);
+  const labC=(cs.getPropertyValue('--dim')||'#64748b').trim(), barC=(cs.getPropertyValue('--blue')||'#58a6ff').trim();
+  const max=(Math.max.apply(null,pairs.map(p=>p[1]))||1), n=pairs.length, slot=(w-20)/n;
+  x.font='11px ui-monospace,monospace'; x.textAlign='center';
+  pairs.forEach((p,i)=>{ const bh=(h-44)*(p[1]/max), bx=10+i*slot+slot*0.18, bw=slot*0.64, by=h-26-bh;
+    x.fillStyle=barC; x.fillRect(bx,by,bw,bh);
+    x.fillStyle=labC; x.fillText(p[0], bx+bw/2, h-9); x.fillText(p[1], bx+bw/2, by-5); });
+}
+$('#bmRun').onclick=runBenchmark;
 
 /* poll */
 $('#refreshBtn').onclick=()=>tick();

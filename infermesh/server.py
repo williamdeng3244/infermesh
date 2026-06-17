@@ -105,6 +105,16 @@ class SettingsPatch(BaseModel):
     api_key: Optional[str] = None  # "" clears (auth off); null = leave unchanged
 
 
+class BenchmarkRequest(BaseModel):
+    """Config for POST /api/benchmark (bounded server-side)."""
+
+    model: str
+    requests: int = 20
+    concurrency: int = 4
+    max_tokens: int = 64
+    prompt: str = "Write one concise sentence about distributed systems."
+
+
 # Rolling per-request metrics for the dashboard's latency/throughput charts.
 _METRICS: deque = deque(maxlen=300)
 
@@ -400,6 +410,26 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     @app.get("/api/metrics")
     async def api_metrics(_: None = Depends(require_auth)):
         return {"samples": list(_METRICS)}
+
+    @app.post("/api/benchmark")
+    async def api_benchmark(req: BenchmarkRequest, _: None = Depends(require_auth)):
+        from infermesh.core.benchmark import run_benchmark
+        model_id = pool.resolve_model_id(req.model)
+        if pool.get_entry(model_id) is None:
+            return JSONResponse(
+                openai_adapter.create_error_response(f"model '{req.model}' not found", "model_not_found", 404),
+                status_code=404,
+            )
+        n = max(1, min(req.requests, 200))
+        c = max(1, min(req.concurrency, 32))
+        mt = max(1, min(req.max_tokens, 1024))
+        try:
+            return await run_benchmark(pool, model_id, requests=n, concurrency=c, max_tokens=mt, prompt=req.prompt)
+        except (ModelTooLargeError, InsufficientMemoryError) as exc:
+            return JSONResponse(
+                openai_adapter.create_error_response(str(exc), "insufficient_memory", 503),
+                status_code=503,
+            )
 
     @app.get("/api/settings")
     async def api_get_settings(_: None = Depends(require_auth)):
