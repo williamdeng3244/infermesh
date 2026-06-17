@@ -24,6 +24,15 @@ DASHBOARD_HTML = r"""<!doctype html>
   --mono:ui-monospace,"Cascadia Code","Fira Code","JetBrains Mono",Menlo,Consolas,monospace;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
 }
+:root[data-theme="light"]{
+  --bg:#eef2f6; --surface:#ffffff; --card:#ffffff; --card2:#f1f5f9; --mutedbg:#e2e8f0;
+  --border:#e2e8f0; --border2:#cbd5e1;
+  --text:#0f172a; --muted:#475569; --dim:#94a3b8;
+  --accent:#16a34a; --accent2:#15803d; --blue:#2563eb; --warn:#b45309; --danger:#dc2626;
+}
+:root[data-theme="light"] .topbar{background:rgba(255,255,255,.72)}
+:root[data-theme="light"] .msg.user{color:#fff}
+:root[data-theme="light"] .btn.primary{color:#fff}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
@@ -127,6 +136,7 @@ tbody tr:hover{background:var(--card2)}
     <div class="topbar">
       <h2 id="title">Models</h2>
       <span class="spacer"></span>
+      <button class="btn sm" id="themeBtn" aria-label="Toggle light/dark theme" title="Toggle theme"></button>
       <input id="apikey" placeholder="API key (if enabled)" size="20" autocomplete="off" aria-label="API key"/>
       <button class="btn sm" id="refreshBtn">&#8635; Refresh</button>
     </div>
@@ -226,6 +236,11 @@ async function api(path,method,body){
 }
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 function setHealth(ok){const p=$('#sb-health');p.className='pill '+(ok?'ok':'bad');p.innerHTML='<span class="dot"></span> '+(ok?'healthy':'unreachable');}
+const SUN='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const MOON='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+function applyTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('infermesh-theme',t);}catch(e){}const b=$('#themeBtn');if(b)b.innerHTML=(t==='light'?MOON:SUN);if(active==='metrics'&&typeof refreshMetrics==='function')refreshMetrics();}
+applyTheme((function(){try{return localStorage.getItem('infermesh-theme');}catch(e){return null;}})()||'dark');
+$('#themeBtn').onclick=function(){applyTheme(document.documentElement.getAttribute('data-theme')==='light'?'dark':'light');};
 
 $$('#nav button').forEach(b=>b.onclick=()=>switchSection(b.dataset.sec));
 function switchSection(sec){
@@ -353,7 +368,9 @@ function drawChart(id, vals, color, unit){
   const max=(Math.max.apply(null,vals)||1)*1.15, n=vals.length, padL=42;
   const px=i=> padL + (w-padL-8)*(n<=1?0.5:i/(n-1));
   const py=v=> h-8 - (h-26)*(v/max);
-  x.strokeStyle='#1f2a3b'; x.lineWidth=1; x.fillStyle='#64748b'; x.font='10px ui-monospace,monospace';
+  const cs=getComputedStyle(document.documentElement);
+  const gridC=(cs.getPropertyValue('--border')||'#1f2a3b').trim(), labC=(cs.getPropertyValue('--dim')||'#64748b').trim();
+  x.strokeStyle=gridC; x.lineWidth=1; x.fillStyle=labC; x.font='10px ui-monospace,monospace';
   for(let g=0;g<=2;g++){ const yy=py(max*g/2); x.beginPath(); x.moveTo(padL,yy); x.lineTo(w-8,yy); x.stroke(); x.fillText(Math.round(max*g/2),6,yy+3); }
   x.beginPath(); vals.forEach((v,i)=>{ const X=px(i),Y=py(v); i?x.lineTo(X,Y):x.moveTo(X,Y); });
   x.strokeStyle=color; x.lineWidth=2; x.stroke();
@@ -369,8 +386,10 @@ async function refreshMetrics(){
       '<div class="card"><div class="k">Avg latency</div><div class="v">'+avg(lat).toFixed(0)+'<small> ms</small></div></div>'+
       '<div class="card"><div class="k">Avg throughput</div><div class="v">'+avg(tps).toFixed(1)+'<small> tok/s</small></div></div>'+
       '<div class="card"><div class="k">Last latency</div><div class="v">'+(s.length?Math.round(s[s.length-1].latency_ms):'—')+'<small> ms</small></div></div>';
-    drawChart('chartLatency', lat, '#58a6ff', 'ms');
-    drawChart('chartTps', tps, '#22c55e', 'tok/s');
+    const cs=getComputedStyle(document.documentElement);
+    const cBlue=(cs.getPropertyValue('--blue')||'#58a6ff').trim(), cGreen=(cs.getPropertyValue('--accent')||'#22c55e').trim();
+    drawChart('chartLatency', lat, cBlue, 'ms');
+    drawChart('chartTps', tps, cGreen, 'tok/s');
   }catch(e){}
 }
 

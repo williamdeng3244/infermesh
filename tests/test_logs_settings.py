@@ -46,7 +46,8 @@ def test_settings_put_api_key_toggles_auth(client, monkeypatch):
 def test_dashboard_has_all_sections(client):
     html = client.get("/admin").text
     for marker in ("sec-models", "sec-chat", "sec-logs", "sec-metrics", "sec-settings",
-                   'id="chatInput"', 'id="logs"', 'id="setIdle"', "chartLatency"):
+                   'id="chatInput"', 'id="logs"', 'id="setIdle"', "chartLatency",
+                   'id="themeBtn"', 'data-theme="light"'):
         assert marker in html, marker
 
 
