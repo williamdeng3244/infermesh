@@ -206,6 +206,18 @@ class ModelPool:
         entry.is_pinned = pinned
         return True
 
+    def set_device(self, model_id: str, device: str) -> bool:
+        """Set the target device (e.g. "cuda:0", "cpu") used the next time this
+        model loads. Applies via ModelSpec.extra["device"]; takes effect on the
+        next load (unload first to move an already-loaded model)."""
+        entry = self._entries.get(model_id)
+        if entry is None:
+            return False
+        extra = dict(entry.spec.extra or {})
+        extra["device"] = device
+        entry.spec.extra = extra
+        return True
+
     def _case_insensitive_match(self, name: str) -> Optional[str]:
         lower = name.lower()
         for mid in self._entries:
