@@ -12,7 +12,7 @@ with a single pluggable backend interface.
 **Milestones:** **M1** — foundation (pluggable backends, OpenAI + Anthropic chat,
 multi-model LRU/pin/TTL pool). **M2** — embeddings + reranker endpoints. **M3** —
 admin dashboard. **M4** — furnished dashboard (Chat / Logs / Settings) + runtime
-config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. **M7** — benchmark suite (latency percentiles · TTFT · throughput). **M8** — hosted-model proxy backend: register OpenAI / Anthropic / OpenRouter / any OpenAI-compatible endpoint via `--providers`, so remote models join the same pool, dashboard, and OpenAI+Anthropic gateway as local vLLM models. **M9** — Claude Code hardening: SSE keep-alives during long prefill, `response_format` parity on the hosted path, and cross-platform background service management (`start` / `stop` / `restart` / `status`). 44 tests green on the mock backend (no GPU).
+config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. **M7** — benchmark suite (latency percentiles · TTFT · throughput). **M8** — hosted-model proxy backend: register OpenAI / Anthropic / OpenRouter / any OpenAI-compatible endpoint via `--providers`, so remote models join the same pool, dashboard, and OpenAI+Anthropic gateway as local vLLM models. **M9** — Claude Code hardening: SSE keep-alives during long prefill, `response_format` parity on the hosted path, and cross-platform background service management (`start` / `stop` / `restart` / `status`). **M10** — in-process **Transformers backend** (`AutoModelForCausalLM` on CUDA / CPU / MPS), the bring-your-own-accelerator path; decoding raw text locally also activates the model-family tool-call parsers (Qwen-XML / Hermes / Llama-bracket / Gemma4) — **verified generating on an RTX 5070**. 51 tests green on the mock backend (no GPU).
 
 ## The one architectural rule
 
@@ -171,14 +171,17 @@ header toggles **light / dark** mode (persisted in the browser; defaults dark).
 uv run pytest          # or:  .venv/bin/pytest
 ```
 
-44 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm not
+51 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm/torch not
 installed**: vendor-import guard, pool lifecycle (discovery / LRU eviction /
 pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), the
 embeddings + rerank endpoints, the admin dashboard + pin/unpin, the logs / settings
 / metrics endpoints, the vLLM launch-arg builder, the benchmark runner, the
 OpenAI-compat proxy backend (key resolution / request body / provider-file registration),
-SSE keep-alives during prefill, `response_format` forwarding, and the background-service
-helpers (arg forwarding / pidfile / liveness / status).
+SSE keep-alives during prefill, `response_format` forwarding, the background-service
+helpers (arg forwarding / pidfile / liveness / status), the family tool-call parsers
+(Qwen-XML, …), and the Transformers backend's registration / prompt / tool wiring.
+The Transformers backend's actual GPU generation is verified out-of-band (an RTX
+5070), not in this suite, which stays hardware-free by design.
 
 ## Run against vLLM (real tokens on a GPU)
 
@@ -206,6 +209,32 @@ and `env` for the sidecar's environment. On a host with only the CUDA **runtime*
 (no toolkit): install a C compiler (`build-essential python3-dev`) so Triton can
 JIT, and set `env={"VLLM_USE_FLASHINFER_SAMPLER": "0"}` so vLLM uses its native
 sampler instead of JIT-compiling FlashInfer kernels (which needs `nvcc`).
+
+## Run on a local GPU/CPU in-process (Transformers backend)
+
+The `transformers` backend loads a HuggingFace causal LM **in-process** with
+`torch` and decodes locally — no sidecar, no HTTP API. It's the "bring your own
+accelerator" path: NVIDIA, AMD (ROCm torch), Apple `mps`, CPU, or a custom device
+with a torch backend. **Verified** generating `Qwen2.5-0.5B-Instruct` on an NVIDIA
+RTX 5070 (fp16, ~950 MB VRAM) and on CPU.
+
+```bash
+pip install '.[transformers]'        # torch + transformers + accelerate
+infermesh serve --backend transformers --model-dir /path/to/hf/models
+```
+
+A "model" is a HuggingFace repo id or a local snapshot dir. Per-model knobs ride on
+`ModelSpec.extra`: `device` (`cuda`/`cpu`/`mps`/`cuda:1`, default auto), `dtype`
+(`float16`/`bfloat16`/`float32`), `trust_remote_code`, `max_new_tokens`. Streaming
+uses `TextIteratorStreamer`; `unload()` frees the model and empties the CUDA cache
+so the pool's LRU eviction reclaims VRAM.
+
+**Local tool calling.** Because this backend decodes raw text, it runs model output
+through `infermesh.api.tool_calling.parse_tool_calls` — the family-format parsers
+lifted from oMLX (Qwen/GLM `<tool_call>` XML, Hermes, Llama-bracket, Gemma4,
+namespaced/MiniMax). When a request supplies `tools`, the decoded text is parsed and
+returned as OpenAI-shaped `tool_calls` (with `finish_reason: "tool_calls"`). vLLM and
+the hosted proxy get tool calls from their servers; this backend parses them itself.
 
 ## Connect hosted models (OpenAI / Anthropic / OpenRouter / …)
 
@@ -283,7 +312,7 @@ accounting now sums backends' `stats().used_mem_mb` + a `MemoryProbe`.
 
 * `core/backend.py` — `InferenceBackend` interface + dataclasses
 * `core/factory.py`, `core/registry.py`, `core/memory.py`, `core/settings.py`
-* `backends/mock/mock_backend.py`, `backends/vllm/vllm_backend.py`, `backends/openai/openai_backend.py` (hosted-model proxy)
+* `backends/mock/mock_backend.py`, `backends/vllm/vllm_backend.py`, `backends/openai/openai_backend.py` (hosted-model proxy), `backends/transformers/transformers_backend.py` (in-process GPU/CPU)
 * `server.py` (FastAPI gateway — chat + embeddings + rerank + logs/settings/metrics/benchmark), `dashboard.py` (6-section admin UI), `core/benchmark.py`, `cli.py` (`infermesh serve`), `tests/`
 
 ## Project layout
@@ -298,7 +327,8 @@ infermesh/
 │   ├── backends/    # ALL hardware-specific (and remote-provider) code
 │   │   ├── mock/mock_backend.py
 │   │   ├── vllm/vllm_backend.py
-│   │   └── openai/openai_backend.py   # proxy to OpenAI/Anthropic/… (httpx, no SDK)
+│   │   ├── openai/openai_backend.py   # proxy to OpenAI/Anthropic/… (httpx, no SDK)
+│   │   └── transformers/transformers_backend.py  # in-process torch on GPU/CPU/MPS
 │   ├── server.py    # FastAPI app + routes
 │   └── cli.py       # `infermesh serve …`
 └── tests/           # green with the mock backend (no GPU)
