@@ -222,14 +222,19 @@ tbody tr:hover{background:var(--card2)}
           <input id="bmConc" type="number" min="1" max="32" value="4" style="width:70px"/>
           <label class="muted" style="font-size:12px">Max tokens</label>
           <input id="bmTok" type="number" min="1" max="1024" value="64" style="width:78px"/>
+          <label class="muted" style="font-size:12px">Mode</label>
+          <select id="bmMode" style="width:140px"><option value="same">same prompt</option><option value="different">different</option></select>
           <button class="btn primary" id="bmRun">Run benchmark</button>
+          <button class="btn sm" id="bmSingle">Single request</button>
+          <button class="btn sm" id="bmCopy">Copy</button>
           <span id="bmStatus" class="muted" style="font-size:12px"></span>
         </div>
         <div class="cards" id="bmCards"></div>
         <div class="panel" id="bmDetail" style="display:none;padding:18px">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-            <div><div class="muted" style="font-size:12px;margin-bottom:8px">Latency (ms)</div><dl class="kv" id="bmLatency"></dl></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px">
+            <div><div class="muted" style="font-size:12px;margin-bottom:8px">Latency / E2E (ms)</div><dl class="kv" id="bmLatency"></dl></div>
             <div><div class="muted" style="font-size:12px;margin-bottom:8px">Time to first token (ms)</div><dl class="kv" id="bmTtft"></dl></div>
+            <div><div class="muted" style="font-size:12px;margin-bottom:8px">Time per output token (ms)</div><dl class="kv" id="bmTpot"></dl></div>
           </div>
           <div class="muted" style="font-size:12px;margin:18px 0 8px">Latency percentiles</div>
           <canvas id="bmChart" style="width:100%;display:block"></canvas>
@@ -275,7 +280,7 @@ tbody tr:hover{background:var(--card2)}
 <div class="toast" id="toast"></div>
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-let active='models', logsPaused=false;
+let active='models', logsPaused=false, lastBench=null;
 const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',devices:'Devices',benchmark:'Benchmark',settings:'Settings'};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>(n==null?'—':Number(n).toLocaleString());
@@ -467,20 +472,28 @@ async function loadBenchModels(){
 async function runBenchmark(){
   const model=$('#bmModel').value;
   if(!model){ $('#bm-err').textContent='pick a model'; return; }
-  const body={model:model, requests:(+$('#bmReq').value||20), concurrency:(+$('#bmConc').value||4), max_tokens:(+$('#bmTok').value||64)};
+  const body={model:model, requests:(+$('#bmReq').value||20), concurrency:(+$('#bmConc').value||4), max_tokens:(+$('#bmTok').value||64), mode:($('#bmMode')?$('#bmMode').value:'same')};
   $('#bm-err').textContent=''; $('#bmStatus').textContent='running '+body.requests+' req @ conc '+body.concurrency+'… (real models take a few s)';
   $('#bmRun').disabled=true;
   try{
     const r=await api('/api/benchmark','POST',body);
-    $('#bmStatus').textContent='done in '+r.wall_time_s+'s';
+    lastBench=r;
+    $('#bmStatus').textContent='done in '+r.wall_time_s+'s · mode: '+(r.mode||'same');
+    const pk=(r.peak_mem_mb!=null)?(fmt(r.peak_mem_mb)+' MB'):'—';
     $('#bmCards').innerHTML=
+      '<div class="card"><div class="k">Prefill (PP)</div><div class="v">'+r.pp_tps.mean+'<small> tok/s</small></div></div>'+
+      '<div class="card"><div class="k">Decode (TG)</div><div class="v">'+r.tg_tps.mean+'<small> tok/s</small></div></div>'+
+      '<div class="card"><div class="k">TPOT</div><div class="v">'+r.tpot_ms.mean+'<small> ms/tok</small></div></div>'+
+      '<div class="card"><div class="k">TTFT p50</div><div class="v">'+r.ttft_ms.p50+'<small> ms</small></div></div>'+
+      '<div class="card"><div class="k">E2E p50</div><div class="v">'+r.latency_ms.p50+'<small> ms</small></div></div>'+
       '<div class="card"><div class="k">Throughput</div><div class="v">'+r.requests_per_sec+'<small> req/s</small></div></div>'+
       '<div class="card"><div class="k">Output</div><div class="v">'+r.output_tokens_per_sec+'<small> tok/s</small></div></div>'+
-      '<div class="card"><div class="k">Latency p50</div><div class="v">'+r.latency_ms.p50+'<small> ms</small></div></div>'+
+      '<div class="card"><div class="k">Peak GPU mem</div><div class="v">'+pk+'</div></div>'+
       '<div class="card"><div class="k">Succeeded</div><div class="v">'+r.succeeded+'<small> / '+(r.succeeded+r.failed)+'</small></div></div>';
-    const L=r.latency_ms, T=r.ttft_ms;
+    const L=r.latency_ms, T=r.ttft_ms, P=r.tpot_ms;
     $('#bmLatency').innerHTML=['mean','p50','p90','p99','min','max'].map(k=>'<dt>'+k+'</dt><dd>'+L[k]+'</dd>').join('');
-    $('#bmTtft').innerHTML=['mean','p50','p90'].map(k=>'<dt>'+k+'</dt><dd>'+T[k]+'</dd>').join('');
+    $('#bmTtft').innerHTML=['mean','p50','p90','p99'].map(k=>'<dt>'+k+'</dt><dd>'+T[k]+'</dd>').join('');
+    $('#bmTpot').innerHTML=['mean','p50','p90','p99'].map(k=>'<dt>'+k+'</dt><dd>'+P[k]+'</dd>').join('');
     $('#bmDetail').style.display='block';
     drawBars('bmChart', [['p50',L.p50],['p90',L.p90],['p99',L.p99],['max',L.max]]);
     refreshBenchHistory();
@@ -500,6 +513,12 @@ function drawBars(id, pairs){
     x.fillStyle=labC; x.fillText(p[0], bx+bw/2, h-9); x.fillText(p[1], bx+bw/2, by-5); });
 }
 $('#bmRun').onclick=runBenchmark;
+$('#bmSingle').onclick=()=>{ $('#bmReq').value=1; $('#bmConc').value=1; runBenchmark(); };
+$('#bmCopy').onclick=()=>{ if(!lastBench){ toast('run a benchmark first'); return; }
+  const txt=JSON.stringify(lastBench,null,2);
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(()=>toast('results copied')).catch(()=>toast('copy failed')); }
+  else { toast('clipboard unavailable in this context'); }
+};
 
 /* Devices */
 function devCell(n){ return n ? (fmt(n)+' MB') : '—'; }
