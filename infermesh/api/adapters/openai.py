@@ -30,6 +30,7 @@ from ..openai_models import (
     Usage,
 )
 from ..thinking import extract_thinking
+from ..multimodal import extract_openai_images
 from ..utils import clean_special_tokens, extract_text_content
 from ..tool_calling import convert_tools_for_template
 
@@ -67,6 +68,19 @@ class OpenAIAdapter(BaseAdapter):
             )
             for msg in messages
         ]
+
+        # Attach VLM images (extract_text_content drops them). Current-turn images
+        # go on the last user message.
+        _imgs = []
+        for _m in request.messages:
+            _found = extract_openai_images(getattr(_m, "content", None))
+            if _found:
+                _imgs.extend(_found)
+        if _imgs:
+            for _im in reversed(internal_messages):
+                if _im.role == "user":
+                    _im.images = _imgs
+                    break
 
         # Convert tools if provided
         tools = None

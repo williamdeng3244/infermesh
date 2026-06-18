@@ -20,6 +20,7 @@ class InternalMessage:
     name: Optional[str] = None
     tool_calls: Optional[List[Dict[str, Any]]] = None
     tool_call_id: Optional[str] = None
+    images: Optional[List[str]] = None  # VLM image refs: data URLs, http(s) URLs, or file paths
 
 
 @dataclass

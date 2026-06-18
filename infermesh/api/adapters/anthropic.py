@@ -17,6 +17,7 @@ from .base import (
     InternalResponse,
     StreamChunk,
 )
+from ..multimodal import extract_anthropic_images
 from ..anthropic_models import (
     MessagesRequest as AnthropicMessagesRequest,
 )
@@ -70,6 +71,19 @@ class AnthropicAdapter(BaseAdapter):
                     content=msg.get("content", ""),
                 )
             )
+
+        # Attach VLM images (the text path drops them); current-turn images go on
+        # the last user message.
+        _imgs = []
+        for _m in request.messages:
+            _found = extract_anthropic_images(getattr(_m, "content", None))
+            if _found:
+                _imgs.extend(_found)
+        if _imgs:
+            for _im in reversed(internal_messages):
+                if _im.role == "user":
+                    _im.images = _imgs
+                    break
 
         # Convert tools if provided
         tools = None
