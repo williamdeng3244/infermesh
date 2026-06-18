@@ -61,13 +61,15 @@ class TransformersBackend(InferenceBackend):
         self._loaded: bool = False
         self._estimated_mb: int = 0
         self._hardware: Optional[HardwareInfo] = None
+        self._vision: bool = False
+        self._processor: Any = None
 
     @property
     def backend_name(self) -> str:
         return "transformers"
 
     def capabilities(self) -> BackendCaps:
-        return BackendCaps(streaming=True, tool_calling=True, embeddings=False)
+        return BackendCaps(streaming=True, tool_calling=True, embeddings=False, vision=self._vision)
 
     def hardware(self) -> HardwareInfo:
         if self._hardware is None:
@@ -104,7 +106,6 @@ class TransformersBackend(InferenceBackend):
 
     def _load_sync(self, spec: ModelSpec) -> None:
         import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer
 
         extra = spec.extra or {}
         device = extra.get("device") or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -114,21 +115,82 @@ class TransformersBackend(InferenceBackend):
         torch_dtype = getattr(torch, dtype_name)
         trust = bool(extra.get("trust_remote_code", False))
 
-        self._tokenizer = AutoTokenizer.from_pretrained(spec.source, trust_remote_code=trust)
+        self._vision = bool(extra.get("vision")) or self._detect_vision(spec.source)
+        if self._vision:
+            from transformers import AutoProcessor
+            try:
+                from transformers import AutoModelForImageTextToText as _VisionLM
+            except ImportError:  # older transformers
+                from transformers import AutoModelForVision2Seq as _VisionLM
+            self._processor = AutoProcessor.from_pretrained(spec.source, trust_remote_code=trust)
+            self._tokenizer = getattr(self._processor, "tokenizer", None)
+            model_cls = _VisionLM
+        else:
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            self._tokenizer = AutoTokenizer.from_pretrained(spec.source, trust_remote_code=trust)
+            model_cls = AutoModelForCausalLM
+
         try:  # transformers v5 renamed torch_dtype -> dtype
-            self._model = AutoModelForCausalLM.from_pretrained(
-                spec.source, dtype=torch_dtype, trust_remote_code=trust,
-            )
+            self._model = model_cls.from_pretrained(spec.source, dtype=torch_dtype, trust_remote_code=trust)
         except TypeError:
-            self._model = AutoModelForCausalLM.from_pretrained(
-                spec.source, torch_dtype=torch_dtype, trust_remote_code=trust,
-            )
+            self._model = model_cls.from_pretrained(spec.source, torch_dtype=torch_dtype, trust_remote_code=trust)
         self._model.to(device)
         self._model.eval()
         self._device = str(device)
 
         weight_bytes = sum(p.numel() * p.element_size() for p in self._model.parameters())
         self._estimated_mb = int(extra.get("estimated_mb") or (weight_bytes // (1024 * 1024)))
+
+    @staticmethod
+    def _detect_vision(source: str) -> bool:
+        """Detect a vision-language model from a local config.json (HF repo ids
+        without a local snapshot should set extra['vision']=True)."""
+        import json as _json
+        from pathlib import Path as _Path
+        try:
+            data = _json.loads((_Path(str(source)).expanduser() / "config.json").read_text())
+        except (OSError, ValueError):
+            return False
+        if "vision_config" in data:
+            return True
+        archs = " ".join(data.get("architectures") or []).lower()
+        return any(k in archs for k in ("vl", "vision", "imagetext", "idefics", "llava", "smolvlm"))
+
+    @staticmethod
+    def _load_images(refs) -> list:
+        """Load image refs (data URL / http(s) / file path) into PIL images."""
+        import base64 as _b64
+        import io as _io
+        from PIL import Image
+        images = []
+        for ref in (refs or []):
+            if ref.startswith("data:"):
+                images.append(Image.open(_io.BytesIO(_b64.b64decode(ref.split(",", 1)[1]))).convert("RGB"))
+            elif ref.startswith(("http://", "https://")):
+                import urllib.request
+                with urllib.request.urlopen(ref, timeout=30) as resp:
+                    images.append(Image.open(_io.BytesIO(resp.read())).convert("RGB"))
+            else:
+                images.append(Image.open(ref).convert("RGB"))
+        return images
+
+    def _generate_vision_sync(self, req: InternalRequest) -> tuple[str, int, int]:
+        import torch
+        pil_images: list = []
+        proc_messages = []
+        for m in req.messages:
+            parts = [{"type": "image"} for _ in (m.images or [])]
+            pil_images.extend(self._load_images(m.images))
+            parts.append({"type": "text", "text": m.content})
+            proc_messages.append({"role": m.role, "content": parts})
+        text = self._processor.apply_chat_template(proc_messages, add_generation_prompt=True, tokenize=False)
+        inputs = self._processor(text=[text], images=pil_images or None, return_tensors="pt").to(self._device)
+        with torch.no_grad():
+            out = self._model.generate(**inputs, **self._sampling_kwargs(req))
+        in_len = int(inputs["input_ids"].shape[1])
+        gen = out[0][in_len:]
+        decoded = self._processor.batch_decode(gen.unsqueeze(0), skip_special_tokens=True)[0]
+        return decoded, in_len, int(gen.shape[0])
 
     async def unload(self) -> None:
         self._loaded = False
@@ -199,6 +261,10 @@ class TransformersBackend(InferenceBackend):
         full decoded text (the base aggregator does not collect tool calls)."""
         if not self._loaded:
             raise RuntimeError("TransformersBackend.chat() called before load()")
+        if self._vision:
+            text, pt, ct = await asyncio.to_thread(self._generate_vision_sync, req)
+            return InternalResponse(text=text, finish_reason="stop", prompt_tokens=pt,
+                                    completion_tokens=ct, model=req.model)
         prompt = self._build_prompt(req)
         text, pt, ct = await asyncio.to_thread(self._generate_sync, prompt, req)
         text, tool_calls, finish = self._parse_tools(text, req)
@@ -210,6 +276,14 @@ class TransformersBackend(InferenceBackend):
     async def chat_stream(self, req: InternalRequest) -> AsyncIterator[StreamChunk]:
         if not self._loaded:
             raise RuntimeError("TransformersBackend.chat_stream() called before load()")
+
+        if self._vision:  # buffer-then-emit (VLM streaming is generator-internal)
+            resp = await self.chat(req)
+            if resp.text:
+                yield StreamChunk(text=resp.text, is_first=True)
+            yield StreamChunk(text="", is_last=True, finish_reason=resp.finish_reason,
+                              prompt_tokens=resp.prompt_tokens, completion_tokens=resp.completion_tokens)
+            return
 
         # Tool-call requests buffer-then-parse (avoids leaking raw <tool_call>
         # markup mid-stream); plain chat streams token-by-token live.
