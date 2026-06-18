@@ -124,6 +124,12 @@ class BenchmarkRequest(BaseModel):
     mode: str = "same"  # "same" (shared prompt, prefix-cacheable) | "different"
 
 
+class HFDownloadRequest(BaseModel):
+    """Config for POST /api/hf/download."""
+
+    repo_id: str
+
+
 # Rolling per-request metrics for the dashboard's latency/throughput charts.
 _METRICS: deque = deque(maxlen=300)
 
@@ -474,6 +480,46 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     @app.get("/api/history")
     async def api_history(_: None = Depends(require_auth)):
         return {"benchmarks": load_benchmarks(), "metrics": load_metrics()}
+
+    def _register_downloaded() -> None:
+        """Add freshly-downloaded models to the pool (so they appear without a restart)."""
+        from infermesh.core import downloader
+        from infermesh.core.backend import ModelSpec
+        if not settings.model_dir:
+            return
+        for job in downloader.completed_jobs():
+            mid = job.get("model_id")
+            if mid and pool.get_entry(mid) is None:
+                pool.add_spec(ModelSpec(model_id=mid, source=job["path"], backend=settings.backend))
+
+    @app.get("/api/hf/search")
+    async def api_hf_search(
+        q: str = Query(..., min_length=1),
+        limit: int = Query(default=20, ge=1, le=50),
+        _: None = Depends(require_auth),
+    ):
+        from infermesh.core import downloader
+        try:
+            models = await asyncio.to_thread(downloader.search_models, q, limit)
+        except RuntimeError as exc:  # huggingface_hub not installed
+            raise HTTPException(status_code=501, detail=str(exc))
+        return {"models": models}
+
+    @app.post("/api/hf/download")
+    async def api_hf_download(req: HFDownloadRequest, _: None = Depends(require_auth)):
+        from infermesh.core import downloader
+        if not settings.model_dir:
+            raise HTTPException(status_code=400, detail="downloads need a --model-dir; none is configured")
+        try:
+            return downloader.start_download(req.repo_id, settings.model_dir)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=501, detail=str(exc))
+
+    @app.get("/api/hf/downloads")
+    async def api_hf_downloads(_: None = Depends(require_auth)):
+        from infermesh.core import downloader
+        _register_downloaded()
+        return {"downloads": downloader.downloads_status(), "model_dir": settings.model_dir}
 
     @app.post("/api/benchmark")
     async def api_benchmark(req: BenchmarkRequest, _: None = Depends(require_auth)):
