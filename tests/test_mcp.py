@@ -3,6 +3,7 @@
 httpx ASGITransport (no real server, no stdio), plus the FastMCP build."""
 
 import httpx
+import pytest
 
 from infermesh.core.backend import ModelSpec
 from infermesh.core.factory import BackendFactory
@@ -65,6 +66,7 @@ def _tool_names(server):
 
 
 def test_build_mcp_registers_tools():
+    pytest.importorskip("mcp")  # the [mcp] extra; skip cleanly in a base CI env
     server = build_mcp("http://127.0.0.1:8000")
     assert server is not None
     names = _tool_names(server)

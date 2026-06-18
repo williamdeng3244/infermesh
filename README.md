@@ -1,5 +1,7 @@
 # infermesh
 
+[![Tests](https://github.com/williamdeng3244/infermesh/actions/workflows/tests.yml/badge.svg)](https://github.com/williamdeng3244/infermesh/actions/workflows/tests.yml)
+
 A hardware-agnostic LLM inference serving platform. Functionally inspired by
 [oMLX](https://github.com/jundot/omlx), but the compute backend is a **pluggable
 seam decided at runtime** — run on NVIDIA, AMD, CPU, or a future in-house
