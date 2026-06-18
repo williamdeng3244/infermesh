@@ -64,6 +64,7 @@ class TransformersBackend(InferenceBackend):
         self._vision: bool = False
         self._processor: Any = None
         self._batcher = None
+        self._kv_cache = None
 
     @property
     def backend_name(self) -> str:
@@ -149,6 +150,15 @@ class TransformersBackend(InferenceBackend):
                 max_batch=int(extra["micro_batch"]),
                 window_s=float(extra.get("batch_window", 0.01)),
             )
+
+        if extra.get("prefix_kv"):
+            from pathlib import Path as _Path
+            from infermesh.backends.transformers.kv_cache import TieredKVCache
+            raw = extra["prefix_kv"]
+            hot = int(raw) if str(raw).isdigit() else 4
+            cold = extra.get("kv_cold_dir") or str(
+                _Path("~/.infermesh/kv").expanduser() / spec.model_id.replace("/", "_"))
+            self._kv_cache = TieredKVCache(hot_capacity=hot, cold_dir=cold)
 
     @staticmethod
     def _detect_vision(source: str) -> bool:
@@ -377,9 +387,12 @@ class TransformersBackend(InferenceBackend):
 
     # ------------------------------ stats ---------------------------------- #
     def stats(self) -> EngineStats:
+        extra = {"device": self._device, "vendor": self.hardware().vendor}
+        if self._kv_cache is not None:
+            extra["kv_cache"] = self._kv_cache.stats()
         return EngineStats(
             model_id=self._spec.model_id if self._spec else "",
             loaded=self._loaded,
             used_mem_mb=self._estimated_mb if self._loaded else 0,
-            extra={"device": self._device, "vendor": self.hardware().vendor},
+            extra=extra,
         )
