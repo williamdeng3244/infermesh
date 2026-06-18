@@ -12,7 +12,7 @@ with a single pluggable backend interface.
 **Milestones:** **M1** — foundation (pluggable backends, OpenAI + Anthropic chat,
 multi-model LRU/pin/TTL pool). **M2** — embeddings + reranker endpoints. **M3** —
 admin dashboard. **M4** — furnished dashboard (Chat / Logs / Settings) + runtime
-config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. **M7** — benchmark suite (latency percentiles · TTFT · throughput). **M8** — hosted-model proxy backend: register OpenAI / Anthropic / OpenRouter / any OpenAI-compatible endpoint via `--providers`, so remote models join the same pool, dashboard, and OpenAI+Anthropic gateway as local vLLM models. **M9** — Claude Code hardening: SSE keep-alives during long prefill, `response_format` parity on the hosted path, and cross-platform background service management (`start` / `stop` / `restart` / `status`). **M10** — in-process **Transformers backend** (`AutoModelForCausalLM` on CUDA / CPU / MPS), the bring-your-own-accelerator path; decoding raw text locally also activates the model-family tool-call parsers (Qwen-XML / Hermes / Llama-bracket / Gemma4) — **verified generating on an RTX 5070**. **M11** — observability: a **Devices** tab (enumerate NVIDIA / AMD / CPU + a per-model GPU picker) and **Metrics + Benchmark history** persisted to `~/.infermesh` so past tests survive a restart. **M12** — comprehensive benchmark: prefill (PP) + decode (TG) tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory, and `same` vs `different` prompt modes (prefix-cache effect), with a single-request profile and copy-to-clipboard. **M13** — **Model Downloader**: search HuggingFace from the dashboard and one-click download a repo into the model dir (background, with progress), auto-registered into the pool when finished. **M14** — **MCP server**: `infermesh mcp` exposes 14 tools (list/load/unload/pin models, run_benchmark, chat, devices, metrics, search/download HF) over stdio so Claude Code and other agents can drive infermesh and run tests themselves. 72 tests green on the mock backend (no GPU).
+config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. **M7** — benchmark suite (latency percentiles · TTFT · throughput). **M8** — hosted-model proxy backend: register OpenAI / Anthropic / OpenRouter / any OpenAI-compatible endpoint via `--providers`, so remote models join the same pool, dashboard, and OpenAI+Anthropic gateway as local vLLM models. **M9** — Claude Code hardening: SSE keep-alives during long prefill, `response_format` parity on the hosted path, and cross-platform background service management (`start` / `stop` / `restart` / `status`). **M10** — in-process **Transformers backend** (`AutoModelForCausalLM` on CUDA / CPU / MPS), the bring-your-own-accelerator path; decoding raw text locally also activates the model-family tool-call parsers (Qwen-XML / Hermes / Llama-bracket / Gemma4) — **verified generating on an RTX 5070**. **M11** — observability: a **Devices** tab (enumerate NVIDIA / AMD / CPU + a per-model GPU picker) and **Metrics + Benchmark history** persisted to `~/.infermesh` so past tests survive a restart. **M12** — comprehensive benchmark: prefill (PP) + decode (TG) tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory, and `same` vs `different` prompt modes (prefix-cache effect), with a single-request profile and copy-to-clipboard. **M13** — **Model Downloader**: search HuggingFace from the dashboard and one-click download a repo into the model dir (background, with progress), auto-registered into the pool when finished. **M14** — **MCP server**: `infermesh mcp` exposes 14 tools (list/load/unload/pin models, run_benchmark, chat, devices, metrics, search/download HF) over stdio so Claude Code and other agents can drive infermesh and run tests themselves. **M15** — **vision-language models**: OpenAI/Anthropic image inputs (base64 / URL / file) flow through a new `InternalMessage.images` to a Transformers vision path (`AutoModelForImageTextToText`) — **verified on an RTX 5070** (SmolVLM correctly read a test image). 77 tests green on the mock backend (no GPU).
 
 ## The one architectural rule
 
@@ -178,7 +178,7 @@ header toggles **light / dark** mode (persisted in the browser; defaults dark).
 uv run pytest          # or:  .venv/bin/pytest
 ```
 
-72 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm/torch not
+77 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm/torch not
 installed**: vendor-import guard, pool lifecycle (discovery / LRU eviction /
 pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), the
 embeddings + rerank endpoints, the admin dashboard + pin/unpin, the logs / settings
@@ -242,6 +242,13 @@ lifted from oMLX (Qwen/GLM `<tool_call>` XML, Hermes, Llama-bracket, Gemma4,
 namespaced/MiniMax). When a request supplies `tools`, the decoded text is parsed and
 returned as OpenAI-shaped `tool_calls` (with `finish_reason: "tool_calls"`). vLLM and
 the hosted proxy get tool calls from their servers; this backend parses them itself.
+
+**Vision-language models.** Set `extra={"vision": true}` (or load a model whose
+`config.json` is a VLM) and the backend uses `AutoModelForImageTextToText` +
+`AutoProcessor`. OpenAI `image_url` parts and Anthropic `image` blocks (base64 /
+URL / file path) ride on `InternalMessage.images` and are fed to the processor.
+Verified on an RTX 5070: `HuggingFaceTB/SmolVLM-256M-Instruct` (~490 MB) read a
+test image and answered correctly.
 
 ## Connect hosted models (OpenAI / Anthropic / OpenRouter / …)
 
