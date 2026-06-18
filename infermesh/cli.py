@@ -76,6 +76,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_serve_args(sub.add_parser("restart", help="Restart the background gateway"))
     sub.add_parser("stop", help="Stop the background gateway")
     sub.add_parser("status", help="Show background gateway status + health")
+    mcp = sub.add_parser("mcp", help="Run an MCP server (stdio) so agents can drive infermesh")
+    mcp.add_argument("--base-url", default="http://127.0.0.1:8000", help="infermesh gateway base URL")
+    mcp.add_argument("--api-key", default=None, help="Gateway API key, if auth is enabled")
     return parser
 
 
@@ -345,13 +348,19 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mcp(args: argparse.Namespace) -> int:
+    from infermesh.mcp_server import run_stdio
+    run_stdio(args.base_url, getattr(args, "api_key", None))
+    return 0
+
+
 # --------------------------------------------------------------------------- #
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     dispatch = {
         "serve": cmd_serve, "start": cmd_start, "stop": cmd_stop,
-        "restart": cmd_restart, "status": cmd_status,
+        "restart": cmd_restart, "status": cmd_status, "mcp": cmd_mcp,
     }
     handler = dispatch.get(args.command)
     if handler is None:
