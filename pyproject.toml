@@ -32,6 +32,7 @@ dependencies = [
 # control plane installs (and imports) without them.
 vllm = ["vllm", "httpx"]
 transformers = ["transformers>=4.40", "torch", "accelerate", "httpx"]
+downloader = ["huggingface_hub"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
 
 [project.scripts]

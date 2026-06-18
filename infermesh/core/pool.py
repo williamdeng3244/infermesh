@@ -218,6 +218,20 @@ class ModelPool:
         entry.spec.extra = extra
         return True
 
+    def add_spec(self, spec: ModelSpec, *, pinned: bool = False) -> str:
+        """Additively register/refresh one model (unlike discover_models, does not
+        drop the others). Used by the downloader once a pull completes."""
+        mid = spec.model_id
+        existing = self._entries.get(mid)
+        if existing is not None and existing.backend is not None:
+            existing.spec = spec
+            existing.estimated_mb = self._estimate_mb(spec)
+        else:
+            self._entries[mid] = EngineEntry(
+                spec=spec, estimated_mb=self._estimate_mb(spec), is_pinned=pinned,
+            )
+        return mid
+
     def _case_insensitive_match(self, name: str) -> Optional[str]:
         lower = name.lower()
         for mid in self._entries:
