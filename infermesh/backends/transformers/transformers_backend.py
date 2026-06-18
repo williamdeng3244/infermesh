@@ -63,6 +63,7 @@ class TransformersBackend(InferenceBackend):
         self._hardware: Optional[HardwareInfo] = None
         self._vision: bool = False
         self._processor: Any = None
+        self._batcher = None
 
     @property
     def backend_name(self) -> str:
@@ -140,6 +141,14 @@ class TransformersBackend(InferenceBackend):
 
         weight_bytes = sum(p.numel() * p.element_size() for p in self._model.parameters())
         self._estimated_mb = int(extra.get("estimated_mb") or (weight_bytes // (1024 * 1024)))
+
+        if extra.get("micro_batch") and not self._vision:
+            from infermesh.backends.transformers.batching import MicroBatcher
+            self._batcher = MicroBatcher(
+                self._generate_batch_sync,
+                max_batch=int(extra["micro_batch"]),
+                window_s=float(extra.get("batch_window", 0.01)),
+            )
 
     @staticmethod
     def _detect_vision(source: str) -> bool:
@@ -247,6 +256,32 @@ class TransformersBackend(InferenceBackend):
         text = self._tokenizer.decode(gen_ids, skip_special_tokens=True)
         return text, int(prompt_len), int(gen_ids.shape[0])
 
+    def _generate_batch_sync(self, reqs: list) -> list:
+        """Run several requests as one left-padded batched greedy generate."""
+        import torch
+        prompts = [self._build_prompt(r) for r in reqs]
+        tok = self._tokenizer
+        prev_side = tok.padding_side
+        tok.padding_side = "left"
+        if tok.pad_token_id is None:
+            tok.pad_token = tok.eos_token
+        enc = tok(prompts, return_tensors="pt", padding=True).to(self._device)
+        default_new = int((self._spec.extra or {}).get("max_new_tokens", 512)) if self._spec else 512
+        max_new = max((r.max_tokens or default_new) for r in reqs)
+        with torch.no_grad():
+            out = self._model.generate(**enc, max_new_tokens=max_new,
+                                       pad_token_id=tok.pad_token_id, do_sample=False)
+        tok.padding_side = prev_side
+        in_len = int(enc["input_ids"].shape[1])
+        results = []
+        for i, r in enumerate(reqs):
+            gen = out[i][in_len:]
+            text = tok.decode(gen, skip_special_tokens=True)
+            text, tool_calls, finish = self._parse_tools(text, r)
+            ct = int((gen != tok.pad_token_id).sum().item())
+            results.append((text, in_len, ct, tool_calls, finish))
+        return results
+
     def _parse_tools(self, text: str, req: InternalRequest) -> tuple[str, Optional[list], str]:
         """Run the family tool-call parsers; return (text, tool_call_dicts, finish_reason)."""
         if not req.tools:
@@ -265,6 +300,10 @@ class TransformersBackend(InferenceBackend):
             text, pt, ct = await asyncio.to_thread(self._generate_vision_sync, req)
             return InternalResponse(text=text, finish_reason="stop", prompt_tokens=pt,
                                     completion_tokens=ct, model=req.model)
+        if self._batcher is not None:
+            text, pt, ct, tool_calls, finish = await self._batcher.submit(req)
+            return InternalResponse(text=text, finish_reason=finish, prompt_tokens=pt,
+                                    completion_tokens=ct, tool_calls=tool_calls, model=req.model)
         prompt = self._build_prompt(req)
         text, pt, ct = await asyncio.to_thread(self._generate_sync, prompt, req)
         text, tool_calls, finish = self._parse_tools(text, req)
@@ -281,6 +320,16 @@ class TransformersBackend(InferenceBackend):
             resp = await self.chat(req)
             if resp.text:
                 yield StreamChunk(text=resp.text, is_first=True)
+            yield StreamChunk(text="", is_last=True, finish_reason=resp.finish_reason,
+                              prompt_tokens=resp.prompt_tokens, completion_tokens=resp.completion_tokens)
+            return
+
+        if self._batcher is not None:  # batched: buffer through chat() then emit
+            resp = await self.chat(req)
+            if resp.text:
+                yield StreamChunk(text=resp.text, is_first=True)
+            for tc in (resp.tool_calls or []):
+                yield StreamChunk(text="", tool_call_delta=tc)
             yield StreamChunk(text="", is_last=True, finish_reason=resp.finish_reason,
                               prompt_tokens=resp.prompt_tokens, completion_tokens=resp.completion_tokens)
             return
