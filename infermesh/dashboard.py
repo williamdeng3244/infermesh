@@ -135,7 +135,7 @@ tbody tr:hover{background:var(--card2)}
     </nav>
     <div class="sb-foot">
       <span id="sb-health" class="pill"><span class="dot"></span> connecting</span>
-      <span id="sb-ver">v0.3.0 · mock / vllm / openai / transformers</span>
+      <span id="sb-ver">v0.3.1 · mock / vllm / openai / transformers</span>
     </div>
   </aside>
 
