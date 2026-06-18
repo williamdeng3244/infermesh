@@ -12,7 +12,7 @@ with a single pluggable backend interface.
 **Milestones:** **M1** — foundation (pluggable backends, OpenAI + Anthropic chat,
 multi-model LRU/pin/TTL pool). **M2** — embeddings + reranker endpoints. **M3** —
 admin dashboard. **M4** — furnished dashboard (Chat / Logs / Settings) + runtime
-config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. **M7** — benchmark suite (latency percentiles · TTFT · throughput). **M8** — hosted-model proxy backend: register OpenAI / Anthropic / OpenRouter / any OpenAI-compatible endpoint via `--providers`, so remote models join the same pool, dashboard, and OpenAI+Anthropic gateway as local vLLM models. **M9** — Claude Code hardening: SSE keep-alives during long prefill, `response_format` parity on the hosted path, and cross-platform background service management (`start` / `stop` / `restart` / `status`). **M10** — in-process **Transformers backend** (`AutoModelForCausalLM` on CUDA / CPU / MPS), the bring-your-own-accelerator path; decoding raw text locally also activates the model-family tool-call parsers (Qwen-XML / Hermes / Llama-bracket / Gemma4) — **verified generating on an RTX 5070**. **M11** — observability: a **Devices** tab (enumerate NVIDIA / AMD / CPU + a per-model GPU picker) and **Metrics + Benchmark history** persisted to `~/.infermesh` so past tests survive a restart. **M12** — comprehensive benchmark: prefill (PP) + decode (TG) tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory, and `same` vs `different` prompt modes (prefix-cache effect), with a single-request profile and copy-to-clipboard. 60 tests green on the mock backend (no GPU).
+config. **M5** — real vLLM GPU backend (verified on an RTX 5070, Blackwell) + latency/throughput charts. **M6** — light/dark theme + real multi-model LRU eviction on the GPU. **M7** — benchmark suite (latency percentiles · TTFT · throughput). **M8** — hosted-model proxy backend: register OpenAI / Anthropic / OpenRouter / any OpenAI-compatible endpoint via `--providers`, so remote models join the same pool, dashboard, and OpenAI+Anthropic gateway as local vLLM models. **M9** — Claude Code hardening: SSE keep-alives during long prefill, `response_format` parity on the hosted path, and cross-platform background service management (`start` / `stop` / `restart` / `status`). **M10** — in-process **Transformers backend** (`AutoModelForCausalLM` on CUDA / CPU / MPS), the bring-your-own-accelerator path; decoding raw text locally also activates the model-family tool-call parsers (Qwen-XML / Hermes / Llama-bracket / Gemma4) — **verified generating on an RTX 5070**. **M11** — observability: a **Devices** tab (enumerate NVIDIA / AMD / CPU + a per-model GPU picker) and **Metrics + Benchmark history** persisted to `~/.infermesh` so past tests survive a restart. **M12** — comprehensive benchmark: prefill (PP) + decode (TG) tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory, and `same` vs `different` prompt modes (prefix-cache effect), with a single-request profile and copy-to-clipboard. **M13** — **Model Downloader**: search HuggingFace from the dashboard and one-click download a repo into the model dir (background, with progress), auto-registered into the pool when finished. 68 tests green on the mock backend (no GPU).
 
 ## The one architectural rule
 
@@ -124,6 +124,9 @@ curl -s http://127.0.0.1:8000/api/status
 | `POST /api/benchmark` | load benchmark: PP/TG tok/s, TTFT, TPOT, E2E percentiles, peak mem, `mode` |
 | `GET  /api/devices` | enumerate compute devices (NVIDIA/AMD/CPU + VRAM) |
 | `GET  /api/history` | past benchmark runs + metric samples (persisted) |
+| `GET  /api/hf/search` | search HuggingFace models (id, downloads, likes, task) |
+| `POST /api/hf/download` | download a repo into the model dir (background) |
+| `GET  /api/hf/downloads` | download progress; registers finished models into the pool |
 
 Optional single API key: pass `--api-key KEY`, then send `Authorization: Bearer KEY`
 or `x-api-key: KEY`. Off by default.
@@ -154,13 +157,14 @@ read timeout. Tune with `--sse-keepalive SECONDS` (default 15; `0` disables).
 
 Open **http://127.0.0.1:8000/** (or `/admin`) in a browser while the server runs —
 a self-contained dark panel (no build step, no JS deps, no CDN) with a sidebar and
-seven sections:
+eight sections:
 
 - **Models** — memory gauge + live table with **Load / Unload / Pin / Unpin**, plus a **device picker** so a model loads on a chosen GPU/CPU
 - **Chat** — pick a model and stream a completion in a chat playground
 - **Logs** — live tail of the server's ring-buffered logs, level-colored
 - **Metrics** — latency + throughput sparkline charts (canvas, no chart lib)
 - **Devices** — detected accelerators (NVIDIA / AMD / CPU) with VRAM used/free/total
+- **Download** — search HuggingFace, browse downloads/likes/task, one-click download into the model dir with a progress bar (`pip install '.[downloader]'`)
 - **Benchmark** — prefill/decode tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory; `same`/`different` prompt modes, a single-request profile, copy-to-clipboard, and a **persisted history of past runs**
 - **Settings** — view all settings and live-edit idle-timeout / API key
 
@@ -174,7 +178,7 @@ header toggles **light / dark** mode (persisted in the browser; defaults dark).
 uv run pytest          # or:  .venv/bin/pytest
 ```
 
-60 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm/torch not
+68 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm/torch not
 installed**: vendor-import guard, pool lifecycle (discovery / LRU eviction /
 pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), the
 embeddings + rerank endpoints, the admin dashboard + pin/unpin, the logs / settings
