@@ -125,6 +125,7 @@ tbody tr:hover{background:var(--card2)}
       <button data-sec="logs" aria-label="Logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Logs</button>
       <button data-sec="metrics" aria-label="Metrics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg> Metrics</button>
       <button data-sec="devices" aria-label="Devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="5" rx="1"/><rect x="2" y="13" width="20" height="5" rx="1"/><line x1="6" y1="8.5" x2="6.01" y2="8.5"/><line x1="6" y1="15.5" x2="6.01" y2="15.5"/></svg> Devices</button>
+      <button data-sec="download" aria-label="Download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg> Download</button>
       <button data-sec="benchmark" aria-label="Benchmark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19a9 9 0 1 1 15 0"/><path d="M12 14l3.5-3.5"/></svg> Benchmark</button>
       <button data-sec="settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg> Settings</button>
     </nav>
@@ -212,6 +213,28 @@ tbody tr:hover{background:var(--card2)}
         </div>
       </section>
 
+      <section class="section" id="sec-download">
+        <div class="chat-bar" style="margin-bottom:12px">
+          <input id="dlSearch" placeholder="Search HuggingFace models (e.g. Qwen2.5-0.5B-Instruct)" style="flex:1;min-width:240px"/>
+          <button class="btn primary" id="dlBtn">Search</button>
+        </div>
+        <p class="muted" style="font-size:12px;margin:0 0 10px">Downloads land in the server's <code>--model-dir</code> and appear under Models when finished.</p>
+        <div class="panel" style="margin-bottom:16px">
+          <table>
+            <thead><tr><th>Model</th><th>Task</th><th>Downloads</th><th>Likes</th><th></th></tr></thead>
+            <tbody id="dlResults"><tr><td colspan="5" class="muted">search to list models</td></tr></tbody>
+          </table>
+        </div>
+        <div class="chat-bar" style="margin-bottom:8px"><span class="muted" style="font-size:12px">Downloads</span></div>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Repo</th><th>Status</th><th>Progress</th><th>Size</th></tr></thead>
+            <tbody id="dlJobs"><tr><td colspan="4" class="muted">no downloads yet</td></tr></tbody>
+          </table>
+        </div>
+        <p id="dl-err" class="err"></p>
+      </section>
+
       <section class="section" id="sec-benchmark">
         <div class="controls" style="flex-wrap:wrap;gap:12px">
           <label class="muted" style="font-size:12px">Model</label>
@@ -281,7 +304,7 @@ tbody tr:hover{background:var(--card2)}
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let active='models', logsPaused=false, lastBench=null;
-const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',devices:'Devices',benchmark:'Benchmark',settings:'Settings'};
+const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',devices:'Devices',download:'Download',benchmark:'Benchmark',settings:'Settings'};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>(n==null?'—':Number(n).toLocaleString());
 const authHeaders=()=>{const k=$('#apikey').value.trim();return k?{'Authorization':'Bearer '+k}:{}};
@@ -312,6 +335,7 @@ function switchSection(sec){
   if(sec==='metrics') refreshMetrics();
   if(sec==='benchmark'){ loadBenchModels(); refreshBenchHistory(); }
   if(sec==='devices') refreshDevices();
+  if(sec==='download') refreshDownloads();
   if(sec==='models') loadDevicePicker();
 }
 
@@ -544,6 +568,31 @@ async function refreshBenchHistory(){
     }).join('')||'<tr><td colspan="7" class="muted">no past runs</td></tr>';
   }catch(e){}
 }
+/* Download (HuggingFace) */
+function fmtBytes(n){ if(!n) return '—'; const u=['B','KB','MB','GB','TB']; let i=0,x=n; while(x>=1024&&i<u.length-1){x/=1024;i++;} return x.toFixed(x<10&&i>0?1:0)+' '+u[i]; }
+async function runHfSearch(){
+  const q=$('#dlSearch').value.trim(); if(!q) return;
+  $('#dl-err').textContent=''; $('#dlResults').innerHTML='<tr><td colspan="5" class="muted">searching&hellip;</td></tr>';
+  try{ const d=await api('/api/hf/search?q='+encodeURIComponent(q)+'&limit=25');
+    $('#dlResults').innerHTML=(d.models||[]).map(m=>'<tr><td class="mono">'+esc(m.id)+(m.gated?' <span class="badge">gated</span>':'')+'</td><td class="muted">'+esc(m.pipeline_tag||'—')+'</td><td class="num">'+fmt(m.downloads)+'</td><td class="num">'+fmt(m.likes)+'</td><td class="rowact"><button class="btn sm" data-repo="'+esc(m.id)+'">Download</button></td></tr>').join('')||'<tr><td colspan="5" class="muted">no results</td></tr>';
+  }catch(e){ $('#dl-err').textContent=String(e); $('#dlResults').innerHTML='<tr><td colspan="5" class="muted">search failed</td></tr>'; }
+}
+async function hfDownload(repo){
+  try{ await api('/api/hf/download','POST',{repo_id:repo}); toast('downloading '+repo); refreshDownloads(); }
+  catch(e){ $('#dl-err').textContent=String(e); }
+}
+async function refreshDownloads(){
+  try{ const d=await api('/api/hf/downloads');
+    $('#dlJobs').innerHTML=(d.downloads||[]).map(j=>{ const pctn=Math.round((j.progress||0)*100);
+      const bar='<div class="bar" style="min-width:90px;display:inline-block;vertical-align:middle"><i style="width:'+pctn+'%"></i></div>';
+      const stat=j.status==='error'?'<span class="err">error</span>':esc(j.status);
+      return '<tr><td class="mono">'+esc(j.repo_id)+'</td><td>'+stat+(j.error?' <span class="muted">'+esc(j.error)+'</span>':'')+'</td><td>'+(j.status==='done'?'100%':bar+' '+pctn+'%')+'</td><td class="num">'+fmtBytes(j.total_bytes)+'</td></tr>';
+    }).join('')||'<tr><td colspan="4" class="muted">no downloads yet</td></tr>';
+  }catch(e){}
+}
+$('#dlBtn').onclick=runHfSearch;
+$('#dlSearch').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); runHfSearch(); }});
+$('#dlResults').addEventListener('click',e=>{ const b=e.target.closest('button[data-repo]'); if(b) hfDownload(b.dataset.repo); });
 /* poll */
 $('#refreshBtn').onclick=()=>tick();
 loadDevicePicker();
@@ -553,6 +602,7 @@ async function tick(){
   catch(e){ setHealth(false); if(active==='models') $('#models-err').textContent=String(e); }
   if(active==='logs') refreshLogs();
   if(active==='metrics') refreshMetrics();
+  if(active==='download') refreshDownloads();
 }
 setInterval(tick,2000); tick();
 </script>
