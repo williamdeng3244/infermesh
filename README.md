@@ -167,7 +167,7 @@ eight sections:
 - **Metrics** — latency + throughput sparkline charts (canvas, no chart lib)
 - **Devices** — detected accelerators (NVIDIA / AMD / CPU) with VRAM used/free/total
 - **Download** — search HuggingFace, browse downloads/likes/task, one-click download into the model dir with a progress bar (`pip install '.[downloader]'`)
-- **Benchmark** — prefill/decode tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory; `same`/`different` prompt modes, a single-request profile, copy-to-clipboard, and a **persisted history of past runs**
+- **Benchmark** — prefill/decode tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory; `same`/`different` prompt modes, a single-request profile, copy-to-clipboard, and a **persisted history of past runs** (each row **expands** to the full per-run breakdown — context, PP/TG tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory, token counts)
 - **Settings** — view all settings and live-edit idle-timeout / API key
 
 If an API key is enabled, paste it into the header field (or set it from the

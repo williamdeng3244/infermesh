@@ -67,5 +67,6 @@ def test_benchmark_endpoint_mode(client):
 def test_dashboard_has_benchmark_modes(client):
     html = client.get("/admin").text
     for marker in ('id="bmMode"', 'id="bmSingle"', 'id="bmCopy"', 'id="bmTpot"',
-                   "Prefill (PP)", "Decode (TG)"):
+                   "Prefill (PP)", "Decode (TG)",
+                   "bm-exp", "function bmDetail", "bm-det-", "Single-request latency"):
         assert marker in html, marker

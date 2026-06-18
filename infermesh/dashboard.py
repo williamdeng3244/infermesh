@@ -111,6 +111,10 @@ tbody tr:hover{background:var(--card2)}
 .field .hint{font-size:12px;color:var(--dim);margin-top:6px}
 .kv{display:grid;grid-template-columns:210px 1fr;gap:9px 16px;font-size:13.5px;margin-top:6px}
 .kv dt{color:var(--muted)} .kv dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.bm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;padding:16px;background:var(--card2);border-top:1px solid var(--border)}
+.bm-block .bm-bt{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);margin-bottom:6px;font-weight:600}
+.kv-sm{grid-template-columns:135px 1fr;gap:5px 10px;font-size:12.5px;margin-top:0}
+.bm-exp{padding:2px 8px;line-height:1}
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border2);padding:10px 18px;border-radius:9px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
 .toast.show{opacity:1}
 </style>
@@ -265,8 +269,8 @@ tbody tr:hover{background:var(--card2)}
         <div class="panel" style="margin-top:16px">
           <div class="chat-bar" style="padding:12px 14px 0"><span class="muted" style="font-size:12px">Past runs &mdash; persisted across restarts</span></div>
           <table>
-            <thead><tr><th>When</th><th>Model</th><th>Req&times;Conc</th><th>req/s</th><th>tok/s</th><th>p50 ms</th><th>p99 ms</th></tr></thead>
-            <tbody id="bmHist"><tr><td colspan="7" class="muted">no past runs</td></tr></tbody>
+            <thead><tr><th style="width:34px"></th><th>When</th><th>Model</th><th>Req&times;Conc</th><th>req/s</th><th>tok/s</th><th>p50 ms</th><th>p99 ms</th></tr></thead>
+            <tbody id="bmHist"><tr><td colspan="8" class="muted">no past runs</td></tr></tbody>
           </table>
         </div>
         <p id="bm-err" class="err"></p>
@@ -562,12 +566,46 @@ $('#devRefresh').onclick=refreshDevices;
 /* Benchmark history */
 async function refreshBenchHistory(){
   try{ const h=await api('/api/history'); const rows=(h.benchmarks||[]).slice().reverse();
-    $('#bmHist').innerHTML=rows.map(x=>{ const r=x.result||{}, L=r.latency_ms||{}, p=x.params||{};
-      let when=''; try{ when=new Date((x.t||0)*1000).toLocaleString(); }catch(_){ }
-      return '<tr><td class="muted">'+esc(when)+'</td><td><strong>'+esc(x.model||'')+'</strong></td><td class="num">'+(p.requests||'?')+'&times;'+(p.concurrency||'?')+'</td><td class="num">'+(r.requests_per_sec!=null?r.requests_per_sec:'—')+'</td><td class="num">'+(r.output_tokens_per_sec!=null?r.output_tokens_per_sec:'—')+'</td><td class="num">'+(L.p50!=null?L.p50:'—')+'</td><td class="num">'+(L.p99!=null?L.p99:'—')+'</td></tr>';
-    }).join('')||'<tr><td colspan="7" class="muted">no past runs</td></tr>';
+    $('#bmHist').innerHTML=rows.map((x,i)=>bmSummaryRow(x,i)+bmDetailRow(x,i)).join('')||'<tr><td colspan="8" class="muted">no past runs</td></tr>';
   }catch(e){}
 }
+function bmn(v){ return v!=null?v:'—'; }
+function bmKv(obj,keys){ return '<dl class="kv kv-sm">'+keys.map(k=>'<dt>'+k+'</dt><dd>'+bmn(obj&&obj[k])+'</dd>').join('')+'</dl>'; }
+function bmRows(pairs){ return '<dl class="kv kv-sm">'+pairs.map(p=>'<dt>'+p[0]+'</dt><dd>'+bmn(p[1])+'</dd>').join('')+'</dl>'; }
+function bmBlock(title,body){ return '<div class="bm-block"><div class="bm-bt">'+title+'</div>'+body+'</div>'; }
+function bmSummaryRow(x,i){
+  const r=x.result||{}, L=r.latency_ms||{}, p=x.params||{};
+  let when=''; try{ when=new Date((x.t||0)*1000).toLocaleString(); }catch(_){ }
+  return '<tr><td><button class="btn sm bm-exp" data-i="'+i+'" aria-label="expand">&#9656;</button></td>'+
+    '<td class="muted">'+esc(when)+'</td><td><strong>'+esc(x.model||'')+'</strong> <span class="muted" style="font-size:11px">'+esc(r.mode||'')+'</span></td>'+
+    '<td class="num">'+bmn(p.requests)+'&times;'+bmn(p.concurrency)+'</td>'+
+    '<td class="num">'+bmn(r.requests_per_sec)+'</td><td class="num">'+bmn(r.output_tokens_per_sec)+'</td>'+
+    '<td class="num">'+bmn(L.p50)+'</td><td class="num">'+bmn(L.p99)+'</td></tr>';
+}
+function bmDetailRow(x,i){
+  return '<tr class="bm-det" id="bm-det-'+i+'" style="display:none"><td colspan="8" style="padding:0">'+bmDetail(x)+'</td></tr>';
+}
+function bmDetail(x){
+  const r=x.result||{}, p=x.params||{};
+  const L=r.latency_ms||{}, T=r.ttft_ms||{}, P=r.tpot_ms||{}, pp=r.pp_tps||{}, tg=r.tg_tps||{};
+  const single=(p.requests==1&&p.concurrency==1);
+  const pk=r.peak_mem_mb!=null?(fmt(r.peak_mem_mb)+' MB'):'—';
+  const succ=(r.succeeded!=null?r.succeeded+' / '+((r.succeeded||0)+(r.failed||0)):'—');
+  return '<div class="bm-grid">'+
+    bmBlock('Context', bmRows([['model',esc(r.model||x.model||'')],['mode',esc(r.mode||'—')],['type',single?'single request':'continuous batching'],['requests',p.requests],['concurrency',p.concurrency],['max tokens',p.max_tokens],['wall time (s)',r.wall_time_s],['succeeded',succ]]))+
+    bmBlock('Throughput', bmRows([['requests / s',r.requests_per_sec],['output tok / s',r.output_tokens_per_sec]]))+
+    bmBlock('Prefill &mdash; PP TPS', bmRows([['mean',pp.mean],['max',pp.max],['prompt tokens',r.total_prompt_tokens]]))+
+    bmBlock('Decode &mdash; TG TPS', bmRows([['mean',tg.mean],['max',tg.max],['output tokens',r.total_output_tokens]]))+
+    bmBlock('Single-request latency / E2E (ms)', bmKv(L,['mean','p50','p90','p99','min','max']))+
+    bmBlock('Time to first token (ms)', bmKv(T,['mean','p50','p90','p99','min','max']))+
+    bmBlock('Time per output token (ms)', bmKv(P,['mean','p50','p90','p99']))+
+    bmBlock('Peak GPU memory', bmRows([['peak',pk]]))+
+  '</div>';
+}
+$('#bmHist').addEventListener('click',e=>{ const b=e.target.closest('button.bm-exp'); if(!b) return;
+  const det=document.getElementById('bm-det-'+b.dataset.i); if(!det) return;
+  const open=det.style.display==='none'; det.style.display=open?'table-row':'none'; b.innerHTML=open?'&#9662;':'&#9656;';
+});
 /* Download (HuggingFace) */
 function fmtBytes(n){ if(!n) return '—'; const u=['B','KB','MB','GB','TB']; let i=0,x=n; while(x>=1024&&i<u.length-1){x/=1024;i++;} return x.toFixed(x<10&&i>0?1:0)+' '+u[i]; }
 async function runHfSearch(){
