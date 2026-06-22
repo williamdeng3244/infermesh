@@ -54,6 +54,9 @@ a{color:var(--blue);text-decoration:none}
 .topbar h2{margin:0;font-size:16px;font-weight:600}
 .spacer{flex:1}
 .pill{font:500 12px var(--sans);padding:3px 10px;border-radius:999px;border:1px solid var(--border2);color:var(--muted);display:inline-flex;align-items:center;gap:7px}
+.seg{display:inline-flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}
+.seg-btn{background:transparent;border:0;color:var(--muted);padding:5px 15px;cursor:pointer;font:500 13px var(--sans)}
+.seg-btn.active{background:var(--blue);color:#0b1120}
 .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--dim)}
 .pill.ok{color:var(--accent);border-color:rgba(34,197,94,.4)}.pill.ok .dot{background:var(--accent);box-shadow:0 0 8px var(--accent)}
 .pill.bad{color:var(--danger);border-color:rgba(239,68,68,.4)}.pill.bad .dot{background:var(--danger)}
@@ -191,6 +194,15 @@ tbody tr:hover{background:var(--card2)}
       </section>
 
       <section class="section" id="sec-metrics">
+        <div class="panel" style="padding:16px;margin-bottom:16px">
+          <div class="chat-bar" style="margin-bottom:12px">
+            <div class="seg"><button id="stScopeSession" class="seg-btn active">Session</button><button id="stScopeAll" class="seg-btn">All-Time</button></div>
+            <span class="muted" style="font-size:11px">aggregate request stats &mdash; All-Time survives restarts</span>
+            <span class="spacer"></span>
+            <button class="btn sm" id="stClear">Clear</button>
+          </div>
+          <div class="cards" id="statCards"></div>
+        </div>
         <div class="cards" id="metricCards"></div>
         <div class="panel" style="padding:18px;margin-bottom:16px">
           <div class="muted" style="font-size:12px;margin-bottom:10px">Latency per request (ms)</div>
@@ -336,7 +348,7 @@ function switchSection(sec){
   if(sec==='chat') loadChatModels();
   if(sec==='logs') refreshLogs();
   if(sec==='settings') loadSettings();
-  if(sec==='metrics') refreshMetrics();
+  if(sec==='metrics'){ refreshMetrics(); refreshStats(); }
   if(sec==='benchmark'){ loadBenchModels(); refreshBenchHistory(); }
   if(sec==='devices') refreshDevices();
   if(sec==='download') refreshDownloads();
@@ -474,6 +486,31 @@ function drawChart(id, vals, color, unit){
   x.lineTo(px(n-1),h-8); x.lineTo(px(0),h-8); x.closePath(); x.fillStyle=color+'22'; x.fill();
   x.fillStyle=color; x.font='600 12px ui-monospace,monospace'; x.fillText(vals[n-1]+' '+unit, w-118, 16);
 }
+/* Stats (session / all-time) */
+let statsScope='session';
+function statN(n){ return (n!=null)?(typeof n==='number'?n.toLocaleString():n):'—'; }
+function statCard(k,v){ return '<div class="card"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'; }
+async function refreshStats(){
+  try{ const s=await api('/api/stats?scope='+statsScope);
+    $('#statCards').innerHTML=
+      statCard('Requests', statN(s.total_requests))+
+      statCard('Tokens served', statN(s.total_tokens_served))+
+      statCard('Prompt tokens', statN(s.total_prompt_tokens))+
+      statCard('Completion tokens', statN(s.total_completion_tokens))+
+      statCard('Cached tokens', statN(s.total_cached_tokens))+
+      statCard('Cache efficiency', statN(s.cache_efficiency)+'<small> %</small>')+
+      statCard('Prefill', statN(s.prefill_tps)+'<small> tok/s</small>')+
+      statCard('Generation', statN(s.generation_tps)+'<small> tok/s</small>');
+  }catch(e){}
+}
+function setStatsScope(sc){ statsScope=sc;
+  $('#stScopeSession').classList.toggle('active',sc==='session');
+  $('#stScopeAll').classList.toggle('active',sc==='alltime');
+  refreshStats();
+}
+$('#stScopeSession').onclick=()=>setStatsScope('session');
+$('#stScopeAll').onclick=()=>setStatsScope('alltime');
+$('#stClear').onclick=async()=>{ try{ await api('/api/stats/clear?scope='+statsScope,'POST'); refreshStats(); toast('cleared '+statsScope+' stats'); }catch(e){} };
 async function refreshMetrics(){
   try{ const d=await api('/api/metrics'); const s=d.samples||[];
     const lat=s.map(p=>p.latency_ms), tps=s.map(p=>p.tps);
@@ -639,7 +676,7 @@ async function tick(){
   try{ const s=await api('/api/status'); setHealth(true); if(active==='models'){ renderModels(s); $('#models-err').textContent=''; } }
   catch(e){ setHealth(false); if(active==='models') $('#models-err').textContent=String(e); }
   if(active==='logs') refreshLogs();
-  if(active==='metrics') refreshMetrics();
+  if(active==='metrics'){ refreshMetrics(); refreshStats(); }
   if(active==='download') refreshDownloads();
 }
 setInterval(tick,2000); tick();
