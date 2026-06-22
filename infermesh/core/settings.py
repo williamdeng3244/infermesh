@@ -27,7 +27,8 @@ class Settings:
     host: str = "127.0.0.1"
     port: int = 8000
     backend: str = "mock"                 # default backend when a spec doesn't force one
-    max_concurrent_requests: int = 8
+    max_concurrent_requests: int = 8     # control-plane admission cap (enforced via AdmissionController)
+    max_queued_requests: int = 0         # 0 => unbounded admission queue; >0 => reject (503) once this many wait
     idle_timeout: float = 0.0             # seconds; 0 => never idle-unload
     max_process_memory: str = "80%"       # "80%" | "12GB" | "512MB" | bare MB
     api_key: Optional[str] = None         # optional single bearer/x-api-key; None => auth off

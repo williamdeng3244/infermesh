@@ -368,6 +368,15 @@ tbody tr:hover{background:var(--card2)}
             <div class="hint" data-i18n="0 disables auto-unload. Applies live to the TTL reaper.">0 disables auto-unload. Applies live to the TTL reaper.</div>
           </div>
           <div class="field">
+            <label for="setConc" data-i18n="Max concurrent requests">Max concurrent requests</label>
+            <div class="row">
+              <input id="setConc" type="number" min="1" step="1" style="width:140px"/>
+              <input id="setQueue" type="number" min="0" step="1" placeholder="queue bound (0 = unbounded)" data-i18n-ph="queue bound (0 = unbounded)" style="width:240px"/>
+              <button class="btn" id="saveConc" data-i18n="Save">Save</button>
+            </div>
+            <div class="hint" data-i18n="Admission cap applied live. Queue bound > 0 returns 503 once that many requests are waiting.">Admission cap applied live. Queue bound &gt; 0 returns 503 once that many requests are waiting.</div>
+          </div>
+          <div class="field">
             <label for="setKey" data-i18n="API key">API key</label>
             <div class="row">
               <input id="setKey" type="text" placeholder="enter key — blank = disable auth" data-i18n-ph="enter key — blank = disable auth" style="width:300px" autocomplete="off"/>
@@ -481,7 +490,8 @@ const I18N={
 "Read once when the server boots. Changing host/port moves the server — you'll reconnect at the new address.":"仅在服务器启动时读取。更改 host/port 会迁移服务器 — 需在新地址重新连接。",
 "restart required":"需要重启","Saved — restart to apply.":"已保存 — 重启后生效。","Restart server":"重启服务器","All settings":"全部设置",
 "connecting":"连接中","healthy":"正常","unreachable":"无法连接",
-"stats copied":"已复制统计","generation defaults saved":"已保存生成默认值","startup settings saved":"已保存启动设置","KV cache settings saved":"已保存 KV 缓存设置","HuggingFace endpoint saved":"已保存 HuggingFace 端点","Idle timeout saved":"已保存空闲超时"
+"stats copied":"已复制统计","generation defaults saved":"已保存生成默认值","startup settings saved":"已保存启动设置","KV cache settings saved":"已保存 KV 缓存设置","HuggingFace endpoint saved":"已保存 HuggingFace 端点","Idle timeout saved":"已保存空闲超时",
+"Max concurrent requests":"最大并发请求","queue bound (0 = unbounded)":"队列上限（0 = 无限）","Admission cap applied live. Queue bound > 0 returns 503 once that many requests are waiting.":"准入上限实时生效。队列上限 > 0 时，等待数达到该值即返回 503。","concurrency saved":"已保存并发设置"
 };
 let lang='en';
 function T(s){ return (lang==='zh' && I18N[s]!=null) ? I18N[s] : s; }
@@ -632,8 +642,9 @@ async function loadSettings(){
     const gv=(el,v)=>{ if($(el)) $(el).value=(v==null?'':v); };
     gv('#setGenTemp',s.gen_temperature); gv('#setGenTopP',s.gen_top_p); gv('#setGenTopK',s.gen_top_k); gv('#setGenMax',s.gen_max_tokens);
     gv('#setHost',s.host); gv('#setPort',s.port); gv('#setBackend',s.backend); gv('#setMaxMem',s.max_process_memory); gv('#setModelDir',s.model_dir);
+    gv('#setConc',s.max_concurrent_requests); gv('#setQueue',s.max_queued_requests);
     $('#keyState').textContent=s.api_key?'set':'unset';
-    const order=['backend','model_dir','host','port','max_concurrent_requests','idle_timeout','max_process_memory','ttl_check_interval','sse_keepalive_interval','kv_hot_capacity','kv_cold_dir','hf_endpoint','gen_temperature','gen_top_p','gen_top_k','gen_max_tokens','api_key'];
+    const order=['backend','model_dir','host','port','max_concurrent_requests','max_queued_requests','idle_timeout','max_process_memory','ttl_check_interval','sse_keepalive_interval','kv_hot_capacity','kv_cold_dir','hf_endpoint','gen_temperature','gen_top_p','gen_top_k','gen_max_tokens','api_key'];
     $('#settingsKv').innerHTML=order.filter(k=>k in s).map(k=>'<dt>'+k+'</dt><dd>'+(k==='api_key'?(s[k]?'set':'unset'):esc(s[k]==null?'—':s[k]))+'</dd>').join('');
   }catch(e){ $('#settings-err').textContent=String(e); }
 }
@@ -690,6 +701,13 @@ async function restartServer(){
   setTimeout(probe,1500);
 }
 $('#restartBtn').onclick=restartServer;
+async function saveConc(){
+  try{ const c=parseInt($('#setConc').value), q=parseInt($('#setQueue').value);
+    await api('/api/settings','PUT',{max_concurrent_requests:isNaN(c)?null:c, max_queued_requests:isNaN(q)?null:q});
+    toast('concurrency saved'); loadSettings();
+  }catch(e){ $('#settings-err').textContent=String(e); }
+}
+$('#saveConc').onclick=saveConc;
 
 /* Metrics */
 function drawChart(id, vals, color, unit){
@@ -776,12 +794,14 @@ $('#mt-permodel').addEventListener('click',e=>{ const th=e.target.closest('th[da
   const k=th.dataset.sort; pmSort.dir=(pmSort.key===k)?-pmSort.dir:-1; pmSort.key=k; renderPerModel(); });
 /* Metrics: live bar + export/copy */
 async function refreshLive(){
-  try{ const s=await api('/api/status'); let active=0, queue=0, loaded=0;
-    (s.models||[]).forEach(m=>{ if(m.loaded){ loaded++; if(m.stats){ active+=m.stats.active_requests||0; queue+=m.stats.queue_depth||0; } } });
+  try{ const s=await api('/api/status'); let bActive=0, bQueue=0, loaded=0;
+    (s.models||[]).forEach(m=>{ if(m.loaded){ loaded++; if(m.stats){ bActive+=m.stats.active_requests||0; bQueue+=m.stats.queue_depth||0; } } });
+    const adm=s.admission||{};                       // control-plane admission is authoritative
+    const active=(adm.active!=null)?adm.active:bActive, queue=(adm.waiting!=null)?adm.waiting:bQueue, cap=adm.cap;
     let tps=0; try{ const ms=await api('/api/metrics'); const r=(ms.samples||[]).slice(-5); if(r.length) tps=r.reduce((a,x)=>a+(x.tps||0),0)/r.length; }catch(_){}
     if($('#liveBar')) $('#liveBar').innerHTML=
       statCard('Loaded models', statN(loaded))+
-      statCard('Active requests', statN(active))+
+      statCard('Active requests', statN(active)+(cap?'<small> / '+statN(cap)+'</small>':''))+
       statCard('Queue depth', statN(queue))+
       statCard('Recent', statN(Math.round(tps))+'<small> tok/s</small>');
   }catch(e){}

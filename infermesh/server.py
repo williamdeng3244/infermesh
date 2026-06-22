@@ -59,6 +59,7 @@ from infermesh.core.pool import (
     PoolError,
 )
 from infermesh.core.settings import Settings
+from infermesh.core.scheduler import AdmissionController, Overloaded
 from infermesh.core.devices import enumerate_devices
 from infermesh.core.stats import StatsAccumulator
 from infermesh.core.history import (
@@ -112,6 +113,8 @@ class SettingsPatch(BaseModel):
 
     idle_timeout: Optional[float] = None
     api_key: Optional[str] = None  # "" clears (auth off); null = leave unchanged
+    max_concurrent_requests: Optional[int] = None  # admission cap (live)
+    max_queued_requests: Optional[int] = None      # admission queue bound (0 => unbounded)
     kv_hot_capacity: Optional[int] = None
     kv_cold_dir: Optional[str] = None
     hf_endpoint: Optional[str] = None
@@ -230,6 +233,9 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     app = FastAPI(title="infermesh", version=__version__, lifespan=lifespan)
     app.state.pool = pool
     app.state.settings = settings
+    gate = AdmissionController(cap=settings.max_concurrent_requests,
+                               max_queue=getattr(settings, "max_queued_requests", 0) or None)
+    app.state.gate = gate
     pool.default_extra = _kv_defaults(settings)
     from infermesh.core import downloader as _downloader
     _downloader.set_endpoint(settings.hf_endpoint)
@@ -255,16 +261,27 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         internal = adapter.parse_request(request)
         model_id = pool.resolve_model_id(request.model)
 
+        try:
+            await gate.acquire()  # control-plane concurrency cap (held until the response completes)
+        except Overloaded as exc:
+            _STATS.record_rejection("overloaded")
+            return JSONResponse(
+                adapter.create_error_response(str(exc), "overloaded", 503),
+                status_code=503,
+            )
+
         if internal.stream:
             try:
                 backend = await pool.get_engine(model_id, _lease=True)
             except ModelNotFoundError as exc:
+                await gate.release()
                 _STATS.record_rejection("model_not_found")
                 return JSONResponse(
                     adapter.create_error_response(str(exc), "model_not_found", 404),
                     status_code=404,
                 )
             except (ModelTooLargeError, InsufficientMemoryError) as exc:
+                await gate.release()
                 _STATS.record_rejection("insufficient_memory")
                 return JSONResponse(
                     adapter.create_error_response(str(exc), "insufficient_memory", 503),
@@ -330,41 +347,45 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                     except asyncio.CancelledError:
                         pass
                     await pool.release_engine(model_id)
+                    await gate.release()
                     _record_metric(request.model, (time.monotonic() - start) * 1000.0, completion,
                                    prompt_tokens=prompt_toks, cached_tokens=cached_toks, ttft_ms=ttft_ms)
 
             return StreamingResponse(event_stream(), media_type="text/event-stream")
 
         # Non-streaming
-        start = time.monotonic()
         try:
-            async with pool.acquire(model_id) as backend:
-                response = await backend.chat(internal)
-        except ModelNotFoundError as exc:
-            _STATS.record_rejection("model_not_found")
-            return JSONResponse(
-                adapter.create_error_response(str(exc), "model_not_found", 404),
-                status_code=404,
-            )
-        except (ModelTooLargeError, InsufficientMemoryError) as exc:
-            _STATS.record_rejection("insufficient_memory")
-            return JSONResponse(
-                adapter.create_error_response(str(exc), "insufficient_memory", 503),
-                status_code=503,
-            )
-        except PoolError as exc:
-            _STATS.record_rejection("server_error")
-            return JSONResponse(
-                adapter.create_error_response(str(exc), "server_error", 500),
-                status_code=500,
-            )
+            start = time.monotonic()
+            try:
+                async with pool.acquire(model_id) as backend:
+                    response = await backend.chat(internal)
+            except ModelNotFoundError as exc:
+                _STATS.record_rejection("model_not_found")
+                return JSONResponse(
+                    adapter.create_error_response(str(exc), "model_not_found", 404),
+                    status_code=404,
+                )
+            except (ModelTooLargeError, InsufficientMemoryError) as exc:
+                _STATS.record_rejection("insufficient_memory")
+                return JSONResponse(
+                    adapter.create_error_response(str(exc), "insufficient_memory", 503),
+                    status_code=503,
+                )
+            except PoolError as exc:
+                _STATS.record_rejection("server_error")
+                return JSONResponse(
+                    adapter.create_error_response(str(exc), "server_error", 500),
+                    status_code=500,
+                )
 
-        _record_metric(request.model, (time.monotonic() - start) * 1000.0, response.completion_tokens,
-                       prompt_tokens=response.prompt_tokens, cached_tokens=response.cached_tokens)
-        formatted = adapter.format_response(response, request)
-        if hasattr(formatted, "model_dump"):
-            return JSONResponse(formatted.model_dump(exclude_none=True))
-        return JSONResponse(formatted)
+            _record_metric(request.model, (time.monotonic() - start) * 1000.0, response.completion_tokens,
+                           prompt_tokens=response.prompt_tokens, cached_tokens=response.cached_tokens)
+            formatted = adapter.format_response(response, request)
+            if hasattr(formatted, "model_dump"):
+                return JSONResponse(formatted.model_dump(exclude_none=True))
+            return JSONResponse(formatted)
+        finally:
+            await gate.release()
 
     # ------------------------------ routes ----------------------------- #
     @app.post("/v1/chat/completions")
@@ -523,7 +544,7 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/api/status")
     async def api_status(_: None = Depends(require_auth)):
-        return pool.get_status()
+        return dict(pool.get_status(), admission=gate.snapshot())
 
     @app.get("/api/logs")
     async def api_logs(
@@ -649,6 +670,14 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         if patch.api_key is not None:
             settings.api_key = patch.api_key or None
             changed.append("api_key")
+        if patch.max_concurrent_requests is not None:
+            settings.max_concurrent_requests = max(1, int(patch.max_concurrent_requests))
+            gate.configure(cap=settings.max_concurrent_requests)   # live
+            changed.append("max_concurrent_requests")
+        if patch.max_queued_requests is not None:
+            settings.max_queued_requests = max(0, int(patch.max_queued_requests))
+            gate.configure(max_queue=settings.max_queued_requests)  # live
+            changed.append("max_queued_requests")
         if patch.kv_hot_capacity is not None:
             settings.kv_hot_capacity = max(0, int(patch.kv_hot_capacity))
             changed.append("kv_hot_capacity")
