@@ -15,6 +15,20 @@ def test_accumulator_derives_metrics(tmp_path):
     assert s.snapshot("alltime")["total_requests"] == 1
 
 
+def test_per_model_breakdown(tmp_path):
+    s = StatsAccumulator(path=tmp_path / "stats.json")
+    s.record(model="alpha", prompt_tokens=10, completion_tokens=5)
+    s.record(model="beta", prompt_tokens=20, completion_tokens=8)
+    s.record(model="alpha", prompt_tokens=10, completion_tokens=5)
+    g = s.snapshot("session")
+    assert g["total_requests"] == 3 and g["model"] is None
+    assert g["models"] == ["alpha", "beta"]
+    a = s.snapshot("session", model="alpha")
+    assert a["model"] == "alpha" and a["total_requests"] == 2 and a["total_prompt_tokens"] == 20
+    assert s.snapshot("session", model="beta")["total_completion_tokens"] == 8
+    assert s.snapshot("session", model="missing")["total_requests"] == 0
+
+
 def test_clear_scopes_are_independent(tmp_path):
     s = StatsAccumulator(path=tmp_path / "stats.json")
     s.record(prompt_tokens=10, completion_tokens=5)
@@ -39,12 +53,15 @@ def test_api_stats_endpoint(client):
     client.post("/v1/chat/completions", json={"model": "echo-1", "messages": [{"role": "user", "content": "hi"}]})
     s = client.get("/api/stats?scope=session").json()
     assert s["scope"] == "session" and s["total_requests"] >= 1 and s["total_tokens_served"] >= 1
+    assert "echo-1" in s["models"]                       # per-model tracking
+    m = client.get("/api/stats?scope=session&model=echo-1").json()
+    assert m["model"] == "echo-1" and m["total_requests"] >= 1
     assert client.get("/api/stats?scope=alltime").json()["scope"] == "alltime"
     assert client.post("/api/stats/clear?scope=session").json()["cleared"] == "session"
 
 
 def test_dashboard_has_stats_panel(client):
     html = client.get("/admin").text
-    for m in ('id="stScopeSession"', 'id="stScopeAll"', 'id="stClear"',
+    for m in ('id="stScopeSession"', 'id="stScopeAll"', 'id="stModel"', 'id="stClear"',
               "function refreshStats", "Cache efficiency", "/api/stats"):
         assert m in html, m

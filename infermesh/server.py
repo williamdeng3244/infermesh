@@ -154,7 +154,7 @@ def _record_metric(model: Optional[str], latency_ms: float, completion_tokens: i
     # Aggregate: prefill time ~= TTFT; the rest is generation.
     prefill_s = (ttft_ms / 1000.0) if ttft_ms else 0.0
     generation_s = max(0.0, (latency_ms - (ttft_ms or 0.0)) / 1000.0)
-    _STATS.record(prompt_tokens=prompt_tokens, completion_tokens=tokens,
+    _STATS.record(model=model or "", prompt_tokens=prompt_tokens, completion_tokens=tokens,
                   cached_tokens=cached_tokens, prefill_s=prefill_s, generation_s=generation_s)
 
 
@@ -499,8 +499,9 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         return {"devices": enumerate_devices()}
 
     @app.get("/api/stats")
-    async def api_stats(scope: str = Query(default="session"), _: None = Depends(require_auth)):
-        return _STATS.snapshot("alltime" if scope == "alltime" else "session")
+    async def api_stats(scope: str = Query(default="session"), model: str = Query(default=""),
+                        _: None = Depends(require_auth)):
+        return _STATS.snapshot("alltime" if scope == "alltime" else "session", model=model)
 
     @app.post("/api/stats/clear")
     async def api_stats_clear(scope: str = Query(default="session"), _: None = Depends(require_auth)):

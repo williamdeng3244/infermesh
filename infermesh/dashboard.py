@@ -197,6 +197,7 @@ tbody tr:hover{background:var(--card2)}
         <div class="panel" style="padding:16px;margin-bottom:16px">
           <div class="chat-bar" style="margin-bottom:12px">
             <div class="seg"><button id="stScopeSession" class="seg-btn active">Session</button><button id="stScopeAll" class="seg-btn">All-Time</button></div>
+            <select id="stModel" style="min-width:160px"><option value="">All models</option></select>
             <span class="muted" style="font-size:11px">aggregate request stats &mdash; All-Time survives restarts</span>
             <span class="spacer"></span>
             <button class="btn sm" id="stClear">Clear</button>
@@ -491,7 +492,9 @@ let statsScope='session';
 function statN(n){ return (n!=null)?(typeof n==='number'?n.toLocaleString():n):'—'; }
 function statCard(k,v){ return '<div class="card"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'; }
 async function refreshStats(){
-  try{ const s=await api('/api/stats?scope='+statsScope);
+  try{ const sel=$('#stModel'); const model=sel?sel.value:'';
+    const s=await api('/api/stats?scope='+statsScope+(model?'&model='+encodeURIComponent(model):''));
+    if(sel){ const cur=sel.value; sel.innerHTML='<option value="">All models</option>'+(s.models||[]).map(m=>'<option value="'+esc(m)+'">'+esc(m)+'</option>').join(''); sel.value=cur; }
     $('#statCards').innerHTML=
       statCard('Requests', statN(s.total_requests))+
       statCard('Tokens served', statN(s.total_tokens_served))+
@@ -511,6 +514,7 @@ function setStatsScope(sc){ statsScope=sc;
 $('#stScopeSession').onclick=()=>setStatsScope('session');
 $('#stScopeAll').onclick=()=>setStatsScope('alltime');
 $('#stClear').onclick=async()=>{ try{ await api('/api/stats/clear?scope='+statsScope,'POST'); refreshStats(); toast('cleared '+statsScope+' stats'); }catch(e){} };
+$('#stModel').onchange=refreshStats;
 async function refreshMetrics(){
   try{ const d=await api('/api/metrics'); const s=d.samples||[];
     const lat=s.map(p=>p.latency_ms), tps=s.map(p=>p.tps);
