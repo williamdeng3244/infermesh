@@ -35,6 +35,7 @@ class Settings:
     sse_keepalive_interval: float = 15.0  # emit ': keep-alive' SSE comment if no token for N s (0 => off)
     kv_hot_capacity: int = 0              # Transformers tiered-KV hot entries (0 => off); applied to new model loads
     kv_cold_dir: Optional[str] = None     # cold (SSD) dir for the tiered KV cache
+    hf_endpoint: Optional[str] = None     # HuggingFace mirror endpoint (e.g. https://hf-mirror.com) for search/download
 
     @classmethod
     def load(cls, path: Path = SETTINGS_PATH) -> "Settings":

@@ -28,20 +28,33 @@ def _require_hf():
     return huggingface_hub
 
 
+_endpoint = None  # optional HF mirror endpoint (e.g. https://hf-mirror.com)
+
+
+def set_endpoint(url) -> None:
+    """Point search/download at a HuggingFace mirror (None = the default hub)."""
+    global _endpoint
+    _endpoint = url or None
+
+
+def _api(hf):
+    return hf.HfApi(endpoint=_endpoint) if _endpoint else hf.HfApi()
+
+
 def _hf_list_models(query: str, limit: int) -> list:
     hf = _require_hf()
-    api = hf.HfApi()
-    return list(api.list_models(search=query, limit=limit, sort="downloads"))
+    return list(_api(hf).list_models(search=query, limit=limit, sort="downloads"))
 
 
 def _hf_model_info(repo_id: str):
     hf = _require_hf()
-    return hf.HfApi().model_info(repo_id, files_metadata=True)
+    return _api(hf).model_info(repo_id, files_metadata=True)
 
 
 def _hf_snapshot(repo_id: str, dest: str) -> str:
     hf = _require_hf()
-    return hf.snapshot_download(repo_id, local_dir=dest)
+    kw = {"endpoint": _endpoint} if _endpoint else {}
+    return hf.snapshot_download(repo_id, local_dir=dest, **kw)
 
 
 def search_models(query: str, limit: int = 20) -> list[dict]:

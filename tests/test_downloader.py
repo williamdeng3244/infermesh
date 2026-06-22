@@ -115,3 +115,19 @@ def test_dashboard_has_download_tab(client):
     html = client.get("/admin").text
     for marker in ('data-sec="download"', 'id="sec-download"', 'id="dlSearch"', "runHfSearch", "hfDownload"):
         assert marker in html, marker
+
+
+def test_set_endpoint():
+    dl.set_endpoint("https://hf-mirror.com")
+    assert dl._endpoint == "https://hf-mirror.com"
+    dl.set_endpoint("")
+    assert dl._endpoint is None          # blank clears -> default hub
+
+
+def test_settings_put_hf_endpoint(client, monkeypatch):
+    from infermesh.core.settings import Settings
+    monkeypatch.setattr(Settings, "save", lambda self, *a, **k: None)
+    r = client.put("/api/settings", json={"hf_endpoint": "https://hf-mirror.com"}).json()
+    assert "hf_endpoint" in r["updated"] and r["settings"]["hf_endpoint"] == "https://hf-mirror.com"
+    assert dl._endpoint == "https://hf-mirror.com"   # applied to the live downloader
+    dl.set_endpoint(None)                            # reset for other tests

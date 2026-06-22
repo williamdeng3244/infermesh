@@ -320,6 +320,14 @@ tbody tr:hover{background:var(--card2)}
             </div>
             <div class="hint">Hot RAM entries for the tiered KV cache (0 = off). Applies to models loaded after saving.</div>
           </div>
+          <div class="field">
+            <label for="setHfEndpoint">HuggingFace endpoint (mirror)</label>
+            <div class="row">
+              <input id="setHfEndpoint" type="text" placeholder="blank = huggingface.co &middot; e.g. https://hf-mirror.com" style="width:340px" autocomplete="off"/>
+              <button class="btn" id="saveHf">Save</button>
+            </div>
+            <div class="hint">Search + download via a mirror (faster/accessible in some regions). Applies immediately.</div>
+          </div>
           <p id="settings-err" class="err"></p>
           <h3 style="margin-top:26px">All settings</h3>
           <dl class="kv" id="settingsKv"></dl>
@@ -465,8 +473,9 @@ async function loadSettings(){
     $('#setIdle').value=s.idle_timeout;
     if($('#setKvHot')) $('#setKvHot').value=s.kv_hot_capacity;
     if($('#setKvCold')) $('#setKvCold').value=s.kv_cold_dir||'';
+    if($('#setHfEndpoint')) $('#setHfEndpoint').value=s.hf_endpoint||'';
     $('#keyState').textContent=s.api_key?'set':'unset';
-    const order=['backend','model_dir','host','port','max_concurrent_requests','idle_timeout','max_process_memory','ttl_check_interval','sse_keepalive_interval','kv_hot_capacity','kv_cold_dir','api_key'];
+    const order=['backend','model_dir','host','port','max_concurrent_requests','idle_timeout','max_process_memory','ttl_check_interval','sse_keepalive_interval','kv_hot_capacity','kv_cold_dir','hf_endpoint','api_key'];
     $('#settingsKv').innerHTML=order.filter(k=>k in s).map(k=>'<dt>'+k+'</dt><dd>'+(k==='api_key'?(s[k]?'set':'unset'):esc(s[k]==null?'—':s[k]))+'</dd>').join('');
   }catch(e){ $('#settings-err').textContent=String(e); }
 }
@@ -491,6 +500,11 @@ async function saveKv(){
 $('#saveIdle').onclick=saveIdle;
 $('#applyKey').onclick=applyKey;
 $('#saveKv').onclick=saveKv;
+async function saveHf(){
+  try{ await api('/api/settings','PUT',{hf_endpoint:$('#setHfEndpoint').value}); toast('HuggingFace endpoint saved'); loadSettings(); }
+  catch(e){ $('#settings-err').textContent=String(e); }
+}
+$('#saveHf').onclick=saveHf;
 
 /* Metrics */
 function drawChart(id, vals, color, unit){

@@ -114,6 +114,7 @@ class SettingsPatch(BaseModel):
     api_key: Optional[str] = None  # "" clears (auth off); null = leave unchanged
     kv_hot_capacity: Optional[int] = None
     kv_cold_dir: Optional[str] = None
+    hf_endpoint: Optional[str] = None
 
 
 class BenchmarkRequest(BaseModel):
@@ -210,6 +211,8 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     app.state.pool = pool
     app.state.settings = settings
     pool.default_extra = _kv_defaults(settings)
+    from infermesh.core import downloader as _downloader
+    _downloader.set_endpoint(settings.hf_endpoint)
 
     # ------------------------------ auth ------------------------------- #
     async def require_auth(
@@ -619,6 +622,11 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         if patch.kv_cold_dir is not None:
             settings.kv_cold_dir = patch.kv_cold_dir or None
             changed.append("kv_cold_dir")
+        if patch.hf_endpoint is not None:
+            settings.hf_endpoint = patch.hf_endpoint or None
+            changed.append("hf_endpoint")
+            from infermesh.core import downloader as _downloader
+            _downloader.set_endpoint(settings.hf_endpoint)
         if "kv_hot_capacity" in changed or "kv_cold_dir" in changed:
             pool.default_extra = _kv_defaults(settings)
         if changed:
