@@ -88,7 +88,8 @@ def test_api_stats_models_breakdown(client):
 def test_dashboard_has_stats_panel(client):
     html = client.get("/admin").text
     for m in ('id="stScopeSession"', 'id="stScopeAll"', 'id="stModel"', 'id="stClear"', 'id="statRej"',
-              "function refreshStats", "function fmtUptime", "Cache efficiency", "Uptime", "Rejected", "/api/stats",
+              "function refreshStats", "function fmtUptime", "Cache efficiency", "Uptime", "Success rate", "/api/stats",
               'data-mt="permodel"', 'id="mt-permodel"', 'id="pmRows"', "function refreshPerModel",
-              'id="liveBar"', 'id="stCopy"', 'id="stExport"', "function refreshLive"):
+              'id="liveBar"', 'id="stCopy"', 'id="stExport"', "function refreshLive",
+              'id="tokBar"', 'id="cacheBar"', 'id="chRange"', "Token composition", "Avg tokens/req"):
         assert m in html, m

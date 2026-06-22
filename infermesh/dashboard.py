@@ -81,6 +81,12 @@ input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid v
 .card .v small{font-size:14px;color:var(--muted);font-weight:500}
 .bar{height:6px;background:var(--mutedbg);border-radius:3px;margin-top:12px;overflow:hidden}
 .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--accent));transition:width .5s ease}
+.stat-viz{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+.stack{display:flex;height:16px;border-radius:8px;overflow:hidden;margin-top:14px;background:var(--mutedbg)}
+.stack>span{display:block;height:100%;transition:width .5s ease}
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.legend b{color:var(--text);font-weight:600;font-family:var(--mono);margin-left:3px}
 .panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 thead th{text-align:left;padding:11px 16px;color:var(--muted);font:600 11px var(--sans);text-transform:uppercase;letter-spacing:.6px;background:var(--card2);border-bottom:1px solid var(--border)}
@@ -216,6 +222,19 @@ tbody tr:hover{background:var(--card2)}
         </div>
         <div class="mt-panel" id="mt-overview">
           <div class="cards" id="statCards"></div>
+          <div class="stat-viz">
+            <div class="card">
+              <div class="k">Token composition</div>
+              <div class="stack" id="tokBar"></div>
+              <div class="legend" id="tokLeg"></div>
+            </div>
+            <div class="card">
+              <div class="k">Cache efficiency</div>
+              <div class="v" id="cacheV">&mdash;<small> %</small></div>
+              <div class="bar"><i id="cacheBar" style="width:0%"></i></div>
+              <div class="muted" id="cacheSub" style="font-size:11px;margin-top:10px">&mdash;</div>
+            </div>
+          </div>
         </div>
         <div class="mt-panel" id="mt-permodel" style="display:none">
           <div class="panel">
@@ -226,6 +245,11 @@ tbody tr:hover{background:var(--card2)}
           </div>
         </div>
         <div class="mt-panel" id="mt-charts" style="display:none">
+          <div class="seg" id="chRange" style="margin-bottom:14px">
+            <button class="seg-btn" data-r="300">5m</button>
+            <button class="seg-btn" data-r="3600">1h</button>
+            <button class="seg-btn active" data-r="0">All</button>
+          </div>
           <div class="cards" id="metricCards"></div>
           <div class="panel" style="padding:18px;margin-bottom:16px">
             <div class="muted" style="font-size:12px;margin-bottom:10px">Latency per request (ms)</div>
@@ -572,17 +596,29 @@ async function refreshStats(){
   try{ const sel=$('#stModel'); const model=sel?sel.value:'';
     const s=await api('/api/stats?scope='+statsScope+(model?'&model='+encodeURIComponent(model):'')); lastStats=s;
     if(sel){ const cur=sel.value; sel.innerHTML='<option value="">All models</option>'+(s.models||[]).map(m=>'<option value="'+esc(m)+'">'+esc(m)+'</option>').join(''); sel.value=cur; }
+    const req=s.total_requests||0, rej=s.total_rejections||0, served=s.total_tokens_served||0;
+    const pt=s.total_prompt_tokens||0, ct=s.total_completion_tokens||0, cached=s.total_cached_tokens||0;
+    const avgTok=req?Math.round(served/req):0, succ=(req+rej)?(req/(req+rej)*100):100;
     $('#statCards').innerHTML=
-      statCard('Requests', statN(s.total_requests))+
-      statCard('Tokens served', statN(s.total_tokens_served))+
-      statCard('Prompt tokens', statN(s.total_prompt_tokens))+
-      statCard('Completion tokens', statN(s.total_completion_tokens))+
-      statCard('Cached tokens', statN(s.total_cached_tokens))+
-      statCard('Cache efficiency', statN(s.cache_efficiency)+'<small> %</small>')+
+      statCard('Requests', statN(req))+
+      statCard('Tokens served', statN(served))+
+      statCard('Avg tokens/req', statN(avgTok))+
+      statCard('Prompt tokens', statN(pt))+
+      statCard('Completion tokens', statN(ct))+
+      statCard('Cached tokens', statN(cached))+
       statCard('Prefill', statN(s.prefill_tps)+'<small> tok/s</small>')+
       statCard('Generation', statN(s.generation_tps)+'<small> tok/s</small>')+
       statCard('Uptime', fmtUptime(s.uptime_seconds))+
-      statCard('Rejected', statN(s.total_rejections));
+      statCard('Success rate', (req+rej?succ.toFixed(1):'100')+'<small> % &middot; '+statN(rej)+' rej</small>');
+    const pNew=Math.max(0,pt-cached), tot=(pNew+cached+ct)||1;
+    const seg=(v,c)=> v>0?'<span style="width:'+(v/tot*100)+'%;background:'+c+'"></span>':'';
+    if($('#tokBar')) $('#tokBar').innerHTML=seg(pNew,'var(--blue)')+seg(cached,'var(--accent)')+seg(ct,'var(--warn)');
+    const leg=(c,l,v)=>'<span><i style="background:'+c+'"></i>'+l+'<b>'+statN(v)+'</b></span>';
+    if($('#tokLeg')) $('#tokLeg').innerHTML=leg('var(--blue)','Prompt (new)',pNew)+leg('var(--accent)','Cached',cached)+leg('var(--warn)','Completion',ct);
+    const ce=+s.cache_efficiency||0;
+    if($('#cacheV')) $('#cacheV').innerHTML=statN(s.cache_efficiency)+'<small> %</small>';
+    if($('#cacheBar')) $('#cacheBar').style.width=Math.min(100,ce)+'%';
+    if($('#cacheSub')) $('#cacheSub').textContent=statN(cached)+' of '+statN(pt)+' prompt tokens reused from cache';
     const rj=s.rejections||{}; const rks=Object.keys(rj);
     if($('#statRej')) $('#statRej').innerHTML = rks.length? ('rejected &mdash; '+rks.map(k=>esc(k)+': '+rj[k]).join(' &middot; ')) : 'none';
   }catch(e){}
@@ -636,14 +672,20 @@ $('#stExport').onclick=async()=>{ try{ const ms=await api('/api/metrics'); const
     const blob=new Blob([head+'\n'+body],{type:'text/csv'}); const a=document.createElement('a');
     a.href=URL.createObjectURL(blob); a.download='infermesh-metrics.csv'; a.click(); URL.revokeObjectURL(a.href); toast('exported '+rows.length+' samples');
   }catch(e){ toast('export failed'); } };
+let chRange=0;  // charts time window in seconds (0 = all)
 async function refreshMetrics(){
-  try{ const d=await api('/api/metrics'); const s=d.samples||[];
+  try{ const d=await api('/api/metrics'); let s=d.samples||[];
+    if(chRange){ const now=Date.now()/1000; s=s.filter(p=>now-(p.t||0)<=chRange); }
     const lat=s.map(p=>p.latency_ms), tps=s.map(p=>p.tps);
     const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+    const sl=lat.slice().sort((a,b)=>a-b), p95=sl.length?sl[Math.min(sl.length-1,Math.floor(0.95*sl.length))]:0;
+    const peak=tps.length?Math.max.apply(null,tps):0;
     $('#metricCards').innerHTML=
       '<div class="card"><div class="k">Requests</div><div class="v">'+s.length+'</div></div>'+
       '<div class="card"><div class="k">Avg latency</div><div class="v">'+avg(lat).toFixed(0)+'<small> ms</small></div></div>'+
+      '<div class="card"><div class="k">p95 latency</div><div class="v">'+p95.toFixed(0)+'<small> ms</small></div></div>'+
       '<div class="card"><div class="k">Avg throughput</div><div class="v">'+avg(tps).toFixed(1)+'<small> tok/s</small></div></div>'+
+      '<div class="card"><div class="k">Peak throughput</div><div class="v">'+peak.toFixed(1)+'<small> tok/s</small></div></div>'+
       '<div class="card"><div class="k">Last latency</div><div class="v">'+(s.length?Math.round(s[s.length-1].latency_ms):'—')+'<small> ms</small></div></div>';
     const cs=getComputedStyle(document.documentElement);
     const cBlue=(cs.getPropertyValue('--blue')||'#58a6ff').trim(), cGreen=(cs.getPropertyValue('--accent')||'#22c55e').trim();
@@ -651,6 +693,8 @@ async function refreshMetrics(){
     drawChart('chartTps', tps, cGreen, 'tok/s');
   }catch(e){}
 }
+$$('#chRange .seg-btn').forEach(b=>b.onclick=()=>{ chRange=+b.dataset.r;
+  $$('#chRange .seg-btn').forEach(x=>x.classList.toggle('active',x===b)); refreshMetrics(); });
 
 /* Benchmark */
 async function loadBenchModels(){
