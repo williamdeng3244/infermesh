@@ -202,9 +202,12 @@ tbody tr:hover{background:var(--card2)}
             <select id="stModel" style="min-width:160px"><option value="">All models</option></select>
             <span class="muted" style="font-size:11px">aggregate request stats &mdash; All-Time survives restarts</span>
             <span class="spacer"></span>
+            <button class="btn sm" id="stCopy">Copy</button>
+            <button class="btn sm" id="stExport">Export CSV</button>
             <button class="btn sm" id="stClear">Clear</button>
           </div>
         </div>
+        <div class="cards" id="liveBar" style="margin-bottom:14px"></div>
         <div class="seg" id="mtTabs" style="margin-bottom:14px">
           <button class="seg-btn active" data-mt="overview">Overview</button>
           <button class="seg-btn" data-mt="permodel">Per-model</button>
@@ -549,13 +552,13 @@ function drawChart(id, vals, color, unit){
   x.fillStyle=color; x.font='600 12px ui-monospace,monospace'; x.fillText(vals[n-1]+' '+unit, w-118, 16);
 }
 /* Stats (session / all-time) */
-let statsScope='session';
+let statsScope='session', lastStats=null;
 function statN(n){ return (n!=null)?(typeof n==='number'?n.toLocaleString():n):'—'; }
 function statCard(k,v){ return '<div class="card"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'; }
 function fmtUptime(sec){ sec=Math.floor(sec||0); const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60),s=sec%60; if(d) return d+'d '+h+'h'; if(h) return h+'h '+m+'m'; if(m) return m+'m '+s+'s'; return s+'s'; }
 async function refreshStats(){
   try{ const sel=$('#stModel'); const model=sel?sel.value:'';
-    const s=await api('/api/stats?scope='+statsScope+(model?'&model='+encodeURIComponent(model):''));
+    const s=await api('/api/stats?scope='+statsScope+(model?'&model='+encodeURIComponent(model):'')); lastStats=s;
     if(sel){ const cur=sel.value; sel.innerHTML='<option value="">All models</option>'+(s.models||[]).map(m=>'<option value="'+esc(m)+'">'+esc(m)+'</option>').join(''); sel.value=cur; }
     $('#statCards').innerHTML=
       statCard('Requests', statN(s.total_requests))+
@@ -586,6 +589,7 @@ let pmRows=[], pmSort={key:'total_requests',dir:-1};
 function setMetricsTab(t){
   $$('#mtTabs .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.mt===t));
   ['overview','permodel','charts','rejections'].forEach(p=>{ const el=$('#mt-'+p); if(el) el.style.display=(p===t)?'':'none'; });
+  refreshLive();
   if(t==='charts') refreshMetrics(); else if(t==='permodel') refreshPerModel(); else refreshStats();
 }
 $$('#mtTabs .seg-btn').forEach(b=>b.onclick=()=>setMetricsTab(b.dataset.mt));
@@ -599,6 +603,27 @@ function renderPerModel(){
 }
 $('#mt-permodel').addEventListener('click',e=>{ const th=e.target.closest('th[data-sort]'); if(!th) return;
   const k=th.dataset.sort; pmSort.dir=(pmSort.key===k)?-pmSort.dir:-1; pmSort.key=k; renderPerModel(); });
+/* Metrics: live bar + export/copy */
+async function refreshLive(){
+  try{ const s=await api('/api/status'); let active=0, queue=0, loaded=0;
+    (s.models||[]).forEach(m=>{ if(m.loaded){ loaded++; if(m.stats){ active+=m.stats.active_requests||0; queue+=m.stats.queue_depth||0; } } });
+    let tps=0; try{ const ms=await api('/api/metrics'); const r=(ms.samples||[]).slice(-5); if(r.length) tps=r.reduce((a,x)=>a+(x.tps||0),0)/r.length; }catch(_){}
+    if($('#liveBar')) $('#liveBar').innerHTML=
+      statCard('Loaded models', statN(loaded))+
+      statCard('Active requests', statN(active))+
+      statCard('Queue depth', statN(queue))+
+      statCard('Recent', statN(Math.round(tps))+'<small> tok/s</small>');
+  }catch(e){}
+}
+$('#stCopy').onclick=()=>{ if(!lastStats){ toast('no stats yet'); return; }
+  const txt=JSON.stringify(lastStats,null,2);
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(()=>toast('stats copied')).catch(()=>toast('copy failed'));
+  else toast('clipboard unavailable'); };
+$('#stExport').onclick=async()=>{ try{ const ms=await api('/api/metrics'); const rows=ms.samples||[];
+    const head='t,model,latency_ms,tokens,tps'; const body=rows.map(r=>[r.t,r.model,r.latency_ms,r.tokens,r.tps].join(',')).join('\n');
+    const blob=new Blob([head+'\n'+body],{type:'text/csv'}); const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download='infermesh-metrics.csv'; a.click(); URL.revokeObjectURL(a.href); toast('exported '+rows.length+' samples');
+  }catch(e){ toast('export failed'); } };
 async function refreshMetrics(){
   try{ const d=await api('/api/metrics'); const s=d.samples||[];
     const lat=s.map(p=>p.latency_ms), tps=s.map(p=>p.tps);
@@ -764,7 +789,7 @@ async function tick(){
   try{ const s=await api('/api/status'); setHealth(true); if(active==='models'){ renderModels(s); $('#models-err').textContent=''; } }
   catch(e){ setHealth(false); if(active==='models') $('#models-err').textContent=String(e); }
   if(active==='logs') refreshLogs();
-  if(active==='metrics'){ refreshMetrics(); refreshStats(); }
+  if(active==='metrics'){ refreshMetrics(); refreshStats(); refreshLive(); }
   if(active==='download') refreshDownloads();
 }
 setInterval(tick,2000); tick();
