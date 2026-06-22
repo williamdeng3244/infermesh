@@ -44,7 +44,7 @@ async def test_mcp_client_benchmark_and_chat():
 
 async def test_mcp_client_devices_and_search(monkeypatch):
     import infermesh.core.downloader as dl
-    monkeypatch.setattr(dl, "_hf_list_models", lambda q, l: [type("M", (), {
+    monkeypatch.setattr(dl, "_hf_list_models", lambda q, l, **k: [type("M", (), {
         "id": "org/x", "downloads": 9, "likes": 1, "pipeline_tag": "text-generation", "gated": False})()])
     c, ac = _client()
     try:

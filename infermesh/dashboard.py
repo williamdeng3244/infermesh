@@ -262,13 +262,25 @@ tbody tr:hover{background:var(--card2)}
       <section class="section" id="sec-download">
         <div class="chat-bar" style="margin-bottom:12px">
           <input id="dlSearch" placeholder="Search HuggingFace models (e.g. Qwen2.5-0.5B-Instruct)" style="flex:1;min-width:240px"/>
+          <select id="dlTask" title="Filter by task">
+            <option value="">Any task</option>
+            <option value="text-generation">Text generation</option>
+            <option value="image-text-to-text">Vision (VLM)</option>
+            <option value="feature-extraction">Embedding</option>
+          </select>
+          <select id="dlSort" title="Sort by">
+            <option value="downloads">Most downloads</option>
+            <option value="trending_score">Trending</option>
+            <option value="likes">Most likes</option>
+            <option value="lastModified">Recently updated</option>
+          </select>
           <button class="btn primary" id="dlBtn">Search</button>
         </div>
         <p class="muted" style="font-size:12px;margin:0 0 10px">Downloads land in the server's <code>--model-dir</code> and appear under Models when finished.</p>
         <div class="panel" style="margin-bottom:16px">
           <table>
             <thead><tr><th>Model</th><th>Task</th><th>Downloads</th><th>Likes</th><th></th></tr></thead>
-            <tbody id="dlResults"><tr><td colspan="5" class="muted">search to list models</td></tr></tbody>
+            <tbody id="dlResults"><tr><td colspan="5" class="muted">popular models load here&hellip;</td></tr></tbody>
           </table>
         </div>
         <div class="chat-bar" style="margin-bottom:8px"><span class="muted" style="font-size:12px">Downloads</span></div>
@@ -398,7 +410,7 @@ function switchSection(sec){
   if(sec==='metrics'){ refreshMetrics(); refreshStats(); }
   if(sec==='benchmark'){ loadBenchModels(); refreshBenchHistory(); }
   if(sec==='devices') refreshDevices();
-  if(sec==='download') refreshDownloads();
+  if(sec==='download'){ refreshDownloads(); if(!dlLoaded){ dlLoaded=true; runHfSearch(); } }
   if(sec==='models') loadDevicePicker();
 }
 
@@ -759,9 +771,10 @@ $('#bmHist').addEventListener('click',e=>{ const b=e.target.closest('button.bm-e
 /* Download (HuggingFace) */
 function fmtBytes(n){ if(!n) return '—'; const u=['B','KB','MB','GB','TB']; let i=0,x=n; while(x>=1024&&i<u.length-1){x/=1024;i++;} return x.toFixed(x<10&&i>0?1:0)+' '+u[i]; }
 async function runHfSearch(){
-  const q=$('#dlSearch').value.trim(); if(!q) return;
-  $('#dl-err').textContent=''; $('#dlResults').innerHTML='<tr><td colspan="5" class="muted">searching&hellip;</td></tr>';
-  try{ const d=await api('/api/hf/search?q='+encodeURIComponent(q)+'&limit=25');
+  const q=$('#dlSearch').value.trim();
+  const sort=$('#dlSort')?$('#dlSort').value:'downloads', task=$('#dlTask')?$('#dlTask').value:'';
+  $('#dl-err').textContent=''; $('#dlResults').innerHTML='<tr><td colspan="5" class="muted">'+(q?'searching':'loading popular models')+'&hellip;</td></tr>';
+  try{ const d=await api('/api/hf/search?limit=25&q='+encodeURIComponent(q)+'&sort='+sort+'&task='+encodeURIComponent(task));
     $('#dlResults').innerHTML=(d.models||[]).map(m=>'<tr><td class="mono">'+esc(m.id)+(m.gated?' <span class="badge">gated</span>':'')+'</td><td class="muted">'+esc(m.pipeline_tag||'—')+'</td><td class="num">'+fmt(m.downloads)+'</td><td class="num">'+fmt(m.likes)+'</td><td class="rowact"><button class="btn sm" data-repo="'+esc(m.id)+'">Download</button></td></tr>').join('')||'<tr><td colspan="5" class="muted">no results</td></tr>';
   }catch(e){ $('#dl-err').textContent=String(e); $('#dlResults').innerHTML='<tr><td colspan="5" class="muted">search failed</td></tr>'; }
 }
@@ -778,7 +791,9 @@ async function refreshDownloads(){
     }).join('')||'<tr><td colspan="4" class="muted">no downloads yet</td></tr>';
   }catch(e){}
 }
+let dlLoaded=false;
 $('#dlBtn').onclick=runHfSearch;
+$('#dlSort').onchange=runHfSearch; $('#dlTask').onchange=runHfSearch;
 $('#dlSearch').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); runHfSearch(); }});
 $('#dlResults').addEventListener('click',e=>{ const b=e.target.closest('button[data-repo]'); if(b) hfDownload(b.dataset.repo); });
 /* poll */

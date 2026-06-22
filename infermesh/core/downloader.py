@@ -41,9 +41,14 @@ def _api(hf):
     return hf.HfApi(endpoint=_endpoint) if _endpoint else hf.HfApi()
 
 
-def _hf_list_models(query: str, limit: int) -> list:
+def _hf_list_models(query: str, limit: int, sort: str = "downloads", task=None) -> list:
     hf = _require_hf()
-    return list(_api(hf).list_models(search=query, limit=limit, sort="downloads"))
+    kw = {"limit": limit, "sort": sort}
+    if query:
+        kw["search"] = query
+    if task:
+        kw["pipeline_tag"] = task
+    return list(_api(hf).list_models(**kw))
 
 
 def _hf_model_info(repo_id: str):
@@ -57,9 +62,9 @@ def _hf_snapshot(repo_id: str, dest: str) -> str:
     return hf.snapshot_download(repo_id, local_dir=dest, **kw)
 
 
-def search_models(query: str, limit: int = 20) -> list[dict]:
+def search_models(query: str = "", limit: int = 20, sort: str = "downloads", task=None) -> list[dict]:
     out: list[dict] = []
-    for m in _hf_list_models(query, limit):
+    for m in _hf_list_models(query, limit, sort=sort, task=task):
         out.append({
             "id": getattr(m, "id", None) or getattr(m, "modelId", ""),
             "downloads": int(getattr(m, "downloads", 0) or 0),

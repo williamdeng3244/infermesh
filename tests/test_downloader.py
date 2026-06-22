@@ -23,7 +23,7 @@ class _Info:
 
 def test_search_models(monkeypatch):
     monkeypatch.setattr(dl, "_hf_list_models",
-                        lambda q, l: [_M("org/alpha", 100, 5, "text-generation"), _M("org/beta", 50)])
+                        lambda q, l, **k: [_M("org/alpha", 100, 5, "text-generation"), _M("org/beta", 50)])
     r = dl.search_models("alpha", 10)
     assert [m["id"] for m in r] == ["org/alpha", "org/beta"]
     assert r[0]["downloads"] == 100 and r[0]["likes"] == 5 and r[0]["pipeline_tag"] == "text-generation"
@@ -76,10 +76,25 @@ def _app(tmp_path):
 
 
 def test_hf_search_endpoint(tmp_path, monkeypatch):
-    monkeypatch.setattr(dl, "_hf_list_models", lambda q, l: [_M("org/x", 9, 1, "text-generation")])
+    monkeypatch.setattr(dl, "_hf_list_models", lambda q, l, **k: [_M("org/x", 9, 1, "text-generation")])
     client, _ = _app(tmp_path)
     r = client.get("/api/hf/search?q=x")
     assert r.status_code == 200 and r.json()["models"][0]["id"] == "org/x"
+
+
+def test_hf_search_sort_task_passthrough(tmp_path, monkeypatch):
+    seen = {}
+
+    def fake(q, l, sort="downloads", task=None):
+        seen.update(q=q, sort=sort, task=task)
+        return [_M("org/y", 1, 0, "image-text-to-text")]
+    monkeypatch.setattr(dl, "_hf_list_models", fake)
+    client, _ = _app(tmp_path)
+    r = client.get("/api/hf/search?sort=trending_score&task=image-text-to-text").json()  # empty q -> popular
+    assert seen["q"] == "" and seen["sort"] == "trending_score" and seen["task"] == "image-text-to-text"
+    assert r["models"][0]["id"] == "org/y" and r["sort"] == "trending_score"
+    bad = client.get("/api/hf/search?sort=bogus").json()   # invalid sort falls back, never 500
+    assert bad["sort"] == "downloads"
 
 
 def test_hf_download_and_autoregister(tmp_path, monkeypatch):
@@ -113,7 +128,8 @@ def test_hf_download_requires_model_dir(client):
 
 def test_dashboard_has_download_tab(client):
     html = client.get("/admin").text
-    for marker in ('data-sec="download"', 'id="sec-download"', 'id="dlSearch"', "runHfSearch", "hfDownload"):
+    for marker in ('data-sec="download"', 'id="sec-download"', 'id="dlSearch"', "runHfSearch", "hfDownload",
+                   'id="dlSort"', 'id="dlTask"'):
         assert marker in html, marker
 
 

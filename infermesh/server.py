@@ -553,16 +553,22 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/api/hf/search")
     async def api_hf_search(
-        q: str = Query(..., min_length=1),
+        q: str = Query(default=""),
         limit: int = Query(default=20, ge=1, le=50),
+        sort: str = Query(default="downloads"),
+        task: str = Query(default=""),
         _: None = Depends(require_auth),
     ):
         from infermesh.core import downloader
+        if sort not in ("downloads", "likes", "trending_score", "lastModified"):
+            sort = "downloads"
         try:
-            models = await asyncio.to_thread(downloader.search_models, q, limit)
+            models = await asyncio.to_thread(downloader.search_models, q, limit, sort, task or None)
         except RuntimeError as exc:  # huggingface_hub not installed
             raise HTTPException(status_code=501, detail=str(exc))
-        return {"models": models}
+        except Exception as exc:  # bad sort/task/query or network — surface, don't 500
+            raise HTTPException(status_code=502, detail=str(exc)[:200])
+        return {"models": models, "sort": sort, "task": task or None}
 
     @app.post("/api/hf/download")
     async def api_hf_download(req: HFDownloadRequest, _: None = Depends(require_auth)):
