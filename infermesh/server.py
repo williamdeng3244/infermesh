@@ -115,6 +115,10 @@ class SettingsPatch(BaseModel):
     kv_hot_capacity: Optional[int] = None
     kv_cold_dir: Optional[str] = None
     hf_endpoint: Optional[str] = None
+    gen_temperature: Optional[float] = None  # null in body clears the default; absent leaves it unchanged
+    gen_top_p: Optional[float] = None
+    gen_top_k: Optional[int] = None
+    gen_max_tokens: Optional[int] = None
 
 
 class BenchmarkRequest(BaseModel):
@@ -169,6 +173,17 @@ def _kv_defaults(settings: Settings) -> dict:
             extra["kv_cold_dir"] = settings.kv_cold_dir
         return extra
     return {}
+
+
+def _apply_gen_defaults(request, settings: Settings):
+    """Fill omitted sampling params on a chat request from server-side generation
+    defaults. A value the client explicitly sent always wins; an unset default
+    (None) leaves the field for the adapter's built-in fallback."""
+    for attr, val in (("temperature", settings.gen_temperature), ("top_p", settings.gen_top_p),
+                      ("top_k", settings.gen_top_k), ("max_tokens", settings.gen_max_tokens)):
+        if val is not None and getattr(request, attr, None) is None:
+            setattr(request, attr, val)
+    return request
 
 
 def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
@@ -231,6 +246,7 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
 
     # --------------------------- chat handler -------------------------- #
     async def _handle_chat(request, adapter):
+        _apply_gen_defaults(request, settings)  # server generation defaults fill any omitted sampling params
         internal = adapter.parse_request(request)
         model_id = pool.resolve_model_id(request.model)
 
@@ -639,6 +655,19 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             changed.append("hf_endpoint")
             from infermesh.core import downloader as _downloader
             _downloader.set_endpoint(settings.hf_endpoint)
+        fset = patch.model_fields_set  # explicit null clears a default; absent key leaves it unchanged
+        if "gen_temperature" in fset:
+            settings.gen_temperature = None if patch.gen_temperature is None else max(0.0, min(2.0, float(patch.gen_temperature)))
+            changed.append("gen_temperature")
+        if "gen_top_p" in fset:
+            settings.gen_top_p = None if patch.gen_top_p is None else max(0.0, min(1.0, float(patch.gen_top_p)))
+            changed.append("gen_top_p")
+        if "gen_top_k" in fset:
+            settings.gen_top_k = None if patch.gen_top_k is None else max(0, int(patch.gen_top_k))
+            changed.append("gen_top_k")
+        if "gen_max_tokens" in fset:
+            settings.gen_max_tokens = None if patch.gen_max_tokens is None else max(1, int(patch.gen_max_tokens))
+            changed.append("gen_max_tokens")
         if "kv_hot_capacity" in changed or "kv_cold_dir" in changed:
             pool.default_extra = _kv_defaults(settings)
         if changed:

@@ -36,6 +36,10 @@ class Settings:
     kv_hot_capacity: int = 0              # Transformers tiered-KV hot entries (0 => off); applied to new model loads
     kv_cold_dir: Optional[str] = None     # cold (SSD) dir for the tiered KV cache
     hf_endpoint: Optional[str] = None     # HuggingFace mirror endpoint (e.g. https://hf-mirror.com) for search/download
+    gen_temperature: Optional[float] = None  # default sampling temperature when a request omits it (None => no default)
+    gen_top_p: Optional[float] = None        # default nucleus top_p when a request omits it
+    gen_top_k: Optional[int] = None          # default top_k when a request omits it (0 => disabled)
+    gen_max_tokens: Optional[int] = None     # default max output tokens when a request omits it
 
     @classmethod
     def load(cls, path: Path = SETTINGS_PATH) -> "Settings":

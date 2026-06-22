@@ -390,6 +390,18 @@ tbody tr:hover{background:var(--card2)}
             </div>
             <div class="hint">Search + download via a mirror (faster/accessible in some regions). Applies immediately.</div>
           </div>
+          <h3 style="margin-top:26px">Generation defaults</h3>
+          <div class="field">
+            <label for="setGenTemp">Sampling defaults &mdash; applied when a request omits the parameter</label>
+            <div class="row">
+              <input id="setGenTemp" type="number" min="0" max="2" step="0.05" placeholder="temperature" title="temperature 0&ndash;2" style="width:130px"/>
+              <input id="setGenTopP" type="number" min="0" max="1" step="0.05" placeholder="top_p" title="top_p 0&ndash;1" style="width:115px"/>
+              <input id="setGenTopK" type="number" min="0" step="1" placeholder="top_k" title="top_k (0 = off)" style="width:110px"/>
+              <input id="setGenMax" type="number" min="1" step="1" placeholder="max_tokens" title="max output tokens" style="width:135px"/>
+              <button class="btn" id="saveGen">Save</button>
+            </div>
+            <div class="hint">Blank = no server default (the client's value or the built-in fallback applies). A request's own values always win.</div>
+          </div>
           <p id="settings-err" class="err"></p>
           <h3 style="margin-top:26px">All settings</h3>
           <dl class="kv" id="settingsKv"></dl>
@@ -536,8 +548,10 @@ async function loadSettings(){
     if($('#setKvHot')) $('#setKvHot').value=s.kv_hot_capacity;
     if($('#setKvCold')) $('#setKvCold').value=s.kv_cold_dir||'';
     if($('#setHfEndpoint')) $('#setHfEndpoint').value=s.hf_endpoint||'';
+    const gv=(el,v)=>{ if($(el)) $(el).value=(v==null?'':v); };
+    gv('#setGenTemp',s.gen_temperature); gv('#setGenTopP',s.gen_top_p); gv('#setGenTopK',s.gen_top_k); gv('#setGenMax',s.gen_max_tokens);
     $('#keyState').textContent=s.api_key?'set':'unset';
-    const order=['backend','model_dir','host','port','max_concurrent_requests','idle_timeout','max_process_memory','ttl_check_interval','sse_keepalive_interval','kv_hot_capacity','kv_cold_dir','hf_endpoint','api_key'];
+    const order=['backend','model_dir','host','port','max_concurrent_requests','idle_timeout','max_process_memory','ttl_check_interval','sse_keepalive_interval','kv_hot_capacity','kv_cold_dir','hf_endpoint','gen_temperature','gen_top_p','gen_top_k','gen_max_tokens','api_key'];
     $('#settingsKv').innerHTML=order.filter(k=>k in s).map(k=>'<dt>'+k+'</dt><dd>'+(k==='api_key'?(s[k]?'set':'unset'):esc(s[k]==null?'—':s[k]))+'</dd>').join('');
   }catch(e){ $('#settings-err').textContent=String(e); }
 }
@@ -567,6 +581,13 @@ async function saveHf(){
   catch(e){ $('#settings-err').textContent=String(e); }
 }
 $('#saveHf').onclick=saveHf;
+async function saveGen(){
+  const num=el=>{ const v=$(el).value.trim(); if(v==='') return null; const n=Number(v); return isNaN(n)?null:n; };
+  try{ await api('/api/settings','PUT',{gen_temperature:num('#setGenTemp'),gen_top_p:num('#setGenTopP'),gen_top_k:num('#setGenTopK'),gen_max_tokens:num('#setGenMax')});
+    toast('generation defaults saved'); loadSettings();
+  }catch(e){ $('#settings-err').textContent=String(e); }
+}
+$('#saveGen').onclick=saveGen;
 
 /* Metrics */
 function drawChart(id, vals, color, unit){

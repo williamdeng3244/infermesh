@@ -48,6 +48,7 @@ def test_dashboard_has_all_sections(client):
     for marker in ("sec-models", "sec-chat", "sec-logs", "sec-metrics", "sec-settings",
                    'id="chatInput"', 'id="logs"', 'id="setIdle"', 'id="setKvHot"', 'id="saveKv"',
                    'id="setHfEndpoint"', 'id="saveHf"', "chartLatency",
+                   'id="setGenTemp"', 'id="saveGen"', "Generation defaults",
                    'class="prefill"', "msg-meta", 'id="themeBtn"', 'data-theme="light"'):
         assert marker in html, marker
 
@@ -70,6 +71,31 @@ def test_settings_put_kv_cache(client, mock_pool, monkeypatch):
     assert "kv_hot_capacity" in body["updated"] and "kv_cold_dir" in body["updated"]
     assert body["settings"]["kv_hot_capacity"] == 12 and body["settings"]["kv_cold_dir"] == "/tmp/kv"
     assert mock_pool.default_extra == {"prefix_kv": 12, "kv_cold_dir": "/tmp/kv"}   # applied globally
+
+
+def test_settings_put_generation_defaults(client, monkeypatch):
+    monkeypatch.setattr(Settings, "save", lambda self, *a, **k: None)
+    r = client.put("/api/settings", json={"gen_temperature": 0.3, "gen_top_k": 40, "gen_max_tokens": 17}).json()
+    for k in ("gen_temperature", "gen_top_k", "gen_max_tokens"):
+        assert k in r["updated"]
+    assert r["settings"]["gen_temperature"] == 0.3 and r["settings"]["gen_top_k"] == 40 and r["settings"]["gen_max_tokens"] == 17
+    clamp = client.put("/api/settings", json={"gen_temperature": 9.9, "gen_top_p": 2.0, "gen_max_tokens": 0}).json()["settings"]
+    assert clamp["gen_temperature"] == 2.0 and clamp["gen_top_p"] == 1.0 and clamp["gen_max_tokens"] == 1   # clamped
+    cleared = client.put("/api/settings", json={"gen_temperature": None}).json()["settings"]
+    assert cleared["gen_temperature"] is None          # explicit null clears the default
+
+
+def test_apply_gen_defaults_only_fills_omitted():
+    from infermesh.server import _apply_gen_defaults
+    from infermesh.api.openai_models import ChatCompletionRequest
+    msgs = [{"role": "user", "content": "hi"}]
+    s = Settings(gen_temperature=0.2, gen_max_tokens=33)
+    filled = _apply_gen_defaults(ChatCompletionRequest(model="m", messages=msgs), s)
+    assert filled.temperature == 0.2 and filled.max_tokens == 33   # omitted -> server default
+    kept = _apply_gen_defaults(ChatCompletionRequest(model="m", messages=msgs, temperature=0.9), s)
+    assert kept.temperature == 0.9                                 # client value always wins
+    none_default = _apply_gen_defaults(ChatCompletionRequest(model="m", messages=msgs), Settings())
+    assert none_default.top_p is None                             # no default -> left for adapter fallback
 
 
 async def test_pool_merges_default_extra_at_load(mock_pool):
