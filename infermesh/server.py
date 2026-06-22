@@ -60,6 +60,7 @@ from infermesh.core.pool import (
 )
 from infermesh.core.settings import Settings
 from infermesh.core.devices import enumerate_devices
+from infermesh.core.stats import StatsAccumulator
 from infermesh.core.history import (
     append_benchmark,
     append_metric,
@@ -132,9 +133,13 @@ class HFDownloadRequest(BaseModel):
 
 # Rolling per-request metrics for the dashboard's latency/throughput charts.
 _METRICS: deque = deque(maxlen=300)
+# Aggregate request stats (session + persisted all-time), oMLX-style.
+_STATS = StatsAccumulator()
 
 
-def _record_metric(model: Optional[str], latency_ms: float, completion_tokens: int) -> None:
+def _record_metric(model: Optional[str], latency_ms: float, completion_tokens: int,
+                   prompt_tokens: int = 0, cached_tokens: int = 0,
+                   ttft_ms: Optional[float] = None) -> None:
     tokens = int(completion_tokens or 0)
     tps = (tokens / (latency_ms / 1000.0)) if latency_ms > 0 and tokens else 0.0
     record = {
@@ -146,6 +151,11 @@ def _record_metric(model: Optional[str], latency_ms: float, completion_tokens: i
     }
     _METRICS.append(record)
     append_metric(record)
+    # Aggregate: prefill time ~= TTFT; the rest is generation.
+    prefill_s = (ttft_ms / 1000.0) if ttft_ms else 0.0
+    generation_s = max(0.0, (latency_ms - (ttft_ms or 0.0)) / 1000.0)
+    _STATS.record(prompt_tokens=prompt_tokens, completion_tokens=tokens,
+                  cached_tokens=cached_tokens, prefill_s=prefill_s, generation_s=generation_s)
 
 
 def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
@@ -230,15 +240,24 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                 # with a timeout, so a slow first token (long prefill on a big model)
                 # emits ': keep-alive' comments instead of letting the client read-time-out.
                 completion = 0
+                prompt_toks = 0
+                cached_toks = 0
+                ttft_ms = None
                 queue: asyncio.Queue = asyncio.Queue()
                 _DONE = object()
 
                 async def produce():
-                    nonlocal completion
+                    nonlocal completion, prompt_toks, cached_toks, ttft_ms
                     try:
                         async for chunk in backend.chat_stream(internal):
+                            if ttft_ms is None and (chunk.text or chunk.reasoning_content):
+                                ttft_ms = (time.monotonic() - start) * 1000.0
                             if chunk.completion_tokens:
                                 completion = chunk.completion_tokens
+                            if chunk.prompt_tokens:
+                                prompt_toks = chunk.prompt_tokens
+                            if chunk.cached_tokens:
+                                cached_toks = chunk.cached_tokens
                             await queue.put(adapter.format_stream_chunk(chunk, request))
                         tail = adapter.format_stream_end(request)
                         if tail:
@@ -272,7 +291,8 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                     except asyncio.CancelledError:
                         pass
                     await pool.release_engine(model_id)
-                    _record_metric(request.model, (time.monotonic() - start) * 1000.0, completion)
+                    _record_metric(request.model, (time.monotonic() - start) * 1000.0, completion,
+                                   prompt_tokens=prompt_toks, cached_tokens=cached_toks, ttft_ms=ttft_ms)
 
             return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -297,7 +317,8 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                 status_code=500,
             )
 
-        _record_metric(request.model, (time.monotonic() - start) * 1000.0, response.completion_tokens)
+        _record_metric(request.model, (time.monotonic() - start) * 1000.0, response.completion_tokens,
+                       prompt_tokens=response.prompt_tokens, cached_tokens=response.cached_tokens)
         formatted = adapter.format_response(response, request)
         if hasattr(formatted, "model_dump"):
             return JSONResponse(formatted.model_dump(exclude_none=True))
@@ -476,6 +497,16 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     @app.get("/api/devices")
     async def api_devices(_: None = Depends(require_auth)):
         return {"devices": enumerate_devices()}
+
+    @app.get("/api/stats")
+    async def api_stats(scope: str = Query(default="session"), _: None = Depends(require_auth)):
+        return _STATS.snapshot("alltime" if scope == "alltime" else "session")
+
+    @app.post("/api/stats/clear")
+    async def api_stats_clear(scope: str = Query(default="session"), _: None = Depends(require_auth)):
+        target = "alltime" if scope == "alltime" else "session"
+        _STATS.clear(target)
+        return {"cleared": target}
 
     @app.get("/api/history")
     async def api_history(_: None = Depends(require_auth)):
