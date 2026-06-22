@@ -62,6 +62,22 @@ def _hf_snapshot(repo_id: str, dest: str) -> str:
     return hf.snapshot_download(repo_id, local_dir=dest, **kw)
 
 
+def _require_ms():
+    try:
+        import modelscope  # noqa: F401
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(
+            "modelscope is not installed. Install the extra: "
+            "pip install 'infermesh[modelscope]'"
+        ) from exc
+    return modelscope
+
+
+def _ms_snapshot(repo_id: str, dest: str) -> str:
+    ms = _require_ms()
+    return ms.snapshot_download(repo_id, local_dir=dest)
+
+
 def search_models(query: str = "", limit: int = 20, sort: str = "downloads", task=None) -> list[dict]:
     out: list[dict] = []
     for m in _hf_list_models(query, limit, sort=sort, task=task):
@@ -102,25 +118,28 @@ def _dest_for(repo_id: str, model_dir: str) -> Path:
     return Path(model_dir).expanduser() / repo_id.split("/")[-1]
 
 
-def start_download(repo_id: str, model_dir: str) -> dict:
-    """Kick off a background snapshot download; returns the initial job record."""
+def start_download(repo_id: str, model_dir: str, source: str = "hf") -> dict:
+    """Kick off a background snapshot download; returns the initial job record.
+    ``source`` is ``"hf"`` (HuggingFace) or ``"modelscope"``."""
     dest = _dest_for(repo_id, model_dir)
+    snapshot = _ms_snapshot if source == "modelscope" else _hf_snapshot
     with _LOCK:
         existing = _JOBS.get(repo_id)
         if existing and existing["status"] in ("queued", "downloading"):
             return dict(existing)
         _JOBS[repo_id] = {
             "repo_id": repo_id, "status": "queued", "total_bytes": 0,
-            "downloaded_bytes": 0, "path": str(dest), "model_id": dest.name, "error": None,
+            "downloaded_bytes": 0, "path": str(dest), "model_id": dest.name,
+            "error": None, "source": source,
         }
 
     def _run() -> None:
         try:
-            total = model_size_bytes(repo_id)
+            total = 0 if source == "modelscope" else model_size_bytes(repo_id)  # ms: size via dir scan
             with _LOCK:
                 _JOBS[repo_id]["total_bytes"] = total
                 _JOBS[repo_id]["status"] = "downloading"
-            _hf_snapshot(repo_id, str(dest))
+            snapshot(repo_id, str(dest))
             with _LOCK:
                 _JOBS[repo_id]["status"] = "done"
                 _JOBS[repo_id]["downloaded_bytes"] = _JOBS[repo_id]["total_bytes"] or _dir_size(str(dest))

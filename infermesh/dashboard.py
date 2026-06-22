@@ -326,6 +326,11 @@ tbody tr:hover{background:var(--card2)}
             <tbody id="dlResults"><tr><td colspan="5" class="muted" data-i18n="popular models load here…">popular models load here&hellip;</td></tr></tbody>
           </table>
         </div>
+        <div class="chat-bar" style="margin-bottom:10px">
+          <span class="muted" style="font-size:12px" data-i18n="ModelScope (by model ID)">ModelScope (by model ID)</span>
+          <input id="msdlId" placeholder="e.g. Qwen/Qwen2.5-0.5B-Instruct" style="flex:1;min-width:200px"/>
+          <button class="btn" id="msdlBtn" data-i18n="Download">Download</button>
+        </div>
         <div class="chat-bar" style="margin-bottom:8px"><span class="muted" style="font-size:12px" data-i18n="Download jobs">Download jobs</span></div>
         <div class="panel">
           <table>
@@ -509,7 +514,8 @@ const I18N={
 "connecting":"连接中","healthy":"正常","unreachable":"无法连接",
 "stats copied":"已复制统计","generation defaults saved":"已保存生成默认值","startup settings saved":"已保存启动设置","KV cache settings saved":"已保存 KV 缓存设置","HuggingFace endpoint saved":"已保存 HuggingFace 端点","Idle timeout saved":"已保存空闲超时",
 "Max concurrent requests":"最大并发请求","queue bound (0 = unbounded)":"队列上限（0 = 无限）","Admission cap applied live. Queue bound > 0 returns 503 once that many requests are waiting.":"准入上限实时生效。队列上限 > 0 时，等待数达到该值即返回 503。","concurrency saved":"已保存并发设置",
-"Per-model overrides":"按模型覆盖","override the global generation defaults for one model":"为单个模型覆盖全局生成默认值","Per-model values win over the global defaults; a request's own value still wins. max_context_window rejects over-long prompts (approximate).":"按模型的值优先于全局默认值；请求自带的值仍然最优先。max_context_window 会拒绝过长的 prompt（近似）。","model overrides saved":"已保存模型覆盖","model overrides cleared":"已清除模型覆盖"
+"Per-model overrides":"按模型覆盖","override the global generation defaults for one model":"为单个模型覆盖全局生成默认值","Per-model values win over the global defaults; a request's own value still wins. max_context_window rejects over-long prompts (approximate).":"按模型的值优先于全局默认值；请求自带的值仍然最优先。max_context_window 会拒绝过长的 prompt（近似）。","model overrides saved":"已保存模型覆盖","model overrides cleared":"已清除模型覆盖",
+"ModelScope (by model ID)":"ModelScope（按模型 ID）"
 };
 let lang='en';
 function T(s){ return (lang==='zh' && I18N[s]!=null) ? I18N[s] : s; }
@@ -1025,6 +1031,13 @@ let dlLoaded=false;
 $('#dlBtn').onclick=runHfSearch;
 $('#dlSort').onchange=runHfSearch; $('#dlTask').onchange=runHfSearch;
 $('#dlSearch').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); runHfSearch(); }});
+async function msDownload(){
+  const id=$('#msdlId').value.trim(); if(!id) return;
+  try{ await api('/api/hf/download','POST',{repo_id:id, source:'modelscope'}); toast('downloading '+id); $('#msdlId').value=''; refreshDownloads(); }
+  catch(e){ $('#dl-err').textContent=String(e); }
+}
+$('#msdlBtn').onclick=msDownload;
+$('#msdlId').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); msDownload(); }});
 $('#dlResults').addEventListener('click',e=>{ const b=e.target.closest('button[data-repo]'); if(b) hfDownload(b.dataset.repo); });
 /* poll */
 $('#refreshBtn').onclick=()=>tick();

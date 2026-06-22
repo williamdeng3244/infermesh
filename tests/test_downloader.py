@@ -129,7 +129,7 @@ def test_hf_download_requires_model_dir(client):
 def test_dashboard_has_download_tab(client):
     html = client.get("/admin").text
     for marker in ('data-sec="download"', 'id="sec-download"', 'id="dlSearch"', "runHfSearch", "hfDownload",
-                   'id="dlSort"', 'id="dlTask"'):
+                   'id="dlSort"', 'id="dlTask"', 'id="msdlId"', 'id="msdlBtn"', "ModelScope (by model ID)"):
         assert marker in html, marker
 
 
@@ -147,3 +147,49 @@ def test_settings_put_hf_endpoint(client, monkeypatch):
     assert "hf_endpoint" in r["updated"] and r["settings"]["hf_endpoint"] == "https://hf-mirror.com"
     assert dl._endpoint == "https://hf-mirror.com"   # applied to the live downloader
     dl.set_endpoint(None)                            # reset for other tests
+
+
+def test_start_download_routes_to_modelscope(tmp_path, monkeypatch):
+    dl._JOBS.clear()
+    calls = {}
+
+    def fake_ms(rid, dest):
+        calls["rid"] = rid
+        os.makedirs(dest, exist_ok=True)
+        with open(os.path.join(dest, "config.json"), "w") as fh:
+            fh.write("{}")
+        return dest
+    monkeypatch.setattr(dl, "_ms_snapshot", fake_ms)
+    job = dl.start_download("Qwen/Q", str(tmp_path), source="modelscope")
+    assert job["source"] == "modelscope"
+    st = {}
+    for _ in range(100):
+        st = {j["repo_id"]: j for j in dl.downloads_status()}["Qwen/Q"]
+        if st["status"] in ("done", "error"):
+            break
+        time.sleep(0.02)
+    assert st["status"] == "done", st.get("error")
+    assert calls["rid"] == "Qwen/Q"   # routed to the ModelScope snapshot, not HF
+
+
+def test_hf_download_endpoint_source_modelscope(tmp_path, monkeypatch):
+    dl._JOBS.clear()
+
+    def fake_ms(rid, dest):
+        os.makedirs(dest, exist_ok=True)
+        with open(os.path.join(dest, "config.json"), "w") as fh:
+            fh.write("{}")
+        return dest
+    monkeypatch.setattr(dl, "_ms_snapshot", fake_ms)
+    client, _ = _app(tmp_path)
+    r = client.post("/api/hf/download", json={"repo_id": "org/M", "source": "modelscope"})
+    assert r.status_code == 200 and r.json()["source"] == "modelscope"
+
+
+def test_require_ms_helpful_error_when_absent():
+    import importlib.util
+    import pytest
+    if importlib.util.find_spec("modelscope") is not None:
+        pytest.skip("modelscope is installed")
+    with pytest.raises(RuntimeError, match="modelscope"):
+        dl._require_ms()

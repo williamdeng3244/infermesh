@@ -156,6 +156,7 @@ class HFDownloadRequest(BaseModel):
     """Config for POST /api/hf/download."""
 
     repo_id: str
+    source: str = "hf"   # "hf" (HuggingFace) | "modelscope"
 
 
 # Rolling per-request metrics for the dashboard's latency/throughput charts.
@@ -672,7 +673,8 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         if not settings.model_dir:
             raise HTTPException(status_code=400, detail="downloads need a --model-dir; none is configured")
         try:
-            return downloader.start_download(req.repo_id, settings.model_dir)
+            src = req.source if req.source in ("hf", "modelscope") else "hf"
+            return downloader.start_download(req.repo_id, settings.model_dir, source=src)
         except RuntimeError as exc:
             raise HTTPException(status_code=501, detail=str(exc))
 
