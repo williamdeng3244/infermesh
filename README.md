@@ -164,7 +164,7 @@ a self-contained dark panel (no build step, no JS deps, no CDN) with a sidebar a
 eight sections:
 
 - **Models** — memory gauge + live table with **Load / Unload / Pin / Unpin**, plus a **device picker** so a model loads on a chosen GPU/CPU
-- **Chat** — pick a model and stream a completion in a chat playground
+- **Chat** — pick a model and stream a completion in a chat playground, with a **prefilling…** indicator until the first token and a **first-token (TTFT)** time on each reply
 - **Logs** — live tail of the server's ring-buffered logs, level-colored
 - **Metrics** — aggregate **Session / All-Time** stats (requests, tokens served, cache efficiency, prefill/gen tok/s, uptime, rejections-by-reason), **per-model or global**, + latency + throughput sparkline charts (canvas, no chart lib)
 - **Devices** — detected accelerators (NVIDIA / AMD / CPU) with VRAM used/free/total

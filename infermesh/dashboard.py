@@ -57,6 +57,8 @@ a{color:var(--blue);text-decoration:none}
 .seg{display:inline-flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}
 .seg-btn{background:transparent;border:0;color:var(--muted);padding:5px 15px;cursor:pointer;font:500 13px var(--sans)}
 .seg-btn.active{background:var(--blue);color:#0b1120}
+.prefill{color:var(--dim);font-style:italic}
+.msg-meta{font-size:11px;color:var(--dim);margin-top:4px}
 .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--dim)}
 .pill.ok{color:var(--accent);border-color:rgba(34,197,94,.4)}.pill.ok .dot{background:var(--accent);box-shadow:0 0 8px var(--accent)}
 .pill.bad{color:var(--danger);border-color:rgba(239,68,68,.4)}.pill.bad .dot{background:var(--danger)}
@@ -413,7 +415,9 @@ async function sendChat(){
   const model=$('#chatModel').value, text=$('#chatInput').value.trim();
   if(!model||!text) return;
   addMsg('user',text); $('#chatInput').value='';
-  const body=addMsg('assistant','').querySelector('.body'); let acc='';
+  const msgEl=addMsg('assistant',''); const body=msgEl.querySelector('.body'); let acc='';
+  body.innerHTML='<span class="prefill">&#9203; prefilling&hellip;</span>';   // until the first token (TTFT)
+  const t0=performance.now(); let ttft=null;
   try{
     const r=await fetch('/v1/chat/completions',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},authHeaders()),
       body:JSON.stringify({model:model,messages:[{role:'user',content:text}],stream:true})});
@@ -433,10 +437,11 @@ async function sendChat(){
         if(!line.startsWith('data:')) continue;
         const p=line.slice(5).trim(); if(p==='[DONE]') continue;
         try{ const o=JSON.parse(p); const dc=o.choices&&o.choices[0]&&o.choices[0].delta&&o.choices[0].delta.content;
-          if(dc){ acc+=dc; body.textContent=acc; scrollMsgs(); } }catch(e){}
+          if(dc){ if(ttft==null){ ttft=performance.now()-t0; body.textContent=''; } acc+=dc; body.textContent=acc; scrollMsgs(); } }catch(e){}
       }
     }
     if(!acc) body.textContent='(empty response)';
+    if(ttft!=null){ const meta=document.createElement('div'); meta.className='msg-meta'; meta.textContent='first token '+(ttft/1000).toFixed(2)+'s'; msgEl.appendChild(meta); scrollMsgs(); }
   }catch(e){ body.textContent='error: '+e; }
 }
 $('#sendBtn').onclick=sendChat;
