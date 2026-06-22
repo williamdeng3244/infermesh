@@ -222,11 +222,13 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             try:
                 backend = await pool.get_engine(model_id, _lease=True)
             except ModelNotFoundError as exc:
+                _STATS.record_rejection("model_not_found")
                 return JSONResponse(
                     adapter.create_error_response(str(exc), "model_not_found", 404),
                     status_code=404,
                 )
             except (ModelTooLargeError, InsufficientMemoryError) as exc:
+                _STATS.record_rejection("insufficient_memory")
                 return JSONResponse(
                     adapter.create_error_response(str(exc), "insufficient_memory", 503),
                     status_code=503,
@@ -302,16 +304,19 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             async with pool.acquire(model_id) as backend:
                 response = await backend.chat(internal)
         except ModelNotFoundError as exc:
+            _STATS.record_rejection("model_not_found")
             return JSONResponse(
                 adapter.create_error_response(str(exc), "model_not_found", 404),
                 status_code=404,
             )
         except (ModelTooLargeError, InsufficientMemoryError) as exc:
+            _STATS.record_rejection("insufficient_memory")
             return JSONResponse(
                 adapter.create_error_response(str(exc), "insufficient_memory", 503),
                 status_code=503,
             )
         except PoolError as exc:
+            _STATS.record_rejection("server_error")
             return JSONResponse(
                 adapter.create_error_response(str(exc), "server_error", 500),
                 status_code=500,

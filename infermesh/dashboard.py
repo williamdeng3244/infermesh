@@ -203,6 +203,7 @@ tbody tr:hover{background:var(--card2)}
             <button class="btn sm" id="stClear">Clear</button>
           </div>
           <div class="cards" id="statCards"></div>
+          <div id="statRej" class="muted" style="font-size:12px;margin-top:10px"></div>
         </div>
         <div class="cards" id="metricCards"></div>
         <div class="panel" style="padding:18px;margin-bottom:16px">
@@ -491,6 +492,7 @@ function drawChart(id, vals, color, unit){
 let statsScope='session';
 function statN(n){ return (n!=null)?(typeof n==='number'?n.toLocaleString():n):'—'; }
 function statCard(k,v){ return '<div class="card"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'; }
+function fmtUptime(sec){ sec=Math.floor(sec||0); const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60),s=sec%60; if(d) return d+'d '+h+'h'; if(h) return h+'h '+m+'m'; if(m) return m+'m '+s+'s'; return s+'s'; }
 async function refreshStats(){
   try{ const sel=$('#stModel'); const model=sel?sel.value:'';
     const s=await api('/api/stats?scope='+statsScope+(model?'&model='+encodeURIComponent(model):''));
@@ -503,7 +505,11 @@ async function refreshStats(){
       statCard('Cached tokens', statN(s.total_cached_tokens))+
       statCard('Cache efficiency', statN(s.cache_efficiency)+'<small> %</small>')+
       statCard('Prefill', statN(s.prefill_tps)+'<small> tok/s</small>')+
-      statCard('Generation', statN(s.generation_tps)+'<small> tok/s</small>');
+      statCard('Generation', statN(s.generation_tps)+'<small> tok/s</small>')+
+      statCard('Uptime', fmtUptime(s.uptime_seconds))+
+      statCard('Rejected', statN(s.total_rejections));
+    const rj=s.rejections||{}; const rks=Object.keys(rj);
+    if($('#statRej')) $('#statRej').innerHTML = rks.length? ('rejected &mdash; '+rks.map(k=>esc(k)+': '+rj[k]).join(' &middot; ')) : '';
   }catch(e){}
 }
 function setStatsScope(sc){ statsScope=sc;

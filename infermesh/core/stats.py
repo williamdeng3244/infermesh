@@ -58,6 +58,8 @@ class StatsAccumulator:
         self._session_pm: dict[str, dict] = {}
         self._alltime = _zero()
         self._alltime_pm: dict[str, dict] = {}
+        self._session_rej: dict[str, int] = {}
+        self._alltime_rej: dict[str, int] = {}
         self._load()
         self._since_save = 0
 
@@ -71,11 +73,15 @@ class StatsAccumulator:
         per_model = data.get("per_model", {})
         if isinstance(per_model, dict):
             self._alltime_pm = {mid: _coerce(c) for mid, c in per_model.items()}
+        rej = data.get("rejections", {})
+        if isinstance(rej, dict):
+            self._alltime_rej = {str(k): int(v) for k, v in rej.items() if isinstance(v, int)}
 
     def _save(self) -> None:
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._path.write_text(json.dumps({"global": self._alltime, "per_model": self._alltime_pm}))
+            self._path.write_text(json.dumps({"global": self._alltime, "per_model": self._alltime_pm,
+                                              "rejections": self._alltime_rej}))
         except OSError:
             pass  # best-effort
 
@@ -92,6 +98,14 @@ class StatsAccumulator:
                 self._save()
                 self._since_save = 0
 
+    def record_rejection(self, reason: str) -> None:
+        """Count a request rejected before serving (model_not_found, insufficient_memory, ...)."""
+        reason = reason or "other"
+        with self._lock:
+            for rej in (self._session_rej, self._alltime_rej):
+                rej[reason] = rej.get(reason, 0) + 1
+            self._save()
+
     def snapshot(self, scope: str = "session", model: str = "") -> dict:
         alltime = scope == "alltime"
         with self._lock:
@@ -101,11 +115,14 @@ class StatsAccumulator:
             else:
                 d = dict(self._alltime if alltime else self._session)
             models = sorted(pm.keys())
+            rej = dict(self._alltime_rej if alltime else self._session_rej)
             uptime = time.time() - self._start
         out = self._derive(d, uptime)
         out["scope"] = "alltime" if alltime else "session"
         out["model"] = model or None
         out["models"] = models
+        out["rejections"] = rej
+        out["total_rejections"] = sum(rej.values())
         return out
 
     @staticmethod
@@ -129,7 +146,9 @@ class StatsAccumulator:
             if scope == "alltime":
                 self._alltime = _zero()
                 self._alltime_pm = {}
+                self._alltime_rej = {}
                 self._save()
             else:
                 self._session = _zero()
                 self._session_pm = {}
+                self._session_rej = {}

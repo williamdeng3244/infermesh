@@ -29,6 +29,20 @@ def test_per_model_breakdown(tmp_path):
     assert s.snapshot("session", model="missing")["total_requests"] == 0
 
 
+def test_rejections_tracked(tmp_path):
+    s = StatsAccumulator(path=tmp_path / "stats.json")
+    s.record_rejection("model_not_found")
+    s.record_rejection("insufficient_memory")
+    s.record_rejection("model_not_found")
+    snap = s.snapshot("session")
+    assert snap["total_rejections"] == 3
+    assert snap["rejections"] == {"model_not_found": 2, "insufficient_memory": 1}
+    assert s.snapshot("alltime")["total_rejections"] == 3
+    s.clear("session")
+    assert s.snapshot("session")["total_rejections"] == 0
+    assert s.snapshot("alltime")["total_rejections"] == 3   # all-time kept
+
+
 def test_clear_scopes_are_independent(tmp_path):
     s = StatsAccumulator(path=tmp_path / "stats.json")
     s.record(prompt_tokens=10, completion_tokens=5)
@@ -57,11 +71,14 @@ def test_api_stats_endpoint(client):
     m = client.get("/api/stats?scope=session&model=echo-1").json()
     assert m["model"] == "echo-1" and m["total_requests"] >= 1
     assert client.get("/api/stats?scope=alltime").json()["scope"] == "alltime"
+    client.post("/v1/chat/completions", json={"model": "nope-missing", "messages": [{"role": "user", "content": "x"}]})
+    rej = client.get("/api/stats?scope=session").json()
+    assert rej["total_rejections"] >= 1 and "model_not_found" in rej["rejections"]
     assert client.post("/api/stats/clear?scope=session").json()["cleared"] == "session"
 
 
 def test_dashboard_has_stats_panel(client):
     html = client.get("/admin").text
-    for m in ('id="stScopeSession"', 'id="stScopeAll"', 'id="stModel"', 'id="stClear"',
-              "function refreshStats", "Cache efficiency", "/api/stats"):
+    for m in ('id="stScopeSession"', 'id="stScopeAll"', 'id="stModel"', 'id="stClear"', 'id="statRej"',
+              "function refreshStats", "function fmtUptime", "Cache efficiency", "Uptime", "Rejected", "/api/stats"):
         assert m in html, m
