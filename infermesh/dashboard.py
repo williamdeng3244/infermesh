@@ -136,14 +136,14 @@ tbody tr:hover{background:var(--card2)}
   <aside class="sidebar">
     <div class="brand"><span class="mark"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2 21 7v10l-9 5-9-5V7z"/><path d="M12 7l4.5 2.5v5L12 17l-4.5-2.5v-5z" opacity=".55"/></svg></span> infermesh</div>
     <nav class="nav" id="nav" aria-label="Sections">
-      <button data-sec="models" class="active" aria-label="Models"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/></svg> Models</button>
-      <button data-sec="chat" aria-label="Chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat</button>
-      <button data-sec="logs" aria-label="Logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Logs</button>
-      <button data-sec="metrics" aria-label="Metrics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg> Metrics</button>
-      <button data-sec="devices" aria-label="Devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="5" rx="1"/><rect x="2" y="13" width="20" height="5" rx="1"/><line x1="6" y1="8.5" x2="6.01" y2="8.5"/><line x1="6" y1="15.5" x2="6.01" y2="15.5"/></svg> Devices</button>
-      <button data-sec="download" aria-label="Download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg> Download</button>
-      <button data-sec="benchmark" aria-label="Benchmark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19a9 9 0 1 1 15 0"/><path d="M12 14l3.5-3.5"/></svg> Benchmark</button>
-      <button data-sec="settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg> Settings</button>
+      <button data-sec="models" class="active" aria-label="Models"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/></svg> <span data-i18n="Models">Models</span></button>
+      <button data-sec="chat" aria-label="Chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> <span data-i18n="Chat">Chat</span></button>
+      <button data-sec="logs" aria-label="Logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> <span data-i18n="Logs">Logs</span></button>
+      <button data-sec="metrics" aria-label="Metrics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg> <span data-i18n="Metrics">Metrics</span></button>
+      <button data-sec="devices" aria-label="Devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="5" rx="1"/><rect x="2" y="13" width="20" height="5" rx="1"/><line x1="6" y1="8.5" x2="6.01" y2="8.5"/><line x1="6" y1="15.5" x2="6.01" y2="15.5"/></svg> <span data-i18n="Devices">Devices</span></button>
+      <button data-sec="download" aria-label="Download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg> <span data-i18n="Download">Download</span></button>
+      <button data-sec="benchmark" aria-label="Benchmark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19a9 9 0 1 1 15 0"/><path d="M12 14l3.5-3.5"/></svg> <span data-i18n="Benchmark">Benchmark</span></button>
+      <button data-sec="settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg> <span data-i18n="Settings">Settings</span></button>
     </nav>
     <div class="sb-foot">
       <span id="sb-health" class="pill"><span class="dot"></span> connecting</span>
@@ -153,25 +153,26 @@ tbody tr:hover{background:var(--card2)}
 
   <div class="main">
     <div class="topbar">
-      <h2 id="title">Models</h2>
+      <h2 id="title" data-i18n="Models">Models</h2>
       <span class="spacer"></span>
-      <button class="btn sm" id="themeBtn" aria-label="Toggle light/dark theme" title="Toggle theme"></button>
-      <input id="apikey" placeholder="API key (if enabled)" size="20" autocomplete="off" aria-label="API key"/>
-      <button class="btn sm" id="refreshBtn">&#8635; Refresh</button>
+      <button class="btn sm" id="langBtn" title="语言 / Language" aria-label="Language">中</button>
+      <button class="btn sm" id="themeBtn" aria-label="Toggle light/dark theme" data-i18n-title="Toggle theme" title="Toggle theme"></button>
+      <input id="apikey" placeholder="API key (if enabled)" data-i18n-ph="API key (if enabled)" size="20" autocomplete="off" aria-label="API key"/>
+      <button class="btn sm" id="refreshBtn"><span aria-hidden="true">&#8635;</span> <span data-i18n="Refresh">Refresh</span></button>
     </div>
     <div class="content">
 
       <section class="section active" id="sec-models">
         <div class="cards" id="cards"></div>
         <div class="chat-bar" style="margin-bottom:12px">
-          <label class="muted" style="font-size:12px">Load on device</label>
+          <label class="muted" style="font-size:12px" data-i18n="Load on device">Load on device</label>
           <select id="devSel" style="min-width:220px"><option value="">auto</option></select>
-          <span class="muted" style="font-size:11px">applies to the next Load (Transformers backend)</span>
+          <span class="muted" style="font-size:11px" data-i18n="applies to the next Load (Transformers backend)">applies to the next Load (Transformers backend)</span>
         </div>
         <div class="panel">
           <table>
-            <thead><tr><th>Model</th><th>Type</th><th>Backend</th><th>Status</th><th>Mem MB</th><th>Gen tps</th><th>Leases</th><th>Actions</th></tr></thead>
-            <tbody id="rows"><tr><td colspan="8" class="muted">loading&hellip;</td></tr></tbody>
+            <thead><tr><th data-i18n="Model">Model</th><th data-i18n="Type">Type</th><th data-i18n="Backend">Backend</th><th data-i18n="Status">Status</th><th data-i18n="Mem MB">Mem MB</th><th data-i18n="Gen tps">Gen tps</th><th data-i18n="Leases">Leases</th><th data-i18n="Actions">Actions</th></tr></thead>
+            <tbody id="rows"><tr><td colspan="8" class="muted" data-i18n="loading…">loading&hellip;</td></tr></tbody>
           </table>
         </div>
         <p id="models-err" class="err"></p>
@@ -180,57 +181,57 @@ tbody tr:hover{background:var(--card2)}
       <section class="section" id="sec-chat">
         <div class="chat-wrap">
           <div class="chat-bar">
-            <label class="muted" style="font-size:12px">Model</label>
+            <label class="muted" style="font-size:12px" data-i18n="Model">Model</label>
             <select id="chatModel" style="min-width:190px"></select>
             <span class="spacer"></span>
-            <button class="btn sm" id="chatClear">Clear</button>
+            <button class="btn sm" id="chatClear" data-i18n="Clear">Clear</button>
           </div>
           <div class="msgs" id="msgs"></div>
           <div class="composer">
-            <textarea id="chatInput" placeholder="Message the model&hellip;  (Enter to send, Shift+Enter for newline)" aria-label="Chat message"></textarea>
-            <button class="btn primary" id="sendBtn">Send</button>
+            <textarea id="chatInput" placeholder="Message the model&hellip;  (Enter to send, Shift+Enter for newline)" data-i18n-ph="Message the model…  (Enter to send, Shift+Enter for newline)" aria-label="Chat message"></textarea>
+            <button class="btn primary" id="sendBtn" data-i18n="Send">Send</button>
           </div>
         </div>
       </section>
 
       <section class="section" id="sec-logs">
         <div class="chat-bar" style="margin-bottom:12px">
-          <span class="muted" style="font-size:12px">Live tail of infermesh logs (pool · server · backends)</span>
+          <span class="muted" style="font-size:12px" data-i18n="Live tail of infermesh logs (pool · server · backends)">Live tail of infermesh logs (pool · server · backends)</span>
           <span class="spacer"></span>
-          <label class="muted" style="font-size:12px"><input type="checkbox" id="logsPause"/> pause</label>
+          <label class="muted" style="font-size:12px"><input type="checkbox" id="logsPause"/> <span data-i18n="pause">pause</span></label>
         </div>
-        <div class="logs" id="logs"><div class="muted">loading&hellip;</div></div>
+        <div class="logs" id="logs"><div class="muted" data-i18n="loading…">loading&hellip;</div></div>
       </section>
 
       <section class="section" id="sec-metrics">
         <div class="panel" style="padding:14px 16px;margin-bottom:14px">
           <div class="chat-bar">
-            <div class="seg"><button id="stScopeSession" class="seg-btn active">Session</button><button id="stScopeAll" class="seg-btn">All-Time</button></div>
-            <select id="stModel" style="min-width:160px"><option value="">All models</option></select>
-            <span class="muted" style="font-size:11px">aggregate request stats &mdash; All-Time survives restarts</span>
+            <div class="seg"><button id="stScopeSession" class="seg-btn active" data-i18n="Session">Session</button><button id="stScopeAll" class="seg-btn" data-i18n="All-Time">All-Time</button></div>
+            <select id="stModel" style="min-width:160px"><option value="" data-i18n="All models">All models</option></select>
+            <span class="muted" style="font-size:11px" data-i18n="aggregate request stats — All-Time survives restarts">aggregate request stats &mdash; All-Time survives restarts</span>
             <span class="spacer"></span>
-            <button class="btn sm" id="stCopy">Copy</button>
-            <button class="btn sm" id="stExport">Export CSV</button>
-            <button class="btn sm" id="stClear">Clear</button>
+            <button class="btn sm" id="stCopy" data-i18n="Copy">Copy</button>
+            <button class="btn sm" id="stExport" data-i18n="Export CSV">Export CSV</button>
+            <button class="btn sm" id="stClear" data-i18n="Clear">Clear</button>
           </div>
         </div>
         <div class="cards" id="liveBar" style="margin-bottom:14px"></div>
         <div class="seg" id="mtTabs" style="margin-bottom:14px">
-          <button class="seg-btn active" data-mt="overview">Overview</button>
-          <button class="seg-btn" data-mt="permodel">Per-model</button>
-          <button class="seg-btn" data-mt="charts">Charts</button>
-          <button class="seg-btn" data-mt="rejections">Rejections</button>
+          <button class="seg-btn active" data-mt="overview" data-i18n="Overview">Overview</button>
+          <button class="seg-btn" data-mt="permodel" data-i18n="Per-model">Per-model</button>
+          <button class="seg-btn" data-mt="charts" data-i18n="Charts">Charts</button>
+          <button class="seg-btn" data-mt="rejections" data-i18n="Rejections">Rejections</button>
         </div>
         <div class="mt-panel" id="mt-overview">
           <div class="cards" id="statCards"></div>
           <div class="stat-viz">
             <div class="card">
-              <div class="k">Token composition</div>
+              <div class="k" data-i18n="Token composition">Token composition</div>
               <div class="stack" id="tokBar"></div>
               <div class="legend" id="tokLeg"></div>
             </div>
             <div class="card">
-              <div class="k">Cache efficiency</div>
+              <div class="k" data-i18n="Cache efficiency">Cache efficiency</div>
               <div class="v" id="cacheV">&mdash;<small> %</small></div>
               <div class="bar"><i id="cacheBar" style="width:0%"></i></div>
               <div class="muted" id="cacheSub" style="font-size:11px;margin-top:10px">&mdash;</div>
@@ -240,8 +241,8 @@ tbody tr:hover{background:var(--card2)}
         <div class="mt-panel" id="mt-permodel" style="display:none">
           <div class="panel">
             <table>
-              <thead><tr><th data-sort="model">Model</th><th data-sort="total_requests">Requests</th><th data-sort="generation_tps">Gen tok/s</th><th data-sort="total_tokens_served">Tokens</th><th data-sort="cache_efficiency">Cache %</th></tr></thead>
-              <tbody id="pmRows"><tr><td colspan="5" class="muted">no per-model data yet</td></tr></tbody>
+              <thead><tr><th data-sort="model" data-i18n="Model">Model</th><th data-sort="total_requests" data-i18n="Requests">Requests</th><th data-sort="generation_tps" data-i18n="Gen tok/s">Gen tok/s</th><th data-sort="total_tokens_served" data-i18n="Tokens">Tokens</th><th data-sort="cache_efficiency" data-i18n="Cache %">Cache %</th></tr></thead>
+              <tbody id="pmRows"><tr><td colspan="5" class="muted" data-i18n="no per-model data yet">no per-model data yet</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -249,70 +250,70 @@ tbody tr:hover{background:var(--card2)}
           <div class="seg" id="chRange" style="margin-bottom:14px">
             <button class="seg-btn" data-r="300">5m</button>
             <button class="seg-btn" data-r="3600">1h</button>
-            <button class="seg-btn active" data-r="0">All</button>
+            <button class="seg-btn active" data-r="0" data-i18n="All">All</button>
           </div>
           <div class="cards" id="metricCards"></div>
           <div class="panel" style="padding:18px;margin-bottom:16px">
-            <div class="muted" style="font-size:12px;margin-bottom:10px">Latency per request (ms)</div>
+            <div class="muted" style="font-size:12px;margin-bottom:10px" data-i18n="Latency per request (ms)">Latency per request (ms)</div>
             <canvas id="chartLatency" style="width:100%;display:block"></canvas>
           </div>
           <div class="panel" style="padding:18px">
-            <div class="muted" style="font-size:12px;margin-bottom:10px">Throughput per request (tokens/s)</div>
+            <div class="muted" style="font-size:12px;margin-bottom:10px" data-i18n="Throughput per request (tokens/s)">Throughput per request (tokens/s)</div>
             <canvas id="chartTps" style="width:100%;display:block"></canvas>
           </div>
-          <p class="muted" style="font-size:12px;margin-top:12px">History records one point per chat completion — use the <strong>Chat</strong> tab (or send API requests) to generate data.</p>
+          <p class="muted" style="font-size:12px;margin-top:12px" data-i18n="History records one point per chat completion — use the Chat tab (or send API requests) to generate data.">History records one point per chat completion — use the <strong>Chat</strong> tab (or send API requests) to generate data.</p>
         </div>
         <div class="mt-panel" id="mt-rejections" style="display:none">
           <div class="panel" style="padding:16px">
-            <div class="muted" style="font-size:12px;margin-bottom:10px">Requests rejected before serving, by reason</div>
-            <div id="statRej" class="muted" style="font-size:13px">none</div>
+            <div class="muted" style="font-size:12px;margin-bottom:10px" data-i18n="Requests rejected before serving, by reason">Requests rejected before serving, by reason</div>
+            <div id="statRej" class="muted" style="font-size:13px" data-i18n="none">none</div>
           </div>
         </div>
       </section>
 
       <section class="section" id="sec-devices">
         <div class="chat-bar" style="margin-bottom:12px">
-          <span class="muted" style="font-size:12px">Detected compute devices &mdash; pick one per model on the Models tab</span>
+          <span class="muted" style="font-size:12px" data-i18n="Detected compute devices — pick one per model on the Models tab">Detected compute devices &mdash; pick one per model on the Models tab</span>
           <span class="spacer"></span>
-          <button class="btn sm" id="devRefresh">&#8635; Refresh</button>
+          <button class="btn sm" id="devRefresh"><span aria-hidden="true">&#8635;</span> <span data-i18n="Refresh">Refresh</span></button>
         </div>
         <div class="panel">
           <table>
-            <thead><tr><th>Device</th><th>Vendor</th><th>Name</th><th>VRAM used</th><th>VRAM free</th><th>VRAM total</th></tr></thead>
-            <tbody id="devRows"><tr><td colspan="6" class="muted">loading&hellip;</td></tr></tbody>
+            <thead><tr><th data-i18n="Device">Device</th><th data-i18n="Vendor">Vendor</th><th data-i18n="Name">Name</th><th data-i18n="VRAM used">VRAM used</th><th data-i18n="VRAM free">VRAM free</th><th data-i18n="VRAM total">VRAM total</th></tr></thead>
+            <tbody id="devRows"><tr><td colspan="6" class="muted" data-i18n="loading…">loading&hellip;</td></tr></tbody>
           </table>
         </div>
       </section>
 
       <section class="section" id="sec-download">
         <div class="chat-bar" style="margin-bottom:12px">
-          <input id="dlSearch" placeholder="Search HuggingFace models (e.g. Qwen2.5-0.5B-Instruct)" style="flex:1;min-width:240px"/>
-          <select id="dlTask" title="Filter by task">
-            <option value="">Any task</option>
-            <option value="text-generation">Text generation</option>
-            <option value="image-text-to-text">Vision (VLM)</option>
-            <option value="feature-extraction">Embedding</option>
+          <input id="dlSearch" placeholder="Search HuggingFace models (e.g. Qwen2.5-0.5B-Instruct)" data-i18n-ph="Search HuggingFace models (e.g. Qwen2.5-0.5B-Instruct)" style="flex:1;min-width:240px"/>
+          <select id="dlTask" title="Filter by task" data-i18n-title="Filter by task">
+            <option value="" data-i18n="Any task">Any task</option>
+            <option value="text-generation" data-i18n="Text generation">Text generation</option>
+            <option value="image-text-to-text" data-i18n="Vision (VLM)">Vision (VLM)</option>
+            <option value="feature-extraction" data-i18n="Embedding">Embedding</option>
           </select>
-          <select id="dlSort" title="Sort by">
-            <option value="downloads">Most downloads</option>
-            <option value="trending_score">Trending</option>
-            <option value="likes">Most likes</option>
-            <option value="lastModified">Recently updated</option>
+          <select id="dlSort" title="Sort by" data-i18n-title="Sort by">
+            <option value="downloads" data-i18n="Most downloads">Most downloads</option>
+            <option value="trending_score" data-i18n="Trending">Trending</option>
+            <option value="likes" data-i18n="Most likes">Most likes</option>
+            <option value="lastModified" data-i18n="Recently updated">Recently updated</option>
           </select>
-          <button class="btn primary" id="dlBtn">Search</button>
+          <button class="btn primary" id="dlBtn" data-i18n="Search">Search</button>
         </div>
-        <p class="muted" style="font-size:12px;margin:0 0 10px">Downloads land in the server's <code>--model-dir</code> and appear under Models when finished.</p>
+        <p class="muted" style="font-size:12px;margin:0 0 10px" data-i18n="Downloads land in the server's --model-dir and appear under Models when finished.">Downloads land in the server's <code>--model-dir</code> and appear under Models when finished.</p>
         <div class="panel" style="margin-bottom:16px">
           <table>
-            <thead><tr><th>Model</th><th>Task</th><th>Downloads</th><th>Likes</th><th></th></tr></thead>
-            <tbody id="dlResults"><tr><td colspan="5" class="muted">popular models load here&hellip;</td></tr></tbody>
+            <thead><tr><th data-i18n="Model">Model</th><th data-i18n="Task">Task</th><th data-i18n="Downloads">Downloads</th><th data-i18n="Likes">Likes</th><th></th></tr></thead>
+            <tbody id="dlResults"><tr><td colspan="5" class="muted" data-i18n="popular models load here…">popular models load here&hellip;</td></tr></tbody>
           </table>
         </div>
-        <div class="chat-bar" style="margin-bottom:8px"><span class="muted" style="font-size:12px">Downloads</span></div>
+        <div class="chat-bar" style="margin-bottom:8px"><span class="muted" style="font-size:12px" data-i18n="Download jobs">Download jobs</span></div>
         <div class="panel">
           <table>
-            <thead><tr><th>Repo</th><th>Status</th><th>Progress</th><th>Size</th></tr></thead>
-            <tbody id="dlJobs"><tr><td colspan="4" class="muted">no downloads yet</td></tr></tbody>
+            <thead><tr><th data-i18n="Repo">Repo</th><th data-i18n="Status">Status</th><th data-i18n="Progress">Progress</th><th data-i18n="Size">Size</th></tr></thead>
+            <tbody id="dlJobs"><tr><td colspan="4" class="muted" data-i18n="no downloads yet">no downloads yet</td></tr></tbody>
           </table>
         </div>
         <p id="dl-err" class="err"></p>
@@ -320,36 +321,36 @@ tbody tr:hover{background:var(--card2)}
 
       <section class="section" id="sec-benchmark">
         <div class="controls" style="flex-wrap:wrap;gap:12px">
-          <label class="muted" style="font-size:12px">Model</label>
+          <label class="muted" style="font-size:12px" data-i18n="Model">Model</label>
           <select id="bmModel" style="min-width:180px"></select>
-          <label class="muted" style="font-size:12px">Requests</label>
+          <label class="muted" style="font-size:12px" data-i18n="Requests">Requests</label>
           <input id="bmReq" type="number" min="1" max="200" value="20" style="width:78px"/>
-          <label class="muted" style="font-size:12px">Concurrency</label>
+          <label class="muted" style="font-size:12px" data-i18n="Concurrency">Concurrency</label>
           <input id="bmConc" type="number" min="1" max="32" value="4" style="width:70px"/>
-          <label class="muted" style="font-size:12px">Max tokens</label>
+          <label class="muted" style="font-size:12px" data-i18n="Max tokens">Max tokens</label>
           <input id="bmTok" type="number" min="1" max="1024" value="64" style="width:78px"/>
-          <label class="muted" style="font-size:12px">Mode</label>
-          <select id="bmMode" style="width:140px"><option value="same">same prompt</option><option value="different">different</option></select>
-          <button class="btn primary" id="bmRun">Run benchmark</button>
-          <button class="btn sm" id="bmSingle">Single request</button>
-          <button class="btn sm" id="bmCopy">Copy</button>
+          <label class="muted" style="font-size:12px" data-i18n="Mode">Mode</label>
+          <select id="bmMode" style="width:140px"><option value="same" data-i18n="same prompt">same prompt</option><option value="different" data-i18n="different">different</option></select>
+          <button class="btn primary" id="bmRun" data-i18n="Run benchmark">Run benchmark</button>
+          <button class="btn sm" id="bmSingle" data-i18n="Single request">Single request</button>
+          <button class="btn sm" id="bmCopy" data-i18n="Copy">Copy</button>
           <span id="bmStatus" class="muted" style="font-size:12px"></span>
         </div>
         <div class="cards" id="bmCards"></div>
         <div class="panel" id="bmDetail" style="display:none;padding:18px">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px">
-            <div><div class="muted" style="font-size:12px;margin-bottom:8px">Latency / E2E (ms)</div><dl class="kv" id="bmLatency"></dl></div>
-            <div><div class="muted" style="font-size:12px;margin-bottom:8px">Time to first token (ms)</div><dl class="kv" id="bmTtft"></dl></div>
-            <div><div class="muted" style="font-size:12px;margin-bottom:8px">Time per output token (ms)</div><dl class="kv" id="bmTpot"></dl></div>
+            <div><div class="muted" style="font-size:12px;margin-bottom:8px" data-i18n="Latency / E2E (ms)">Latency / E2E (ms)</div><dl class="kv" id="bmLatency"></dl></div>
+            <div><div class="muted" style="font-size:12px;margin-bottom:8px" data-i18n="Time to first token (ms)">Time to first token (ms)</div><dl class="kv" id="bmTtft"></dl></div>
+            <div><div class="muted" style="font-size:12px;margin-bottom:8px" data-i18n="Time per output token (ms)">Time per output token (ms)</div><dl class="kv" id="bmTpot"></dl></div>
           </div>
-          <div class="muted" style="font-size:12px;margin:18px 0 8px">Latency percentiles</div>
+          <div class="muted" style="font-size:12px;margin:18px 0 8px" data-i18n="Latency percentiles">Latency percentiles</div>
           <canvas id="bmChart" style="width:100%;display:block"></canvas>
         </div>
         <div class="panel" style="margin-top:16px">
-          <div class="chat-bar" style="padding:12px 14px 0"><span class="muted" style="font-size:12px">Past runs &mdash; persisted across restarts</span></div>
+          <div class="chat-bar" style="padding:12px 14px 0"><span class="muted" style="font-size:12px" data-i18n="Past runs — persisted across restarts">Past runs &mdash; persisted across restarts</span></div>
           <table>
-            <thead><tr><th style="width:34px"></th><th>When</th><th>Model</th><th>Req&times;Conc</th><th>req/s</th><th>tok/s</th><th>p50 ms</th><th>p99 ms</th></tr></thead>
-            <tbody id="bmHist"><tr><td colspan="8" class="muted">no past runs</td></tr></tbody>
+            <thead><tr><th style="width:34px"></th><th data-i18n="When">When</th><th data-i18n="Model">Model</th><th data-i18n="Req×Conc">Req&times;Conc</th><th>req/s</th><th>tok/s</th><th>p50 ms</th><th>p99 ms</th></tr></thead>
+            <tbody id="bmHist"><tr><td colspan="8" class="muted" data-i18n="no past runs">no past runs</td></tr></tbody>
           </table>
         </div>
         <p id="bm-err" class="err"></p>
@@ -357,76 +358,76 @@ tbody tr:hover{background:var(--card2)}
 
       <section class="section" id="sec-settings">
         <div class="form">
-          <h3>Runtime-editable</h3>
+          <h3 data-i18n="Runtime-editable">Runtime-editable</h3>
           <div class="field">
-            <label for="setIdle">Idle timeout (seconds)</label>
+            <label for="setIdle" data-i18n="Idle timeout (seconds)">Idle timeout (seconds)</label>
             <div class="row">
               <input id="setIdle" type="number" min="0" step="0.5" style="width:160px"/>
-              <button class="btn" id="saveIdle">Save</button>
+              <button class="btn" id="saveIdle" data-i18n="Save">Save</button>
             </div>
-            <div class="hint">0 disables auto-unload. Applies live to the TTL reaper.</div>
+            <div class="hint" data-i18n="0 disables auto-unload. Applies live to the TTL reaper.">0 disables auto-unload. Applies live to the TTL reaper.</div>
           </div>
           <div class="field">
-            <label for="setKey">API key</label>
+            <label for="setKey" data-i18n="API key">API key</label>
             <div class="row">
-              <input id="setKey" type="text" placeholder="enter key — blank = disable auth" style="width:300px" autocomplete="off"/>
-              <button class="btn" id="applyKey">Apply</button>
+              <input id="setKey" type="text" placeholder="enter key — blank = disable auth" data-i18n-ph="enter key — blank = disable auth" style="width:300px" autocomplete="off"/>
+              <button class="btn" id="applyKey" data-i18n="Apply">Apply</button>
             </div>
-            <div class="hint">Sets or clears the single bearer key the gateway enforces. Current: <span id="keyState" class="mono"></span></div>
+            <div class="hint"><span data-i18n="Sets or clears the single bearer key the gateway enforces. Current:">Sets or clears the single bearer key the gateway enforces. Current:</span> <span id="keyState" class="mono"></span></div>
           </div>
           <div class="field">
-            <label for="setKvHot">KV cache &mdash; hot entries (Transformers tiered KV)</label>
+            <label for="setKvHot" data-i18n="KV cache — hot entries (Transformers tiered KV)">KV cache &mdash; hot entries (Transformers tiered KV)</label>
             <div class="row">
               <input id="setKvHot" type="number" min="0" step="1" style="width:140px"/>
-              <input id="setKvCold" type="text" placeholder="cold (SSD) dir &mdash; blank = ~/.infermesh/kv" style="width:320px" autocomplete="off"/>
-              <button class="btn" id="saveKv">Save</button>
+              <input id="setKvCold" type="text" placeholder="cold (SSD) dir &mdash; blank = ~/.infermesh/kv" data-i18n-ph="cold (SSD) dir — blank = ~/.infermesh/kv" style="width:320px" autocomplete="off"/>
+              <button class="btn" id="saveKv" data-i18n="Save">Save</button>
             </div>
-            <div class="hint">Hot RAM entries for the tiered KV cache (0 = off). Applies to models loaded after saving.</div>
+            <div class="hint" data-i18n="Hot RAM entries for the tiered KV cache (0 = off). Applies to models loaded after saving.">Hot RAM entries for the tiered KV cache (0 = off). Applies to models loaded after saving.</div>
           </div>
           <div class="field">
-            <label for="setHfEndpoint">HuggingFace endpoint (mirror)</label>
+            <label for="setHfEndpoint" data-i18n="HuggingFace endpoint (mirror)">HuggingFace endpoint (mirror)</label>
             <div class="row">
-              <input id="setHfEndpoint" type="text" placeholder="blank = huggingface.co &middot; e.g. https://hf-mirror.com" style="width:340px" autocomplete="off"/>
-              <button class="btn" id="saveHf">Save</button>
+              <input id="setHfEndpoint" type="text" placeholder="blank = huggingface.co &middot; e.g. https://hf-mirror.com" data-i18n-ph="blank = huggingface.co · e.g. https://hf-mirror.com" style="width:340px" autocomplete="off"/>
+              <button class="btn" id="saveHf" data-i18n="Save">Save</button>
             </div>
-            <div class="hint">Search + download via a mirror (faster/accessible in some regions). Applies immediately.</div>
+            <div class="hint" data-i18n="Search + download via a mirror (faster/accessible in some regions). Applies immediately.">Search + download via a mirror (faster/accessible in some regions). Applies immediately.</div>
           </div>
-          <h3 style="margin-top:26px">Generation defaults</h3>
+          <h3 style="margin-top:26px" data-i18n="Generation defaults">Generation defaults</h3>
           <div class="field">
-            <label for="setGenTemp">Sampling defaults &mdash; applied when a request omits the parameter</label>
+            <label for="setGenTemp" data-i18n="Sampling defaults — applied when a request omits the parameter">Sampling defaults &mdash; applied when a request omits the parameter</label>
             <div class="row">
               <input id="setGenTemp" type="number" min="0" max="2" step="0.05" placeholder="temperature" title="temperature 0&ndash;2" style="width:130px"/>
               <input id="setGenTopP" type="number" min="0" max="1" step="0.05" placeholder="top_p" title="top_p 0&ndash;1" style="width:115px"/>
               <input id="setGenTopK" type="number" min="0" step="1" placeholder="top_k" title="top_k (0 = off)" style="width:110px"/>
               <input id="setGenMax" type="number" min="1" step="1" placeholder="max_tokens" title="max output tokens" style="width:135px"/>
-              <button class="btn" id="saveGen">Save</button>
+              <button class="btn" id="saveGen" data-i18n="Save">Save</button>
             </div>
-            <div class="hint">Blank = no server default (the client's value or the built-in fallback applies). A request's own values always win.</div>
+            <div class="hint" data-i18n="Blank = no server default (the client's value or the built-in fallback applies). A request's own values always win.">Blank = no server default (the client's value or the built-in fallback applies). A request's own values always win.</div>
           </div>
-          <h3 style="margin-top:26px">Startup <span class="badge warn">restart to apply</span></h3>
+          <h3 style="margin-top:26px"><span data-i18n="Startup">Startup</span> <span class="badge warn" data-i18n="restart to apply">restart to apply</span></h3>
           <div class="field">
-            <label>Bind address, model dir &amp; default backend &mdash; saved now, applied on restart</label>
+            <label data-i18n="Bind address, model dir &amp; default backend &mdash; saved now, applied on restart">Bind address, model dir &amp; default backend &mdash; saved now, applied on restart</label>
             <div class="row">
               <input id="setHost" type="text" placeholder="host" title="bind host" style="width:140px" autocomplete="off"/>
               <input id="setPort" type="number" min="1" max="65535" step="1" placeholder="port" title="bind port" style="width:110px"/>
               <input id="setBackend" type="text" placeholder="backend" title="default backend" style="width:140px" autocomplete="off"/>
-              <input id="setMaxMem" type="text" placeholder="max memory e.g. 80%" title="max process memory" style="width:170px" autocomplete="off"/>
+              <input id="setMaxMem" type="text" placeholder="max memory e.g. 80%" data-i18n-ph="max memory e.g. 80%" title="max process memory" style="width:170px" autocomplete="off"/>
             </div>
             <div class="row" style="margin-top:8px">
-              <input id="setModelDir" type="text" placeholder="model dir &mdash; blank = none" title="model directory" style="width:430px" autocomplete="off"/>
-              <button class="btn" id="saveStartup">Save</button>
+              <input id="setModelDir" type="text" placeholder="model dir &mdash; blank = none" data-i18n-ph="model dir — blank = none" title="model directory" style="width:430px" autocomplete="off"/>
+              <button class="btn" id="saveStartup" data-i18n="Save">Save</button>
             </div>
-            <div class="hint">Read once when the server boots. Changing <strong>host/port</strong> moves the server &mdash; you'll reconnect at the new address.</div>
+            <div class="hint" data-i18n="Read once when the server boots. Changing host/port moves the server — you'll reconnect at the new address.">Read once when the server boots. Changing <strong>host/port</strong> moves the server &mdash; you'll reconnect at the new address.</div>
           </div>
           <div id="restartBar" class="field" style="display:none">
             <div class="row" style="align-items:center;gap:10px">
-              <span class="badge warn">restart required</span>
-              <span class="muted" id="restartMsg" style="font-size:12px">Saved &mdash; restart to apply.</span>
-              <button class="btn primary" id="restartBtn">Restart server</button>
+              <span class="badge warn" data-i18n="restart required">restart required</span>
+              <span class="muted" id="restartMsg" style="font-size:12px" data-i18n="Saved — restart to apply.">Saved &mdash; restart to apply.</span>
+              <button class="btn primary" id="restartBtn" data-i18n="Restart server">Restart server</button>
             </div>
           </div>
           <p id="settings-err" class="err"></p>
-          <h3 style="margin-top:26px">All settings</h3>
+          <h3 style="margin-top:26px" data-i18n="All settings">All settings</h3>
           <dl class="kv" id="settingsKv"></dl>
         </div>
       </section>
@@ -439,6 +440,63 @@ tbody tr:hover{background:var(--card2)}
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let active='models', logsPaused=false, lastBench=null;
 const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',devices:'Devices',download:'Download',benchmark:'Benchmark',settings:'Settings'};
+/* ---- i18n: keys are the English text; only ZH needs entries. Units (tok/s, ms, %, MB) + proper nouns stay. ---- */
+const I18N={
+"Models":"模型","Chat":"对话","Logs":"日志","Metrics":"指标","Devices":"设备","Download":"下载","Benchmark":"基准测试","Settings":"设置",
+"Refresh":"刷新","API key (if enabled)":"API 密钥（如启用）","Toggle theme":"切换主题",
+"Load on device":"加载到设备","applies to the next Load (Transformers backend)":"应用于下次加载（Transformers 后端）",
+"Model":"模型","Type":"类型","Backend":"后端","Status":"状态","Mem MB":"内存 MB","Gen tps":"生成 tps","Leases":"租约","Actions":"操作","loading…":"加载中…",
+"Clear":"清除","Send":"发送","Message the model…  (Enter to send, Shift+Enter for newline)":"给模型发消息…（Enter 发送，Shift+Enter 换行）",
+"Live tail of infermesh logs (pool · server · backends)":"infermesh 日志实时跟踪（池 · 服务 · 后端）","pause":"暂停",
+"Session":"本次会话","All-Time":"全部时间","All models":"所有模型","aggregate request stats — All-Time survives restarts":"汇总请求统计 — 全部时间在重启后保留",
+"Copy":"复制","Export CSV":"导出 CSV",
+"Overview":"概览","Per-model":"按模型","Charts":"图表","Rejections":"拒绝",
+"Token composition":"令牌构成","Cache efficiency":"缓存效率",
+"Requests":"请求数","Gen tok/s":"生成 tok/s","Tokens":"令牌","Cache %":"缓存 %","no per-model data yet":"暂无按模型数据",
+"All":"全部","Latency per request (ms)":"每请求延迟（ms）","Throughput per request (tokens/s)":"每请求吞吐（tokens/s）",
+"History records one point per chat completion — use the Chat tab (or send API requests) to generate data.":"每次对话补全记录一个数据点 — 在「对话」标签页（或发送 API 请求）生成数据。",
+"Requests rejected before serving, by reason":"服务前被拒绝的请求（按原因）","none":"无","rejected":"已拒绝",
+"Tokens served":"已服务令牌","Avg tokens/req":"平均令牌/请求","Prompt tokens":"提示令牌","Completion tokens":"补全令牌","Cached tokens":"缓存令牌","Prefill":"预填充","Generation":"生成","Uptime":"运行时间","Success rate":"成功率",
+"Loaded models":"已加载模型","Active requests":"活跃请求","Queue depth":"队列深度","Recent":"最近",
+"Avg latency":"平均延迟","p95 latency":"p95 延迟","Avg throughput":"平均吞吐","Peak throughput":"峰值吞吐","Last latency":"最近延迟",
+"Prompt (new)":"提示（新）","Cached":"缓存","Completion":"补全","prompt tokens reused":"提示令牌已复用",
+"Detected compute devices — pick one per model on the Models tab":"检测到的计算设备 — 在「模型」标签页为每个模型选择",
+"Device":"设备","Vendor":"厂商","Name":"名称","VRAM used":"已用显存","VRAM free":"空闲显存","VRAM total":"总显存",
+"Search HuggingFace models (e.g. Qwen2.5-0.5B-Instruct)":"搜索 HuggingFace 模型（例如 Qwen2.5-0.5B-Instruct）",
+"Filter by task":"按任务筛选","Any task":"任意任务","Text generation":"文本生成","Vision (VLM)":"视觉（VLM）","Embedding":"嵌入",
+"Sort by":"排序方式","Most downloads":"下载最多","Trending":"趋势","Most likes":"点赞最多","Recently updated":"最近更新","Search":"搜索",
+"Downloads land in the server's --model-dir and appear under Models when finished.":"下载保存到服务器的 --model-dir，完成后出现在「模型」中。",
+"Task":"任务","Downloads":"下载量","Likes":"点赞","popular models load here…":"正在加载热门模型…",
+"Repo":"仓库","Progress":"进度","Size":"大小","no downloads yet":"暂无下载","Download jobs":"下载任务",
+"Concurrency":"并发","Max tokens":"最大令牌","Mode":"模式","same prompt":"相同提示","different":"不同",
+"Run benchmark":"运行基准测试","Single request":"单次请求",
+"Latency / E2E (ms)":"延迟 / E2E（ms）","Time to first token (ms)":"首令牌时间（ms）","Time per output token (ms)":"每输出令牌时间（ms）","Latency percentiles":"延迟百分位",
+"Past runs — persisted across restarts":"历史运行 — 重启后保留","When":"时间","Req×Conc":"请求×并发","no past runs":"暂无历史运行",
+"Runtime-editable":"运行时可编辑","Idle timeout (seconds)":"空闲超时（秒）","Save":"保存","0 disables auto-unload. Applies live to the TTL reaper.":"0 表示禁用自动卸载。实时应用于 TTL 回收器。",
+"API key":"API 密钥","enter key — blank = disable auth":"输入密钥 — 留空 = 关闭鉴权","Apply":"应用","Sets or clears the single bearer key the gateway enforces. Current:":"设置或清除网关强制的单一密钥。当前：",
+"KV cache — hot entries (Transformers tiered KV)":"KV 缓存 — 热条目（Transformers 分层 KV）","cold (SSD) dir — blank = ~/.infermesh/kv":"冷（SSD）目录 — 留空 = ~/.infermesh/kv","Hot RAM entries for the tiered KV cache (0 = off). Applies to models loaded after saving.":"分层 KV 缓存的热 RAM 条目（0 = 关闭）。应用于保存后加载的模型。",
+"HuggingFace endpoint (mirror)":"HuggingFace 端点（镜像）","blank = huggingface.co · e.g. https://hf-mirror.com":"留空 = huggingface.co · 例如 https://hf-mirror.com","Search + download via a mirror (faster/accessible in some regions). Applies immediately.":"通过镜像搜索+下载（部分地区更快/可访问）。立即应用。",
+"Generation defaults":"生成默认值","Sampling defaults — applied when a request omits the parameter":"采样默认值 — 当请求省略该参数时应用","Blank = no server default (the client's value or the built-in fallback applies). A request's own values always win.":"留空 = 无服务器默认值（应用客户端值或内置回退）。请求自带的值始终优先。",
+"Startup":"启动","restart to apply":"重启后生效","Bind address, model dir & default backend — saved now, applied on restart":"绑定地址、模型目录和默认后端 — 立即保存，重启后生效","max memory e.g. 80%":"最大内存 例如 80%","model dir — blank = none":"模型目录 — 留空 = 无",
+"Read once when the server boots. Changing host/port moves the server — you'll reconnect at the new address.":"仅在服务器启动时读取。更改 host/port 会迁移服务器 — 需在新地址重新连接。",
+"restart required":"需要重启","Saved — restart to apply.":"已保存 — 重启后生效。","Restart server":"重启服务器","All settings":"全部设置",
+"connecting":"连接中","healthy":"正常","unreachable":"无法连接",
+"stats copied":"已复制统计","generation defaults saved":"已保存生成默认值","startup settings saved":"已保存启动设置","KV cache settings saved":"已保存 KV 缓存设置","HuggingFace endpoint saved":"已保存 HuggingFace 端点","Idle timeout saved":"已保存空闲超时"
+};
+let lang='en';
+function T(s){ return (lang==='zh' && I18N[s]!=null) ? I18N[s] : s; }
+function applyLang(l){
+  lang=(l==='zh')?'zh':'en';
+  try{ localStorage.setItem('infermesh-lang',lang); }catch(e){}
+  document.documentElement.setAttribute('lang', lang==='zh'?'zh-CN':'en');
+  document.querySelectorAll('[data-i18n]').forEach(function(el){ el.textContent=T(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(function(el){ el.setAttribute('placeholder',T(el.getAttribute('data-i18n-ph'))); });
+  document.querySelectorAll('[data-i18n-title]').forEach(function(el){ el.title=T(el.getAttribute('data-i18n-title')); });
+  var lb=$('#langBtn'); if(lb) lb.textContent=(lang==='zh')?'EN':'中';
+  var tl=$('#title'); if(tl && typeof active!=='undefined' && active) tl.textContent=T(TITLES[active]||'');
+  try{ if(typeof tick==='function') tick(); }catch(e){}
+  try{ if(typeof active!=='undefined' && active==='settings' && typeof loadSettings==='function') loadSettings(); }catch(e){}
+}
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>(n==null?'—':Number(n).toLocaleString());
 const authHeaders=()=>{const k=$('#apikey').value.trim();return k?{'Authorization':'Bearer '+k}:{}};
@@ -449,8 +507,8 @@ async function api(path,method,body){
   if(!r.ok) throw new Error('HTTP '+r.status+' · '+path);
   return r.json();
 }
-function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
-function setHealth(ok){const p=$('#sb-health');p.className='pill '+(ok?'ok':'bad');p.innerHTML='<span class="dot"></span> '+(ok?'healthy':'unreachable');}
+function toast(m){const t=$('#toast');t.textContent=T(m);t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+function setHealth(ok){const p=$('#sb-health');p.className='pill '+(ok?'ok':'bad');p.innerHTML='<span class="dot"></span> '+(ok?T('healthy'):T('unreachable'));}
 const SUN='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 const MOON='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
 function applyTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('infermesh-theme',t);}catch(e){}const b=$('#themeBtn');if(b)b.innerHTML=(t==='light'?MOON:SUN);if(active==='metrics'&&typeof refreshMetrics==='function')refreshMetrics();}
@@ -462,7 +520,7 @@ function switchSection(sec){
   active=sec;
   $$('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.sec===sec));
   $$('.section').forEach(s=>s.classList.toggle('active',s.id==='sec-'+sec));
-  $('#title').textContent=TITLES[sec];
+  $('#title').textContent=T(TITLES[sec]);
   if(sec==='chat') loadChatModels();
   if(sec==='logs') refreshLogs();
   if(sec==='settings') loadSettings();
@@ -655,12 +713,12 @@ function drawChart(id, vals, color, unit){
 /* Stats (session / all-time) */
 let statsScope='session', lastStats=null;
 function statN(n){ return (n!=null)?(typeof n==='number'?n.toLocaleString():n):'—'; }
-function statCard(k,v){ return '<div class="card"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'; }
+function statCard(k,v){ return '<div class="card"><div class="k">'+T(k)+'</div><div class="v">'+v+'</div></div>'; }
 function fmtUptime(sec){ sec=Math.floor(sec||0); const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60),s=sec%60; if(d) return d+'d '+h+'h'; if(h) return h+'h '+m+'m'; if(m) return m+'m '+s+'s'; return s+'s'; }
 async function refreshStats(){
   try{ const sel=$('#stModel'); const model=sel?sel.value:'';
     const s=await api('/api/stats?scope='+statsScope+(model?'&model='+encodeURIComponent(model):'')); lastStats=s;
-    if(sel){ const cur=sel.value; sel.innerHTML='<option value="">All models</option>'+(s.models||[]).map(m=>'<option value="'+esc(m)+'">'+esc(m)+'</option>').join(''); sel.value=cur; }
+    if(sel){ const cur=sel.value; sel.innerHTML='<option value="">'+T('All models')+'</option>'+(s.models||[]).map(m=>'<option value="'+esc(m)+'">'+esc(m)+'</option>').join(''); sel.value=cur; }
     const req=s.total_requests||0, rej=s.total_rejections||0, served=s.total_tokens_served||0;
     const pt=s.total_prompt_tokens||0, ct=s.total_completion_tokens||0, cached=s.total_cached_tokens||0;
     const avgTok=req?Math.round(served/req):0, succ=(req+rej)?(req/(req+rej)*100):100;
@@ -679,13 +737,13 @@ async function refreshStats(){
     const seg=(v,c)=> v>0?'<span style="width:'+(v/tot*100)+'%;background:'+c+'"></span>':'';
     if($('#tokBar')) $('#tokBar').innerHTML=seg(pNew,'var(--blue)')+seg(cached,'var(--accent)')+seg(ct,'var(--warn)');
     const leg=(c,l,v)=>'<span><i style="background:'+c+'"></i>'+l+'<b>'+statN(v)+'</b></span>';
-    if($('#tokLeg')) $('#tokLeg').innerHTML=leg('var(--blue)','Prompt (new)',pNew)+leg('var(--accent)','Cached',cached)+leg('var(--warn)','Completion',ct);
+    if($('#tokLeg')) $('#tokLeg').innerHTML=leg('var(--blue)',T('Prompt (new)'),pNew)+leg('var(--accent)',T('Cached'),cached)+leg('var(--warn)',T('Completion'),ct);
     const ce=+s.cache_efficiency||0;
     if($('#cacheV')) $('#cacheV').innerHTML=statN(s.cache_efficiency)+'<small> %</small>';
     if($('#cacheBar')) $('#cacheBar').style.width=Math.min(100,ce)+'%';
-    if($('#cacheSub')) $('#cacheSub').textContent=statN(cached)+' of '+statN(pt)+' prompt tokens reused from cache';
+    if($('#cacheSub')) $('#cacheSub').textContent=statN(cached)+' / '+statN(pt)+' '+T('prompt tokens reused');
     const rj=s.rejections||{}; const rks=Object.keys(rj);
-    if($('#statRej')) $('#statRej').innerHTML = rks.length? ('rejected &mdash; '+rks.map(k=>esc(k)+': '+rj[k]).join(' &middot; ')) : 'none';
+    if($('#statRej')) $('#statRej').innerHTML = rks.length? (T('rejected')+' — '+rks.map(k=>esc(k)+': '+rj[k]).join(' · ')) : T('none');
   }catch(e){}
 }
 function setStatsScope(sc){ statsScope=sc;
@@ -712,7 +770,7 @@ async function refreshPerModel(){
 function renderPerModel(){
   const rows=pmRows.slice().sort((a,b)=>{ const k=pmSort.key, av=a[k], bv=b[k];
     return (typeof av==='string')? pmSort.dir*String(av).localeCompare(String(bv)) : pmSort.dir*((av||0)-(bv||0)); });
-  $('#pmRows').innerHTML=rows.map(r=>'<tr><td><strong>'+esc(r.model)+'</strong></td><td class="num">'+statN(r.total_requests)+'</td><td class="num">'+statN(r.generation_tps)+'</td><td class="num">'+statN(r.total_tokens_served)+'</td><td class="num">'+statN(r.cache_efficiency)+'</td></tr>').join('')||'<tr><td colspan="5" class="muted">no per-model data yet</td></tr>';
+  $('#pmRows').innerHTML=rows.map(r=>'<tr><td><strong>'+esc(r.model)+'</strong></td><td class="num">'+statN(r.total_requests)+'</td><td class="num">'+statN(r.generation_tps)+'</td><td class="num">'+statN(r.total_tokens_served)+'</td><td class="num">'+statN(r.cache_efficiency)+'</td></tr>').join('')||'<tr><td colspan="5" class="muted">'+T('no per-model data yet')+'</td></tr>';
 }
 $('#mt-permodel').addEventListener('click',e=>{ const th=e.target.closest('th[data-sort]'); if(!th) return;
   const k=th.dataset.sort; pmSort.dir=(pmSort.key===k)?-pmSort.dir:-1; pmSort.key=k; renderPerModel(); });
@@ -746,12 +804,12 @@ async function refreshMetrics(){
     const sl=lat.slice().sort((a,b)=>a-b), p95=sl.length?sl[Math.min(sl.length-1,Math.floor(0.95*sl.length))]:0;
     const peak=tps.length?Math.max.apply(null,tps):0;
     $('#metricCards').innerHTML=
-      '<div class="card"><div class="k">Requests</div><div class="v">'+s.length+'</div></div>'+
-      '<div class="card"><div class="k">Avg latency</div><div class="v">'+avg(lat).toFixed(0)+'<small> ms</small></div></div>'+
-      '<div class="card"><div class="k">p95 latency</div><div class="v">'+p95.toFixed(0)+'<small> ms</small></div></div>'+
-      '<div class="card"><div class="k">Avg throughput</div><div class="v">'+avg(tps).toFixed(1)+'<small> tok/s</small></div></div>'+
-      '<div class="card"><div class="k">Peak throughput</div><div class="v">'+peak.toFixed(1)+'<small> tok/s</small></div></div>'+
-      '<div class="card"><div class="k">Last latency</div><div class="v">'+(s.length?Math.round(s[s.length-1].latency_ms):'—')+'<small> ms</small></div></div>';
+      statCard('Requests', s.length)+
+      statCard('Avg latency', avg(lat).toFixed(0)+'<small> ms</small>')+
+      statCard('p95 latency', p95.toFixed(0)+'<small> ms</small>')+
+      statCard('Avg throughput', avg(tps).toFixed(1)+'<small> tok/s</small>')+
+      statCard('Peak throughput', peak.toFixed(1)+'<small> tok/s</small>')+
+      statCard('Last latency', (s.length?Math.round(s[s.length-1].latency_ms):'—')+'<small> ms</small>');
     const cs=getComputedStyle(document.documentElement);
     const cBlue=(cs.getPropertyValue('--blue')||'#58a6ff').trim(), cGreen=(cs.getPropertyValue('--accent')||'#22c55e').trim();
     drawChart('chartLatency', lat, cBlue, 'ms');
@@ -917,6 +975,8 @@ async function tick(){
   if(active==='download') refreshDownloads();
 }
 setInterval(tick,2000); tick();
+applyLang((function(){try{return localStorage.getItem('infermesh-lang');}catch(e){return null;}})()||'en');
+$('#langBtn').onclick=function(){applyLang(lang==='zh'?'en':'zh');};
 </script>
 </body>
 </html>

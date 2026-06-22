@@ -128,6 +128,21 @@ def test_restart_argv_strips_settings_flags_keeps_providers(monkeypatch):
     assert not ({"--port", "8021", "--model-dir", "/m"} & set(tail))                          # stripped -> settings.json wins
 
 
+def test_dashboard_i18n_complete():
+    import re, html
+    from infermesh.dashboard import DASHBOARD_HTML as H
+    assert 'id="langBtn"' in H and "function applyLang" in H and "const I18N" in H
+    block = re.search(r"const I18N=\{(.*?)\n\};", H, re.DOTALL).group(1)
+    dictkeys = set(re.findall(r'"([^"]*)":"', block))
+    tagged = set()
+    for attr in ("data-i18n", "data-i18n-ph", "data-i18n-title"):
+        for m in re.findall(attr + r'="([^"]*)"', H):
+            tagged.add(html.unescape(m))
+    missing = sorted(k for k in tagged if k not in dictkeys)
+    assert tagged and not missing, f"data-i18n keys with no ZH translation: {missing}"
+    assert dictkeys >= {"Models", "Settings", "Restart server", "Token composition"}   # spot-check
+
+
 async def test_pool_merges_default_extra_at_load(mock_pool):
     mock_pool.default_extra = {"prefix_kv": 8}
     async with mock_pool.acquire("echo-1"):
