@@ -112,6 +112,8 @@ class SettingsPatch(BaseModel):
 
     idle_timeout: Optional[float] = None
     api_key: Optional[str] = None  # "" clears (auth off); null = leave unchanged
+    kv_hot_capacity: Optional[int] = None
+    kv_cold_dir: Optional[str] = None
 
 
 class BenchmarkRequest(BaseModel):
@@ -158,6 +160,16 @@ def _record_metric(model: Optional[str], latency_ms: float, completion_tokens: i
                   cached_tokens=cached_tokens, prefill_s=prefill_s, generation_s=generation_s)
 
 
+def _kv_defaults(settings: Settings) -> dict:
+    """Global Transformers tiered-KV defaults applied (under per-model extra) at load."""
+    if settings.kv_hot_capacity and settings.kv_hot_capacity > 0:
+        extra = {"prefix_kv": int(settings.kv_hot_capacity)}
+        if settings.kv_cold_dir:
+            extra["kv_cold_dir"] = settings.kv_cold_dir
+        return extra
+    return {}
+
+
 def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     """Build the FastAPI app around a (pre-populated) ModelPool."""
     settings = settings or Settings()
@@ -197,6 +209,7 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     app = FastAPI(title="infermesh", version=__version__, lifespan=lifespan)
     app.state.pool = pool
     app.state.settings = settings
+    pool.default_extra = _kv_defaults(settings)
 
     # ------------------------------ auth ------------------------------- #
     async def require_auth(
@@ -600,6 +613,14 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         if patch.api_key is not None:
             settings.api_key = patch.api_key or None
             changed.append("api_key")
+        if patch.kv_hot_capacity is not None:
+            settings.kv_hot_capacity = max(0, int(patch.kv_hot_capacity))
+            changed.append("kv_hot_capacity")
+        if patch.kv_cold_dir is not None:
+            settings.kv_cold_dir = patch.kv_cold_dir or None
+            changed.append("kv_cold_dir")
+        if "kv_hot_capacity" in changed or "kv_cold_dir" in changed:
+            pool.default_extra = _kv_defaults(settings)
         if changed:
             try:
                 settings.save()

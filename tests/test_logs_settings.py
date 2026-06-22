@@ -46,7 +46,7 @@ def test_settings_put_api_key_toggles_auth(client, monkeypatch):
 def test_dashboard_has_all_sections(client):
     html = client.get("/admin").text
     for marker in ("sec-models", "sec-chat", "sec-logs", "sec-metrics", "sec-settings",
-                   'id="chatInput"', 'id="logs"', 'id="setIdle"', "chartLatency",
+                   'id="chatInput"', 'id="logs"', 'id="setIdle"', 'id="setKvHot"', 'id="saveKv"', "chartLatency",
                    'id="themeBtn"', 'data-theme="light"'):
         assert marker in html, marker
 
@@ -61,3 +61,18 @@ def test_metrics_records_chat(client):
     last = samples[-1]
     assert {"t", "model", "latency_ms", "tokens", "tps"} <= set(last.keys())
     assert last["model"] == "echo-1" and last["latency_ms"] >= 0
+
+
+def test_settings_put_kv_cache(client, mock_pool, monkeypatch):
+    monkeypatch.setattr(Settings, "save", lambda self, *a, **k: None)
+    body = client.put("/api/settings", json={"kv_hot_capacity": 12, "kv_cold_dir": "/tmp/kv"}).json()
+    assert "kv_hot_capacity" in body["updated"] and "kv_cold_dir" in body["updated"]
+    assert body["settings"]["kv_hot_capacity"] == 12 and body["settings"]["kv_cold_dir"] == "/tmp/kv"
+    assert mock_pool.default_extra == {"prefix_kv": 12, "kv_cold_dir": "/tmp/kv"}   # applied globally
+
+
+async def test_pool_merges_default_extra_at_load(mock_pool):
+    mock_pool.default_extra = {"prefix_kv": 8}
+    async with mock_pool.acquire("echo-1"):
+        pass
+    assert mock_pool.get_entry("echo-1").spec.extra.get("prefix_kv") == 8   # global default reached the spec

@@ -131,6 +131,7 @@ class ModelPool:
         self._memory_reserve_mb = memory_reserve_mb
         self._idle_timeout = idle_timeout
         self._default_model_mb = default_model_mb
+        self.default_extra: dict = {}      # merged UNDER a spec's extra at load (global defaults)
 
     # ----------------------------- discovery ------------------------------- #
     def _estimate_mb(self, spec: ModelSpec) -> int:
@@ -379,6 +380,8 @@ class ModelPool:
         entry.is_loading = True
         entry.loading_started_at = time.time()
         try:
+            if self.default_extra:
+                entry.spec.extra = {**self.default_extra, **(entry.spec.extra or {})}
             backend = self._factory.create(entry.spec)
             await backend.load(entry.spec)
             entry.backend = backend

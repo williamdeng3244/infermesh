@@ -33,6 +33,8 @@ class Settings:
     api_key: Optional[str] = None         # optional single bearer/x-api-key; None => auth off
     ttl_check_interval: float = 30.0      # seconds between pool.check_ttl_expirations()
     sse_keepalive_interval: float = 15.0  # emit ': keep-alive' SSE comment if no token for N s (0 => off)
+    kv_hot_capacity: int = 0              # Transformers tiered-KV hot entries (0 => off); applied to new model loads
+    kv_cold_dir: Optional[str] = None     # cold (SSD) dir for the tiered KV cache
 
     @classmethod
     def load(cls, path: Path = SETTINGS_PATH) -> "Settings":

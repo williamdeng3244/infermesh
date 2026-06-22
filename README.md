@@ -170,7 +170,7 @@ eight sections:
 - **Devices** — detected accelerators (NVIDIA / AMD / CPU) with VRAM used/free/total
 - **Download** — search HuggingFace, browse downloads/likes/task, one-click download into the model dir with a progress bar (`pip install '.[downloader]'`)
 - **Benchmark** — prefill/decode tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory; `same`/`different` prompt modes, a single-request profile, copy-to-clipboard, and a **persisted history of past runs** (each row **expands** to the full per-run breakdown — context, PP/TG tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory, token counts)
-- **Settings** — view all settings and live-edit idle-timeout / API key
+- **Settings** — view all settings and live-edit idle-timeout / API key / **tiered-KV cache** (hot-entry capacity + cold SSD dir, applied to new model loads)
 
 If an API key is enabled, paste it into the header field (or set it from the
 Settings tab) and the page sends it with every request. A sun/moon button in the
@@ -182,7 +182,7 @@ header toggles **light / dark** mode (persisted in the browser; defaults dark).
 uv run pytest          # or:  .venv/bin/pytest
 ```
 
-91 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm/torch not
+93 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm/torch not
 installed**: vendor-import guard, pool lifecycle (discovery / LRU eviction /
 pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), the
 embeddings + rerank endpoints, the admin dashboard + pin/unpin, the logs / settings

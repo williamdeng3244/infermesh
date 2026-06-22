@@ -309,6 +309,15 @@ tbody tr:hover{background:var(--card2)}
             </div>
             <div class="hint">Sets or clears the single bearer key the gateway enforces. Current: <span id="keyState" class="mono"></span></div>
           </div>
+          <div class="field">
+            <label for="setKvHot">KV cache &mdash; hot entries (Transformers tiered KV)</label>
+            <div class="row">
+              <input id="setKvHot" type="number" min="0" step="1" style="width:140px"/>
+              <input id="setKvCold" type="text" placeholder="cold (SSD) dir &mdash; blank = ~/.infermesh/kv" style="width:320px" autocomplete="off"/>
+              <button class="btn" id="saveKv">Save</button>
+            </div>
+            <div class="hint">Hot RAM entries for the tiered KV cache (0 = off). Applies to models loaded after saving.</div>
+          </div>
           <p id="settings-err" class="err"></p>
           <h3 style="margin-top:26px">All settings</h3>
           <dl class="kv" id="settingsKv"></dl>
@@ -449,8 +458,10 @@ $('#logsPause').onchange=e=>{ logsPaused=e.target.checked; };
 async function loadSettings(){
   try{ const s=await api('/api/settings');
     $('#setIdle').value=s.idle_timeout;
+    if($('#setKvHot')) $('#setKvHot').value=s.kv_hot_capacity;
+    if($('#setKvCold')) $('#setKvCold').value=s.kv_cold_dir||'';
     $('#keyState').textContent=s.api_key?'set':'unset';
-    const order=['backend','model_dir','host','port','max_concurrent_requests','idle_timeout','max_process_memory','ttl_check_interval','api_key'];
+    const order=['backend','model_dir','host','port','max_concurrent_requests','idle_timeout','max_process_memory','ttl_check_interval','sse_keepalive_interval','kv_hot_capacity','kv_cold_dir','api_key'];
     $('#settingsKv').innerHTML=order.filter(k=>k in s).map(k=>'<dt>'+k+'</dt><dd>'+(k==='api_key'?(s[k]?'set':'unset'):esc(s[k]==null?'—':s[k]))+'</dd>').join('');
   }catch(e){ $('#settings-err').textContent=String(e); }
 }
@@ -466,8 +477,15 @@ async function applyKey(){
     loadSettings();
   }catch(e){ $('#settings-err').textContent=String(e); }
 }
+async function saveKv(){
+  try{ const hot=parseInt($('#setKvHot').value); const cold=$('#setKvCold').value;
+    await api('/api/settings','PUT',{kv_hot_capacity:isNaN(hot)?0:hot, kv_cold_dir:cold});
+    toast('KV cache settings saved'); loadSettings();
+  }catch(e){ $('#settings-err').textContent=String(e); }
+}
 $('#saveIdle').onclick=saveIdle;
 $('#applyKey').onclick=applyKey;
+$('#saveKv').onclick=saveKv;
 
 /* Metrics */
 function drawChart(id, vals, color, unit){
