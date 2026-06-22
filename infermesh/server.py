@@ -530,6 +530,12 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         _STATS.clear(target)
         return {"cleared": target}
 
+    @app.get("/api/stats/models")
+    async def api_stats_models(scope: str = Query(default="session"), _: None = Depends(require_auth)):
+        sc = "alltime" if scope == "alltime" else "session"
+        models = _STATS.snapshot(sc).get("models", [])
+        return {"scope": sc, "models": [{"model": m, **_STATS.snapshot(sc, model=m)} for m in models]}
+
     @app.get("/api/history")
     async def api_history(_: None = Depends(require_auth)):
         return {"benchmarks": load_benchmarks(), "metrics": load_metrics()}

@@ -77,8 +77,17 @@ def test_api_stats_endpoint(client):
     assert client.post("/api/stats/clear?scope=session").json()["cleared"] == "session"
 
 
+def test_api_stats_models_breakdown(client):
+    client.post("/v1/chat/completions", json={"model": "echo-1", "messages": [{"role": "user", "content": "hi"}]})
+    d = client.get("/api/stats/models?scope=session").json()
+    assert d["scope"] == "session" and isinstance(d["models"], list)
+    rows = {r["model"]: r for r in d["models"]}
+    assert "echo-1" in rows and rows["echo-1"]["total_requests"] >= 1
+
+
 def test_dashboard_has_stats_panel(client):
     html = client.get("/admin").text
     for m in ('id="stScopeSession"', 'id="stScopeAll"', 'id="stModel"', 'id="stClear"', 'id="statRej"',
-              "function refreshStats", "function fmtUptime", "Cache efficiency", "Uptime", "Rejected", "/api/stats"):
+              "function refreshStats", "function fmtUptime", "Cache efficiency", "Uptime", "Rejected", "/api/stats",
+              'data-mt="permodel"', 'id="mt-permodel"', 'id="pmRows"', "function refreshPerModel"):
         assert m in html, m

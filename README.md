@@ -126,6 +126,7 @@ curl -s http://127.0.0.1:8000/api/status
 | `POST /api/benchmark` | load benchmark: PP/TG tok/s, TTFT, TPOT, E2E percentiles, peak mem, `mode` |
 | `GET  /api/devices` | enumerate compute devices (NVIDIA/AMD/CPU + VRAM) |
 | `GET  /api/stats` | aggregate request stats (`scope=session` or `alltime`) |
+| `GET  /api/stats/models` | per-model stats breakdown (sortable table) |
 | `POST /api/stats/clear` | reset session or all-time stats |
 | `GET  /api/history` | past benchmark runs + metric samples (persisted) |
 | `GET  /api/hf/search` | search HuggingFace models (id, downloads, likes, task) |
@@ -166,7 +167,7 @@ eight sections:
 - **Models** — memory gauge + live table with **Load / Unload / Pin / Unpin**, plus a **device picker** so a model loads on a chosen GPU/CPU
 - **Chat** — pick a model and stream a completion in a chat playground, with a **prefilling…** indicator until the first token and a **first-token (TTFT)** time on each reply
 - **Logs** — live tail of the server's ring-buffered logs, level-colored
-- **Metrics** — aggregate **Session / All-Time** stats (requests, tokens served, cache efficiency, prefill/gen tok/s, uptime, rejections-by-reason), **per-model or global**, + latency + throughput sparkline charts (canvas, no chart lib)
+- **Metrics** — aggregate **Session / All-Time** stats (requests, tokens served, cache efficiency, prefill/gen tok/s, uptime, rejections-by-reason), **per-model or global**, organized into **Overview / Per-model / Charts / Rejections** sub-tabs with a **sortable per-model table** + latency/throughput sparkline charts (canvas, no chart lib)
 - **Devices** — detected accelerators (NVIDIA / AMD / CPU) with VRAM used/free/total
 - **Download** — search HuggingFace, browse downloads/likes/task, one-click download into the model dir with a progress bar (`pip install '.[downloader]'`); set a **mirror endpoint** in Settings (e.g. `hf-mirror.com`) for faster/regional access
 - **Benchmark** — prefill/decode tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory; `same`/`different` prompt modes, a single-request profile, copy-to-clipboard, and a **persisted history of past runs** (each row **expands** to the full per-run breakdown — context, PP/TG tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory, token counts)
@@ -182,7 +183,7 @@ header toggles **light / dark** mode (persisted in the browser; defaults dark).
 uv run pytest          # or:  .venv/bin/pytest
 ```
 
-95 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm/torch not
+96 tests, all green with `MockEchoBackend` — **no GPU, no model, and vllm/torch not
 installed**: vendor-import guard, pool lifecycle (discovery / LRU eviction /
 pinning / TTL), the OpenAI + Anthropic chat endpoints (stream + non-stream), the
 embeddings + rerank endpoints, the admin dashboard + pin/unpin, the logs / settings

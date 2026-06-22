@@ -196,27 +196,50 @@ tbody tr:hover{background:var(--card2)}
       </section>
 
       <section class="section" id="sec-metrics">
-        <div class="panel" style="padding:16px;margin-bottom:16px">
-          <div class="chat-bar" style="margin-bottom:12px">
+        <div class="panel" style="padding:14px 16px;margin-bottom:14px">
+          <div class="chat-bar">
             <div class="seg"><button id="stScopeSession" class="seg-btn active">Session</button><button id="stScopeAll" class="seg-btn">All-Time</button></div>
             <select id="stModel" style="min-width:160px"><option value="">All models</option></select>
             <span class="muted" style="font-size:11px">aggregate request stats &mdash; All-Time survives restarts</span>
             <span class="spacer"></span>
             <button class="btn sm" id="stClear">Clear</button>
           </div>
+        </div>
+        <div class="seg" id="mtTabs" style="margin-bottom:14px">
+          <button class="seg-btn active" data-mt="overview">Overview</button>
+          <button class="seg-btn" data-mt="permodel">Per-model</button>
+          <button class="seg-btn" data-mt="charts">Charts</button>
+          <button class="seg-btn" data-mt="rejections">Rejections</button>
+        </div>
+        <div class="mt-panel" id="mt-overview">
           <div class="cards" id="statCards"></div>
-          <div id="statRej" class="muted" style="font-size:12px;margin-top:10px"></div>
         </div>
-        <div class="cards" id="metricCards"></div>
-        <div class="panel" style="padding:18px;margin-bottom:16px">
-          <div class="muted" style="font-size:12px;margin-bottom:10px">Latency per request (ms)</div>
-          <canvas id="chartLatency" style="width:100%;display:block"></canvas>
+        <div class="mt-panel" id="mt-permodel" style="display:none">
+          <div class="panel">
+            <table>
+              <thead><tr><th data-sort="model">Model</th><th data-sort="total_requests">Requests</th><th data-sort="generation_tps">Gen tok/s</th><th data-sort="total_tokens_served">Tokens</th><th data-sort="cache_efficiency">Cache %</th></tr></thead>
+              <tbody id="pmRows"><tr><td colspan="5" class="muted">no per-model data yet</td></tr></tbody>
+            </table>
+          </div>
         </div>
-        <div class="panel" style="padding:18px">
-          <div class="muted" style="font-size:12px;margin-bottom:10px">Throughput per request (tokens/s)</div>
-          <canvas id="chartTps" style="width:100%;display:block"></canvas>
+        <div class="mt-panel" id="mt-charts" style="display:none">
+          <div class="cards" id="metricCards"></div>
+          <div class="panel" style="padding:18px;margin-bottom:16px">
+            <div class="muted" style="font-size:12px;margin-bottom:10px">Latency per request (ms)</div>
+            <canvas id="chartLatency" style="width:100%;display:block"></canvas>
+          </div>
+          <div class="panel" style="padding:18px">
+            <div class="muted" style="font-size:12px;margin-bottom:10px">Throughput per request (tokens/s)</div>
+            <canvas id="chartTps" style="width:100%;display:block"></canvas>
+          </div>
+          <p class="muted" style="font-size:12px;margin-top:12px">History records one point per chat completion — use the <strong>Chat</strong> tab (or send API requests) to generate data.</p>
         </div>
-        <p class="muted" style="font-size:12px;margin-top:12px">History records one point per chat completion — use the <strong>Chat</strong> tab (or send API requests) to generate data.</p>
+        <div class="mt-panel" id="mt-rejections" style="display:none">
+          <div class="panel" style="padding:16px">
+            <div class="muted" style="font-size:12px;margin-bottom:10px">Requests rejected before serving, by reason</div>
+            <div id="statRej" class="muted" style="font-size:13px">none</div>
+          </div>
+        </div>
       </section>
 
       <section class="section" id="sec-devices">
@@ -546,18 +569,36 @@ async function refreshStats(){
       statCard('Uptime', fmtUptime(s.uptime_seconds))+
       statCard('Rejected', statN(s.total_rejections));
     const rj=s.rejections||{}; const rks=Object.keys(rj);
-    if($('#statRej')) $('#statRej').innerHTML = rks.length? ('rejected &mdash; '+rks.map(k=>esc(k)+': '+rj[k]).join(' &middot; ')) : '';
+    if($('#statRej')) $('#statRej').innerHTML = rks.length? ('rejected &mdash; '+rks.map(k=>esc(k)+': '+rj[k]).join(' &middot; ')) : 'none';
   }catch(e){}
 }
 function setStatsScope(sc){ statsScope=sc;
   $('#stScopeSession').classList.toggle('active',sc==='session');
   $('#stScopeAll').classList.toggle('active',sc==='alltime');
-  refreshStats();
+  refreshStats(); refreshPerModel();
 }
 $('#stScopeSession').onclick=()=>setStatsScope('session');
 $('#stScopeAll').onclick=()=>setStatsScope('alltime');
 $('#stClear').onclick=async()=>{ try{ await api('/api/stats/clear?scope='+statsScope,'POST'); refreshStats(); toast('cleared '+statsScope+' stats'); }catch(e){} };
 $('#stModel').onchange=refreshStats;
+/* Metrics sub-tabs + per-model table */
+let pmRows=[], pmSort={key:'total_requests',dir:-1};
+function setMetricsTab(t){
+  $$('#mtTabs .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.mt===t));
+  ['overview','permodel','charts','rejections'].forEach(p=>{ const el=$('#mt-'+p); if(el) el.style.display=(p===t)?'':'none'; });
+  if(t==='charts') refreshMetrics(); else if(t==='permodel') refreshPerModel(); else refreshStats();
+}
+$$('#mtTabs .seg-btn').forEach(b=>b.onclick=()=>setMetricsTab(b.dataset.mt));
+async function refreshPerModel(){
+  try{ const d=await api('/api/stats/models?scope='+statsScope); pmRows=d.models||[]; renderPerModel(); }catch(e){}
+}
+function renderPerModel(){
+  const rows=pmRows.slice().sort((a,b)=>{ const k=pmSort.key, av=a[k], bv=b[k];
+    return (typeof av==='string')? pmSort.dir*String(av).localeCompare(String(bv)) : pmSort.dir*((av||0)-(bv||0)); });
+  $('#pmRows').innerHTML=rows.map(r=>'<tr><td><strong>'+esc(r.model)+'</strong></td><td class="num">'+statN(r.total_requests)+'</td><td class="num">'+statN(r.generation_tps)+'</td><td class="num">'+statN(r.total_tokens_served)+'</td><td class="num">'+statN(r.cache_efficiency)+'</td></tr>').join('')||'<tr><td colspan="5" class="muted">no per-model data yet</td></tr>';
+}
+$('#mt-permodel').addEventListener('click',e=>{ const th=e.target.closest('th[data-sort]'); if(!th) return;
+  const k=th.dataset.sort; pmSort.dir=(pmSort.key===k)?-pmSort.dir:-1; pmSort.key=k; renderPerModel(); });
 async function refreshMetrics(){
   try{ const d=await api('/api/metrics'); const s=d.samples||[];
     const lat=s.map(p=>p.latency_ms), tps=s.map(p=>p.tps);
