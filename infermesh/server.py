@@ -119,6 +119,11 @@ class SettingsPatch(BaseModel):
     gen_top_p: Optional[float] = None
     gen_top_k: Optional[int] = None
     gen_max_tokens: Optional[int] = None
+    host: Optional[str] = None              # startup-only (saved now, applied on restart)
+    port: Optional[int] = None
+    model_dir: Optional[str] = None
+    backend: Optional[str] = None
+    max_process_memory: Optional[str] = None
 
 
 class BenchmarkRequest(BaseModel):
@@ -668,6 +673,26 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         if "gen_max_tokens" in fset:
             settings.gen_max_tokens = None if patch.gen_max_tokens is None else max(1, int(patch.gen_max_tokens))
             changed.append("gen_max_tokens")
+        if patch.host is not None:
+            new = patch.host.strip() or settings.host
+            if new != settings.host:
+                settings.host = new; changed.append("host")
+        if patch.port is not None:
+            new = max(1, min(65535, int(patch.port)))
+            if new != settings.port:
+                settings.port = new; changed.append("port")
+        if patch.model_dir is not None:
+            new = patch.model_dir.strip() or None
+            if new != settings.model_dir:
+                settings.model_dir = new; changed.append("model_dir")
+        if patch.backend is not None:
+            new = patch.backend.strip() or settings.backend
+            if new != settings.backend:
+                settings.backend = new; changed.append("backend")
+        if patch.max_process_memory is not None:
+            new = patch.max_process_memory.strip() or settings.max_process_memory
+            if new != settings.max_process_memory:
+                settings.max_process_memory = new; changed.append("max_process_memory")
         if "kv_hot_capacity" in changed or "kv_cold_dir" in changed:
             pool.default_extra = _kv_defaults(settings)
         if changed:
@@ -677,6 +702,16 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                 logger.error("settings save failed: %s", exc)
         data = asdict(settings)
         data["api_key"] = bool(settings.api_key)
-        return {"updated": changed, "settings": data}
+        restart_fields = {"host", "port", "model_dir", "backend", "max_process_memory"}
+        return {"updated": changed, "settings": data,
+                "restart_required": [c for c in changed if c in restart_fields]}
+
+    @app.post("/api/restart")
+    async def api_restart(_: None = Depends(require_auth)):
+        """Re-exec the serve process so it reloads settings.json (keeps the PID)."""
+        import os as _os
+        from infermesh import cli as _cli
+        _cli.restart_in_place()
+        return {"restarting": True, "pid": _os.getpid()}
 
     return app

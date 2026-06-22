@@ -264,6 +264,43 @@ def _serve_argv(args: argparse.Namespace) -> list[str]:
     return out
 
 
+def _restart_argv() -> list[str]:
+    """Re-exec argv that re-reads settings.json: drop the flags now owned by the
+    saved settings (so dashboard edits win) but keep ``--providers``/``--pin``."""
+    strip = {"--model-dir", "--host", "--port", "--backend", "--max-concurrent-requests",
+             "--idle-timeout", "--max-process-memory", "--api-key", "--sse-keepalive"}
+    src = sys.argv[1:]
+    kept: list[str] = []
+    i = 0
+    while i < len(src):
+        tok = src[i]
+        if tok.split("=", 1)[0] in strip:
+            i += 1 if "=" in tok else 2   # skip the flag (and its separate value)
+            continue
+        kept.append(tok)
+        i += 1
+    if "serve" not in kept:
+        kept.insert(0, "serve")
+    return [sys.executable, "-m", "infermesh.cli", *kept]
+
+
+def restart_in_place(delay: float = 0.4) -> None:
+    """Schedule an in-process re-exec so the running serve process reloads
+    settings.json. Keeps the same PID (a pidfile written by ``start`` stays
+    valid). Returns immediately; the swap happens after ``delay`` seconds so the
+    triggering HTTP response can flush first."""
+    import threading
+
+    def _go() -> None:
+        time.sleep(delay)
+        try:
+            os.execv(sys.executable, _restart_argv())
+        except Exception as exc:  # noqa: BLE001 - never take the process down on a bad exec
+            logging.getLogger("infermesh.cli").error("restart re-exec failed: %s", exc)
+
+    threading.Thread(target=_go, daemon=True).start()
+
+
 def cmd_start(args: argparse.Namespace) -> int:
     settings = _resolve_settings(args)  # persist + resolve host/port
     existing = _read_pidfile()

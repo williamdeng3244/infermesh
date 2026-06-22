@@ -49,6 +49,7 @@ def test_dashboard_has_all_sections(client):
                    'id="chatInput"', 'id="logs"', 'id="setIdle"', 'id="setKvHot"', 'id="saveKv"',
                    'id="setHfEndpoint"', 'id="saveHf"', "chartLatency",
                    'id="setGenTemp"', 'id="saveGen"', "Generation defaults",
+                   'id="setHost"', 'id="saveStartup"', 'id="restartBtn"', "Restart server",
                    'class="prefill"', "msg-meta", 'id="themeBtn"', 'data-theme="light"'):
         assert marker in html, marker
 
@@ -96,6 +97,35 @@ def test_apply_gen_defaults_only_fills_omitted():
     assert kept.temperature == 0.9                                 # client value always wins
     none_default = _apply_gen_defaults(ChatCompletionRequest(model="m", messages=msgs), Settings())
     assert none_default.top_p is None                             # no default -> left for adapter fallback
+
+
+def test_settings_put_startup_fields_and_restart_required(client, monkeypatch):
+    monkeypatch.setattr(Settings, "save", lambda self, *a, **k: None)
+    r = client.put("/api/settings", json={"port": 9123, "backend": "vllm", "model_dir": "/models"}).json()
+    assert set(r["restart_required"]) == {"port", "backend", "model_dir"}
+    assert r["settings"]["port"] == 9123 and r["settings"]["backend"] == "vllm" and r["settings"]["model_dir"] == "/models"
+    again = client.put("/api/settings", json={"port": 9123, "backend": "vllm"}).json()
+    assert again["restart_required"] == []                  # identical values -> no spurious restart flag
+    assert client.put("/api/settings", json={"port": 999999}).json()["settings"]["port"] == 65535   # clamped
+
+
+def test_restart_endpoint_schedules_reexec(client, monkeypatch):
+    import infermesh.cli as cli
+    calls = []
+    monkeypatch.setattr(cli, "restart_in_place", lambda *a, **k: calls.append(True))
+    r = client.post("/api/restart").json()
+    assert r["restarting"] is True and "pid" in r and calls == [True]   # scheduled, not actually exec'd
+
+
+def test_restart_argv_strips_settings_flags_keeps_providers(monkeypatch):
+    import sys
+    import infermesh.cli as cli
+    monkeypatch.setattr(sys, "argv", ["/x/cli.py", "serve", "--port", "8021",
+                                      "--model-dir", "/m", "--providers", "p.yaml", "--pin", "m1"])
+    tail = cli._restart_argv()[3:]                          # after [python, -m, infermesh.cli]
+    assert tail[0] == "serve"
+    assert "--providers" in tail and "p.yaml" in tail and "--pin" in tail and "m1" in tail   # preserved
+    assert not ({"--port", "8021", "--model-dir", "/m"} & set(tail))                          # stripped -> settings.json wins
 
 
 async def test_pool_merges_default_extra_at_load(mock_pool):

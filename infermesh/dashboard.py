@@ -96,6 +96,7 @@ tbody tr:hover{background:var(--card2)}
 .mono{font-family:var(--mono)}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .badge{font:600 11px var(--mono);padding:2px 8px;border-radius:6px;border:1px solid var(--border2);color:var(--muted)}
+.badge.warn{color:var(--warn);border-color:var(--warn)}
 .badge.loaded{color:var(--accent);border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.08)}
 .badge.loading{color:var(--blue);border-color:rgba(88,166,255,.4)}
 .badge.pinned{color:var(--warn);border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.08)}
@@ -402,6 +403,28 @@ tbody tr:hover{background:var(--card2)}
             </div>
             <div class="hint">Blank = no server default (the client's value or the built-in fallback applies). A request's own values always win.</div>
           </div>
+          <h3 style="margin-top:26px">Startup <span class="badge warn">restart to apply</span></h3>
+          <div class="field">
+            <label>Bind address, model dir &amp; default backend &mdash; saved now, applied on restart</label>
+            <div class="row">
+              <input id="setHost" type="text" placeholder="host" title="bind host" style="width:140px" autocomplete="off"/>
+              <input id="setPort" type="number" min="1" max="65535" step="1" placeholder="port" title="bind port" style="width:110px"/>
+              <input id="setBackend" type="text" placeholder="backend" title="default backend" style="width:140px" autocomplete="off"/>
+              <input id="setMaxMem" type="text" placeholder="max memory e.g. 80%" title="max process memory" style="width:170px" autocomplete="off"/>
+            </div>
+            <div class="row" style="margin-top:8px">
+              <input id="setModelDir" type="text" placeholder="model dir &mdash; blank = none" title="model directory" style="width:430px" autocomplete="off"/>
+              <button class="btn" id="saveStartup">Save</button>
+            </div>
+            <div class="hint">Read once when the server boots. Changing <strong>host/port</strong> moves the server &mdash; you'll reconnect at the new address.</div>
+          </div>
+          <div id="restartBar" class="field" style="display:none">
+            <div class="row" style="align-items:center;gap:10px">
+              <span class="badge warn">restart required</span>
+              <span class="muted" id="restartMsg" style="font-size:12px">Saved &mdash; restart to apply.</span>
+              <button class="btn primary" id="restartBtn">Restart server</button>
+            </div>
+          </div>
           <p id="settings-err" class="err"></p>
           <h3 style="margin-top:26px">All settings</h3>
           <dl class="kv" id="settingsKv"></dl>
@@ -550,6 +573,7 @@ async function loadSettings(){
     if($('#setHfEndpoint')) $('#setHfEndpoint').value=s.hf_endpoint||'';
     const gv=(el,v)=>{ if($(el)) $(el).value=(v==null?'':v); };
     gv('#setGenTemp',s.gen_temperature); gv('#setGenTopP',s.gen_top_p); gv('#setGenTopK',s.gen_top_k); gv('#setGenMax',s.gen_max_tokens);
+    gv('#setHost',s.host); gv('#setPort',s.port); gv('#setBackend',s.backend); gv('#setMaxMem',s.max_process_memory); gv('#setModelDir',s.model_dir);
     $('#keyState').textContent=s.api_key?'set':'unset';
     const order=['backend','model_dir','host','port','max_concurrent_requests','idle_timeout','max_process_memory','ttl_check_interval','sse_keepalive_interval','kv_hot_capacity','kv_cold_dir','hf_endpoint','gen_temperature','gen_top_p','gen_top_k','gen_max_tokens','api_key'];
     $('#settingsKv').innerHTML=order.filter(k=>k in s).map(k=>'<dt>'+k+'</dt><dd>'+(k==='api_key'?(s[k]?'set':'unset'):esc(s[k]==null?'—':s[k]))+'</dd>').join('');
@@ -588,6 +612,26 @@ async function saveGen(){
   }catch(e){ $('#settings-err').textContent=String(e); }
 }
 $('#saveGen').onclick=saveGen;
+async function saveStartup(){
+  const v=el=>$(el).value.trim();
+  try{ const r=await api('/api/settings','PUT',{host:v('#setHost'),port:(v('#setPort')===''?null:Number(v('#setPort'))),backend:v('#setBackend'),max_process_memory:v('#setMaxMem'),model_dir:v('#setModelDir')});
+    toast('startup settings saved'); loadSettings();
+    const rr=r.restart_required||[];
+    if(rr.length){ $('#restartBar').style.display=''; $('#restartMsg').textContent='Saved '+rr.join(', ')+' — restart to apply.'; }
+  }catch(e){ $('#settings-err').textContent=String(e); }
+}
+$('#saveStartup').onclick=saveStartup;
+async function restartServer(){
+  const btn=$('#restartBtn'); if(btn) btn.disabled=true; $('#restartMsg').textContent='restarting…';
+  try{ await api('/api/restart','POST',{}); }catch(e){}   // connection may drop mid-restart — expected
+  let tries=0;
+  const probe=async()=>{ tries++;
+    try{ const h=await fetch('/health',{cache:'no-store'}); if(h.ok){ $('#restartMsg').textContent='back online — reloading…'; setTimeout(()=>location.reload(),700); return; } }catch(_){}
+    if(tries<40) setTimeout(probe,500); else { $('#restartMsg').textContent='still restarting… reload manually'; if(btn) btn.disabled=false; }
+  };
+  setTimeout(probe,1500);
+}
+$('#restartBtn').onclick=restartServer;
 
 /* Metrics */
 function drawChart(id, vals, color, unit){
