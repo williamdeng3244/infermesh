@@ -51,6 +51,7 @@ def test_dashboard_has_all_sections(client):
                    'id="setGenTemp"', 'id="saveGen"', "Generation defaults",
                    'id="setHost"', 'id="saveStartup"', 'id="restartBtn"', "Restart server",
                    'id="setConc"', 'id="saveConc"', "Max concurrent requests",
+                   'id="msModel"', 'id="msSave"', "Per-model overrides",
                    'class="prefill"', "msg-meta", 'id="themeBtn"', 'data-theme="light"'):
         assert marker in html, marker
 

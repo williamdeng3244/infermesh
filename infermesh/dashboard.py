@@ -175,6 +175,23 @@ tbody tr:hover{background:var(--card2)}
             <tbody id="rows"><tr><td colspan="8" class="muted" data-i18n="loading…">loading&hellip;</td></tr></tbody>
           </table>
         </div>
+        <div class="panel" style="margin-top:16px;padding:14px 16px">
+          <div class="chat-bar" style="margin-bottom:10px">
+            <label class="muted" style="font-size:12px" data-i18n="Per-model overrides">Per-model overrides</label>
+            <select id="msModel" style="min-width:190px"></select>
+            <span class="muted" style="font-size:11px" data-i18n="override the global generation defaults for one model">override the global generation defaults for one model</span>
+          </div>
+          <div class="chat-bar" style="flex-wrap:wrap">
+            <input id="msTemp" type="number" min="0" max="2" step="0.05" placeholder="temperature" style="width:120px"/>
+            <input id="msTopP" type="number" min="0" max="1" step="0.05" placeholder="top_p" style="width:105px"/>
+            <input id="msTopK" type="number" min="0" step="1" placeholder="top_k" style="width:100px"/>
+            <input id="msMax" type="number" min="1" step="1" placeholder="max_tokens" style="width:120px"/>
+            <input id="msCtx" type="number" min="1" step="1" placeholder="max_context_window" title="approx, by characters" style="width:170px"/>
+            <button class="btn" id="msSave" data-i18n="Save">Save</button>
+            <button class="btn sm" id="msClear" data-i18n="Clear">Clear</button>
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:8px" data-i18n="Per-model values win over the global defaults; a request's own value still wins. max_context_window rejects over-long prompts (approximate).">Per-model values win over the global defaults; a request's own value still wins. max_context_window rejects over-long prompts (approximate).</div>
+        </div>
         <p id="models-err" class="err"></p>
       </section>
 
@@ -491,7 +508,8 @@ const I18N={
 "restart required":"需要重启","Saved — restart to apply.":"已保存 — 重启后生效。","Restart server":"重启服务器","All settings":"全部设置",
 "connecting":"连接中","healthy":"正常","unreachable":"无法连接",
 "stats copied":"已复制统计","generation defaults saved":"已保存生成默认值","startup settings saved":"已保存启动设置","KV cache settings saved":"已保存 KV 缓存设置","HuggingFace endpoint saved":"已保存 HuggingFace 端点","Idle timeout saved":"已保存空闲超时",
-"Max concurrent requests":"最大并发请求","queue bound (0 = unbounded)":"队列上限（0 = 无限）","Admission cap applied live. Queue bound > 0 returns 503 once that many requests are waiting.":"准入上限实时生效。队列上限 > 0 时，等待数达到该值即返回 503。","concurrency saved":"已保存并发设置"
+"Max concurrent requests":"最大并发请求","queue bound (0 = unbounded)":"队列上限（0 = 无限）","Admission cap applied live. Queue bound > 0 returns 503 once that many requests are waiting.":"准入上限实时生效。队列上限 > 0 时，等待数达到该值即返回 503。","concurrency saved":"已保存并发设置",
+"Per-model overrides":"按模型覆盖","override the global generation defaults for one model":"为单个模型覆盖全局生成默认值","Per-model values win over the global defaults; a request's own value still wins. max_context_window rejects over-long prompts (approximate).":"按模型的值优先于全局默认值；请求自带的值仍然最优先。max_context_window 会拒绝过长的 prompt（近似）。","model overrides saved":"已保存模型覆盖","model overrides cleared":"已清除模型覆盖"
 };
 let lang='en';
 function T(s){ return (lang==='zh' && I18N[s]!=null) ? I18N[s] : s; }
@@ -538,7 +556,7 @@ function switchSection(sec){
   if(sec==='benchmark'){ loadBenchModels(); refreshBenchHistory(); }
   if(sec==='devices') refreshDevices();
   if(sec==='download'){ refreshDownloads(); if(!dlLoaded){ dlLoaded=true; runHfSearch(); } }
-  if(sec==='models') loadDevicePicker();
+  if(sec==='models'){ loadDevicePicker(); refreshModelSettings(); }
 }
 
 /* Models */
@@ -708,6 +726,31 @@ async function saveConc(){
   }catch(e){ $('#settings-err').textContent=String(e); }
 }
 $('#saveConc').onclick=saveConc;
+/* Per-model generation overrides */
+let msAll={};
+async function refreshModelSettings(){
+  try{ const d=await api('/v1/models'); const sel=$('#msModel'); const cur=sel.value;
+    sel.innerHTML=(d.data||[]).map(m=>'<option value="'+esc(m.id)+'">'+esc(m.id)+'</option>').join('');
+    if(cur) sel.value=cur;
+    const ms=await api('/api/model-settings'); msAll=ms.settings||{}; loadMsFields();
+  }catch(e){}
+}
+function loadMsFields(){
+  const o=msAll[$('#msModel').value]||{};
+  const set=(el,v)=>{ if($(el)) $(el).value=(v==null?'':v); };
+  set('#msTemp',o.temperature); set('#msTopP',o.top_p); set('#msTopK',o.top_k); set('#msMax',o.max_tokens); set('#msCtx',o.max_context_window);
+}
+function msBody(clear){
+  const m=$('#msModel').value; const num=el=>{ const v=$(el).value.trim(); return (clear||v==='')?null:Number(v); };
+  return {model:m,temperature:num('#msTemp'),top_p:num('#msTopP'),top_k:num('#msTopK'),max_tokens:num('#msMax'),max_context_window:num('#msCtx')};
+}
+async function saveMs(){ if(!$('#msModel').value) return;
+  try{ await api('/api/model-settings','PUT',msBody(false)); toast('model overrides saved'); refreshModelSettings(); }
+  catch(e){ $('#models-err').textContent=String(e); } }
+async function clearMs(){ if(!$('#msModel').value) return;
+  try{ await api('/api/model-settings','PUT',msBody(true)); toast('model overrides cleared'); refreshModelSettings(); }
+  catch(e){ $('#models-err').textContent=String(e); } }
+$('#msModel').onchange=loadMsFields; $('#msSave').onclick=saveMs; $('#msClear').onclick=clearMs;
 
 /* Metrics */
 function drawChart(id, vals, color, unit){

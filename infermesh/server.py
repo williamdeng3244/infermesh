@@ -60,6 +60,7 @@ from infermesh.core.pool import (
 )
 from infermesh.core.settings import Settings
 from infermesh.core.scheduler import AdmissionController, Overloaded
+from infermesh.core.model_settings import ModelSettingsStore, SAMPLING_FIELDS
 from infermesh.core.devices import enumerate_devices
 from infermesh.core.stats import StatsAccumulator
 from infermesh.core.history import (
@@ -129,6 +130,17 @@ class SettingsPatch(BaseModel):
     max_process_memory: Optional[str] = None
 
 
+class ModelSettingsPatch(BaseModel):
+    """Per-model generation overrides; a null field clears that override."""
+
+    model: str
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    top_k: Optional[int] = None
+    max_tokens: Optional[int] = None
+    max_context_window: Optional[int] = None
+
+
 class BenchmarkRequest(BaseModel):
     """Config for POST /api/benchmark (bounded server-side)."""
 
@@ -150,6 +162,7 @@ class HFDownloadRequest(BaseModel):
 _METRICS: deque = deque(maxlen=300)
 # Aggregate request stats (session + persisted all-time), oMLX-style.
 _STATS = StatsAccumulator()
+_MODEL_SETTINGS = ModelSettingsStore()
 
 
 def _record_metric(model: Optional[str], latency_ms: float, completion_tokens: int,
@@ -192,6 +205,37 @@ def _apply_gen_defaults(request, settings: Settings):
         if val is not None and getattr(request, attr, None) is None:
             setattr(request, attr, val)
     return request
+
+
+def _apply_model_overrides(request, model_id: str, store: ModelSettingsStore) -> dict:
+    """Fill omitted sampling params from a model's per-model overrides (which win
+    over the global defaults but still yield to an explicit request value).
+    Returns the override dict so the caller can read ``max_context_window``."""
+    ov = store.get(model_id)
+    for attr in SAMPLING_FIELDS:
+        val = ov.get(attr)
+        if val is not None and getattr(request, attr, None) is None:
+            setattr(request, attr, val)
+    return ov
+
+
+def _approx_prompt_tokens(request) -> int:
+    """Tokenizer-free estimate (~4 chars/token) of a chat request's prompt size,
+    summed over message text. Backs the approximate ``max_context_window`` guard
+    -- the control plane has no tokenizer, so this is deliberately a soft bound."""
+    chars = 0
+    for msg in (getattr(request, "messages", None) or []):
+        content = getattr(msg, "content", None)
+        if isinstance(content, str):
+            chars += len(content)
+        elif isinstance(content, list):
+            for part in content:
+                text = getattr(part, "text", None)
+                if text is None and isinstance(part, dict):
+                    text = part.get("text")
+                if text:
+                    chars += len(text)
+    return chars // 4
 
 
 def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
@@ -257,9 +301,19 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
 
     # --------------------------- chat handler -------------------------- #
     async def _handle_chat(request, adapter):
-        _apply_gen_defaults(request, settings)  # server generation defaults fill any omitted sampling params
-        internal = adapter.parse_request(request)
         model_id = pool.resolve_model_id(request.model)
+        ov = _apply_model_overrides(request, model_id, _MODEL_SETTINGS)  # per-model overrides win over globals
+        _apply_gen_defaults(request, settings)                          # globals fill whatever is still omitted
+        mcw = ov.get("max_context_window")
+        if mcw and _approx_prompt_tokens(request) > int(mcw):
+            _STATS.record_rejection("context_too_long")
+            return JSONResponse(
+                adapter.create_error_response(
+                    f"prompt is approximately too long for max_context_window={mcw}",
+                    "context_too_long", 400),
+                status_code=400,
+            )
+        internal = adapter.parse_request(request)
 
         try:
             await gate.acquire()  # control-plane concurrency cap (held until the response completes)
@@ -742,5 +796,26 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         from infermesh import cli as _cli
         _cli.restart_in_place()
         return {"restarting": True, "pid": _os.getpid()}
+
+    @app.get("/api/model-settings")
+    async def api_model_settings(_: None = Depends(require_auth)):
+        return {"settings": _MODEL_SETTINGS.all()}
+
+    @app.put("/api/model-settings")
+    async def api_put_model_settings(patch: ModelSettingsPatch, _: None = Depends(require_auth)):
+        fset = patch.model_fields_set
+        fields: dict = {}
+        if "temperature" in fset:
+            fields["temperature"] = None if patch.temperature is None else max(0.0, min(2.0, float(patch.temperature)))
+        if "top_p" in fset:
+            fields["top_p"] = None if patch.top_p is None else max(0.0, min(1.0, float(patch.top_p)))
+        if "top_k" in fset:
+            fields["top_k"] = None if patch.top_k is None else max(0, int(patch.top_k))
+        if "max_tokens" in fset:
+            fields["max_tokens"] = None if patch.max_tokens is None else max(1, int(patch.max_tokens))
+        if "max_context_window" in fset:
+            fields["max_context_window"] = None if patch.max_context_window is None else max(1, int(patch.max_context_window))
+        cur = _MODEL_SETTINGS.set(patch.model, **fields)
+        return {"model": patch.model, "settings": cur}
 
     return app
