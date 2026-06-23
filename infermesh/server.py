@@ -703,8 +703,15 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             pool.set_device(model_id, req.device)
             await pool.unload_if_idle_unpinned(model_id, force=True)
         try:
-            result = await run_benchmark(pool, model_id, requests=n, concurrency=c,
-                                         max_tokens=mt, prompt=req.prompt, mode=req.mode)
+            _bench = run_benchmark(pool, model_id, requests=n, concurrency=c,
+                                   max_tokens=mt, prompt=req.prompt, mode=req.mode)
+            # a device-pinned run reloads the model there; some accelerators (e.g. a CPU
+            # fallback on a torch_gcu box) can hang on load — bound it instead of hanging.
+            result = await (asyncio.wait_for(_bench, timeout=240) if req.device else _bench)
+        except asyncio.TimeoutError:
+            return JSONResponse(openai_adapter.create_error_response(
+                f"benchmark on device '{req.device}' timed out — that accelerator may be "
+                f"unavailable in this environment", "device_timeout", 503), status_code=503)
         except (ModelTooLargeError, InsufficientMemoryError) as exc:
             return JSONResponse(
                 openai_adapter.create_error_response(str(exc), "insufficient_memory", 503),
