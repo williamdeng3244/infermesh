@@ -147,18 +147,16 @@ async def run_benchmark(
         return None
 
     async def _sampler() -> None:
-        first = await asyncio.to_thread(_mem_now)
-        if first is None:
-            return
-        peak[0] = max(peak[0], first)
+        # Sample throughout (the model may only load partway through a cold run, so
+        # never early-exit on an initial None — that's how GCU/late-load mem appears).
         while not stop.is_set():
+            m = await asyncio.to_thread(_mem_now)
+            if m is not None:
+                peak[0] = max(peak[0], m)
             try:
                 await asyncio.wait_for(stop.wait(), timeout=0.25)
             except asyncio.TimeoutError:
                 pass
-            m = await asyncio.to_thread(_mem_now)
-            if m is not None:
-                peak[0] = max(peak[0], m)
 
     sampler_task = asyncio.ensure_future(_sampler())
     t0 = time.perf_counter()
