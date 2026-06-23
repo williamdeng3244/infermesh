@@ -186,10 +186,19 @@ async def run_benchmark(
             tg.append((n - 1) / (gen_ms / 1000.0))
             tpot.append(gen_ms / (n - 1))
 
+    dname = None
+    try:
+        from infermesh.core.devices import enumerate_devices
+        for _d in enumerate_devices():
+            if _d.get("vendor") == dev["vendor"]:
+                dname = _d.get("name"); break
+    except Exception:
+        pass
     return {
         "model": model_id,
         "device": dev["device"],
         "vendor": dev["vendor"],
+        "device_name": dname,
         "mode": mode,
         "requests": requests,
         "concurrency": concurrency,

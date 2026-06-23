@@ -363,6 +363,7 @@ tbody tr:hover{background:var(--card2)}
         <div class="panel" style="padding:15px 16px;margin-bottom:16px">
           <div class="bm-ctl">
             <div class="bm-field"><label data-i18n="Model">Model</label><select id="bmModel" style="min-width:200px"></select></div>
+            <div class="bm-field"><label data-i18n="Device">Device</label><select id="bmDevice" style="min-width:190px"></select></div>
             <div class="bm-field"><label data-i18n="Requests">Requests</label><input id="bmReq" type="number" min="1" max="200" value="20"/></div>
             <div class="bm-field"><label data-i18n="Concurrency">Concurrency</label><input id="bmConc" type="number" min="1" max="32" value="4"/></div>
             <div class="bm-field"><label data-i18n="Max tokens">Max tokens</label><input id="bmTok" type="number" min="1" max="1024" value="64"/></div>
@@ -535,7 +536,8 @@ const I18N={
 "Per-model overrides":"按模型覆盖","override the global generation defaults for one model":"为单个模型覆盖全局生成默认值","Per-model values win over the global defaults; a request's own value still wins. max_context_window rejects over-long prompts (approximate).":"按模型的值优先于全局默认值；请求自带的值仍然最优先。max_context_window 会拒绝过长的 prompt（近似）。","model overrides saved":"已保存模型覆盖","model overrides cleared":"已清除模型覆盖",
 "ModelScope (by model ID)":"ModelScope（按模型 ID）",
 "Prefill (PP)":"预填充 (PP)","Decode (TG)":"解码 (TG)","Throughput":"吞吐","Output":"输出","Peak GPU mem":"峰值显存","Succeeded":"成功","Run context":"运行配置","Prefill — PP TPS":"预填充 — PP TPS","Decode — TG TPS":"解码 — TG TPS","Single-request latency / E2E (ms)":"单请求延迟 / E2E (ms)","Peak GPU memory":"峰值显存",
-"max ctx (approx)":"最大上下文（近似）","overrides":"项覆盖","using global defaults":"使用全局默认值"
+"max ctx (approx)":"最大上下文（近似）","overrides":"项覆盖","using global defaults":"使用全局默认值",
+"Device":"设备","auto (current)":"自动（当前）","connected":"已连接","offline":"离线"
 };
 let lang='en';
 function T(s){ return (lang==='zh' && I18N[s]!=null) ? I18N[s] : s; }
@@ -579,7 +581,7 @@ function switchSection(sec){
   if(sec==='logs') refreshLogs();
   if(sec==='settings') loadSettings();
   if(sec==='metrics'){ refreshMetrics(); refreshStats(); }
-  if(sec==='benchmark'){ loadBenchModels(); refreshBenchHistory(); }
+  if(sec==='benchmark'){ loadBenchModels(); loadBenchDevices(); refreshBenchHistory(); }
   if(sec==='devices') refreshDevices();
   if(sec==='download'){ refreshDownloads(); if(!dlLoaded){ dlLoaded=true; runHfSearch(); } }
   if(sec==='models'){ loadDevicePicker(); refreshModelSettings(); }
@@ -918,16 +920,30 @@ async function loadBenchModels(){
     if(cur&&d.data.some(m=>m.id===cur)) sel.value=cur;
   }catch(e){}
 }
+async function loadBenchDevices(){
+  const sel=$('#bmDevice'); if(!sel) return;
+  try{
+    const dv=await api('/api/devices'); const live=dv.devices||[]; const liveIds=new Set(live.map(d=>d.id));
+    let past=[], seen={};
+    try{ const h=await api('/api/history'); (h.benchmarks||[]).forEach(b=>{ const r=b.result||{}; if(r.device_name&&r.device&&!liveIds.has(r.device)&&!seen[r.device_name]){ seen[r.device_name]=1; past.push(r.device_name); } }); }catch(_){}
+    const cur=sel.value;
+    sel.innerHTML='<option value="">'+T('auto (current)')+'</option>'+
+      live.map(d=>'<option value="'+esc(d.id)+'">✓ '+esc(d.name)+(d.vendor!=='cpu'?(' · '+T('connected')):'')+'</option>').join('')+
+      past.map(nm=>'<option value="" disabled>'+esc(nm)+' · '+T('offline')+'</option>').join('');
+    if(cur) sel.value=cur;
+  }catch(e){}
+}
 async function runBenchmark(){
   const model=$('#bmModel').value;
   if(!model){ $('#bm-err').textContent='pick a model'; return; }
-  const body={model:model, requests:(+$('#bmReq').value||20), concurrency:(+$('#bmConc').value||4), max_tokens:(+$('#bmTok').value||64), mode:($('#bmMode')?$('#bmMode').value:'same')};
-  $('#bm-err').textContent=''; $('#bmStatus').textContent='running '+body.requests+' req @ conc '+body.concurrency+'… (real models take a few s)';
+  const body={model:model, requests:(+$('#bmReq').value||20), concurrency:(+$('#bmConc').value||4), max_tokens:(+$('#bmTok').value||64), mode:($('#bmMode')?$('#bmMode').value:'same'), device:(($('#bmDevice')&&$('#bmDevice').value)||null)};
+  $('#bm-err').textContent=''; $('#bmStatus').textContent='running '+body.requests+'×'+body.concurrency+(body.device?(' on '+body.device):'')+'… (real models take a few s)';
   $('#bmRun').disabled=true;
   try{
     const r=await api('/api/benchmark','POST',body);
     lastBench=r;
-    $('#bmStatus').textContent='done · '+(r.model||'')+' on '+(r.device||r.vendor||'cpu')+' · '+r.wall_time_s+'s · mode '+(r.mode||'same');
+    $('#bmStatus').textContent='done · '+(r.model||'')+' on '+(r.device_name||r.device||'cpu')+' · '+r.wall_time_s+'s · mode '+(r.mode||'same');
+    loadBenchDevices();
     const pk=(r.peak_mem_mb!=null)?(fmt(r.peak_mem_mb)+' MB'):'—';
     $('#bmCards').innerHTML=
       '<div class="card"><div class="k">'+T('Prefill (PP)')+'</div><div class="v">'+r.pp_tps.mean+'<small> tok/s</small></div></div>'+
@@ -991,7 +1007,7 @@ async function refreshBenchHistory(){
   }catch(e){}
 }
 function bmn(v){ return v!=null?v:'—'; }
-function devChip(r){ const d=r&&r.device, v=r&&r.vendor; if(!d&&!v) return ''; const gpu=!!(v&&v!=='cpu'); return '<span class="chip '+(gpu?'gpu':'cpu')+'" title="device: '+esc(d||'')+'">'+(gpu?esc(v)+' · '+esc(d||'gpu'):'cpu')+'</span>'; }
+function devChip(r){ const nm=r&&r.device_name, d=r&&r.device, v=r&&r.vendor; if(!d&&!v&&!nm) return ''; const gpu=!!(v&&v!=='cpu'); return '<span class="chip '+(gpu?'gpu':'cpu')+'" title="'+esc((v||'')+' '+(d||''))+'">'+(gpu?esc(nm||v):'CPU')+'</span>'; }
 function bmKv(obj,keys){ return '<dl class="kv kv-sm">'+keys.map(k=>'<dt>'+k+'</dt><dd>'+bmn(obj&&obj[k])+'</dd>').join('')+'</dl>'; }
 function bmRows(pairs){ return '<dl class="kv kv-sm">'+pairs.map(p=>'<dt>'+p[0]+'</dt><dd>'+bmn(p[1])+'</dd>').join('')+'</dl>'; }
 function bmBlock(title,body){ return '<div class="bm-block"><div class="bm-bt">'+title+'</div>'+body+'</div>'; }
@@ -1014,7 +1030,7 @@ function bmDetail(x){
   const pk=r.peak_mem_mb!=null?(fmt(r.peak_mem_mb)+' MB'):'—';
   const succ=(r.succeeded!=null?r.succeeded+' / '+((r.succeeded||0)+(r.failed||0)):'—');
   return '<div class="bm-grid">'+
-    bmBlock(T('Run context'), bmRows([['model',esc(r.model||x.model||'')],['device',esc(r.device||'—')],['accelerator',esc(r.vendor||'—')],['mode',esc(r.mode||'—')],['type',single?'single request':'continuous batching'],['requests',p.requests],['concurrency',p.concurrency],['max tokens',p.max_tokens],['wall time (s)',r.wall_time_s],['succeeded',succ]]))+
+    bmBlock(T('Run context'), bmRows([['model',esc(r.model||x.model||'')],['GPU',esc(r.device_name||'—')],['device',esc(r.device||'—')],['accelerator',esc(r.vendor||'—')],['mode',esc(r.mode||'—')],['type',single?'single request':'continuous batching'],['requests',p.requests],['concurrency',p.concurrency],['max tokens',p.max_tokens],['wall time (s)',r.wall_time_s],['succeeded',succ]]))+
     bmBlock(T('Throughput'), bmRows([['requests / s',r.requests_per_sec],['output tok / s',r.output_tokens_per_sec]]))+
     bmBlock(T('Prefill — PP TPS'), bmRows([['mean',pp.mean],['max',pp.max],['prompt tokens',r.total_prompt_tokens]]))+
     bmBlock(T('Decode — TG TPS'), bmRows([['mean',tg.mean],['max',tg.max],['output tokens',r.total_output_tokens]]))+

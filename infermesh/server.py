@@ -150,6 +150,7 @@ class BenchmarkRequest(BaseModel):
     max_tokens: int = 64
     prompt: str = "Write one concise sentence about distributed systems."
     mode: str = "same"  # "same" (shared prompt, prefix-cacheable) | "different"
+    device: Optional[str] = None  # run on a specific accelerator (e.g. "gcu:0", "cpu"); None = current
 
 
 class HFDownloadRequest(BaseModel):
@@ -664,7 +665,9 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         except RuntimeError as exc:  # huggingface_hub not installed
             raise HTTPException(status_code=501, detail=str(exc))
         except Exception as exc:  # bad sort/task/query or network — surface, don't 500
-            raise HTTPException(status_code=502, detail=str(exc)[:200])
+            raise HTTPException(status_code=502, detail=(
+                "search failed — is HuggingFace reachable? Set a mirror endpoint in "
+                "Settings (e.g. https://hf-mirror.com). " + str(exc)[:120]))
         return {"models": models, "sort": sort, "task": task or None}
 
     @app.post("/api/hf/download")
@@ -696,6 +699,9 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         n = max(1, min(req.requests, 200))
         c = max(1, min(req.concurrency, 32))
         mt = max(1, min(req.max_tokens, 1024))
+        if req.device:  # pin the model to the chosen accelerator, reloading it there
+            pool.set_device(model_id, req.device)
+            await pool.unload_if_idle_unpinned(model_id, force=True)
         try:
             result = await run_benchmark(pool, model_id, requests=n, concurrency=c,
                                          max_tokens=mt, prompt=req.prompt, mode=req.mode)
