@@ -120,10 +120,16 @@ tbody tr:hover{background:var(--card2)}
 .mref-h{font-size:13px;margin-bottom:6px}.mref-h .muted{font-size:11px;font-weight:500}
 .mref-en{font-size:12px;color:var(--muted);line-height:1.5}
 .mref-zh{font-size:12px;color:var(--dim);line-height:1.6;margin-top:4px}
-.bm-term{margin-top:12px}
-.bm-term>summary{cursor:pointer;font:600 12px var(--sans);color:var(--muted);padding:6px 0;list-style:none}
+.bm-term{margin-top:14px}
+.bm-term>summary{cursor:pointer;font:600 12px var(--sans);color:var(--text);padding:7px 13px;list-style:none;border:1px solid var(--border2);border-radius:7px;background:var(--card2);display:inline-block;transition:border-color .15s ease,background .15s ease}
+.bm-term>summary:hover{border-color:var(--blue);background:var(--mutedbg)}
 .bm-term>summary::-webkit-details-marker{display:none}
 .bm-term>summary::before{content:"▸ "}.bm-term[open]>summary::before{content:"▾ "}
+.term-top{margin:11px 0 2px}
+.bm-raw{margin-top:6px}
+.bm-raw>summary{cursor:pointer;font:600 10px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.5px;list-style:none;padding:4px 0}
+.bm-raw>summary::-webkit-details-marker{display:none}
+.bm-raw>summary::before{content:"▸ "}.bm-raw[open]>summary::before{content:"▾ "}
 .term-h{font:600 10px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin:8px 0 3px}
 pre.term{background:#0a0e1a;color:#c9d4e3;border:1px solid var(--border);border-radius:7px;padding:11px 13px;font:11.5px/1.5 var(--mono);overflow:auto;white-space:pre;max-height:340px;margin:0}
 .badge.loaded{color:var(--accent);border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.08)}
@@ -155,7 +161,7 @@ pre.term{background:#0a0e1a;color:#c9d4e3;border:1px solid var(--border);border-
 .bm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;padding:16px;background:var(--card2);border-top:1px solid var(--border)}
 .bm-block .bm-bt{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);margin-bottom:6px;font-weight:600}
 .kv-sm{grid-template-columns:135px 1fr;gap:5px 10px;font-size:12.5px;margin-top:0}
-.bm-exp{padding:2px 8px;line-height:1}
+.bm-exp{padding:3px 10px;line-height:1;font-size:13px}
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border2);padding:10px 18px;border-radius:9px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
 .toast.show{opacity:1}
 </style>
@@ -576,7 +582,7 @@ const I18N={
 "Device":"设备","auto (current)":"自动（当前）","connected":"已连接","offline":"离线",
 "Models loaded":"已加载模型","Committed memory":"已占用内存","Live used / ceiling":"实时使用 / 上限","Host RAM":"主机内存","loading":"加载中","loaded":"已加载","idle":"空闲","pinned":"已固定","Load":"加载","Unload":"卸载","Pin":"固定","Unpin":"取消固定","no models discovered":"未发现模型","single request":"单次请求","continuous batching":"连续批处理",
 "Lines:":"行数：","Min display level":"最低显示级别","filters the view only — not the saved log file":"仅过滤此处显示 — 不影响日志文件的保存级别","Showing":"显示","lines":"行","no logs yet":"暂无日志",
-"Metrics Reference":"指标说明","System":"系统","Raw command":"原始命令","Raw result (terminal)":"原始结果（终端）"
+"Metrics Reference":"指标说明","System":"系统","Raw command":"原始命令","Raw result (terminal)":"原始结果（终端）","Raw command & terminal output":"原始命令 & 终端输出","command":"命令","results":"结果","raw JSON":"原始 JSON","copied":"已复制"
 };
 let lang='en';
 function T(s){ return (lang==='zh' && I18N[s]!=null) ? I18N[s] : s; }
@@ -591,7 +597,7 @@ function applyLang(l){
   var tl=$('#title'); if(tl && typeof active!=='undefined' && active) tl.textContent=T(TITLES[active]||'');
   try{ if(typeof tick==='function') tick(); }catch(e){}
   try{   // re-render the active section's dynamic content immediately in the new language
-    if(active==='benchmark'){ loadBenchDevices(); refreshBenchHistory(); }
+    if(active==='benchmark'){ loadBenchDevices(); renderBenchHistory(); }
     else if(active==='devices'){ refreshDevices(); }
     else if(active==='settings'){ loadSettings(); }
     else if(active==='models'){ refreshModelSettings(); }
@@ -1051,10 +1057,15 @@ async function loadDevicePicker(){
 }
 $('#devRefresh').onclick=refreshDevices;
 /* Benchmark history */
+let bmHistRows=[];
 async function refreshBenchHistory(){
-  try{ const h=await api('/api/history'); const rows=(h.benchmarks||[]).slice().reverse();
-    $('#bmHist').innerHTML=rows.map((x,i)=>bmSummaryRow(x,i)+bmDetailRow(x,i)).join('')||'<tr><td colspan="8" class="muted">no past runs</td></tr>';
-  }catch(e){}
+  try{ const h=await api('/api/history'); bmHistRows=(h.benchmarks||[]).slice().reverse(); renderBenchHistory(); }catch(e){}
+}
+function renderBenchHistory(){
+  // re-render from cache (instant, no fetch) and preserve which detail rows were expanded
+  const open=new Set(); document.querySelectorAll('#bmHist tr.bm-det').forEach(tr=>{ if(tr.style.display!=='none') open.add(tr.id); });
+  $('#bmHist').innerHTML=bmHistRows.map((x,i)=>bmSummaryRow(x,i)+bmDetailRow(x,i)).join('')||'<tr><td colspan="8" class="muted">'+T('no past runs')+'</td></tr>';
+  open.forEach(id=>{ const tr=document.getElementById(id); if(tr){ tr.style.display='table-row'; const i=id.replace('bm-det-',''); const b=document.querySelector('#bmHist button.bm-exp[data-i="'+i+'"]'); if(b) b.innerHTML='&#9662;'; } });
 }
 function bmn(v){ return v!=null?v:'—'; }
 function devChip(r){ const nm=r&&r.device_name, d=r&&r.device, v=r&&r.vendor; if(!d&&!v&&!nm) return ''; const gpu=!!(v&&v!=='cpu'); return '<span class="chip '+(gpu?'gpu':'cpu')+'" title="'+esc((v||'')+' '+(d||''))+'">'+(gpu?esc(nm||v):'CPU')+'</span>'; }
@@ -1092,14 +1103,40 @@ function bmDetail(x){
     bmBlock(T('System'), bmRows([['os',esc(sys.os||'—')],['python',esc(sys.python||'—')],['infermesh',esc(sys.infermesh||'—')],['cpu',esc((sys.cpu||'—')+' · '+(sys.cpu_cores||'?')+' cores')],['ram',sys.ram_gb?(sys.ram_gb+' GB'):'—'],['gpu',esc(gpu)],['host',esc(sys.hostname||'—')]]))+
   '</div>'+bmTerminal(x);
 }
+function bmTermText(x){
+  const r=x.result||{}, p=x.params||{}, s=x.system||{}, num=v=>(v==null?'—':v);
+  const rows=[
+    ['Model', x.model], ['Device', (r.device_name||r.device||'—')+(r.vendor?(' ('+r.vendor+')'):'')],
+    ['Mode', r.mode], ['Requests x Conc', num(p.requests)+' x '+num(p.concurrency)], ['Max tokens', num(p.max_tokens)],
+    null,
+    ['TTFT p50 (ms)', num((r.ttft_ms||{}).p50)], ['TPOT mean (ms/tok)', num((r.tpot_ms||{}).mean)],
+    ['pp TPS mean', num((r.pp_tps||{}).mean)], ['tg TPS mean', num((r.tg_tps||{}).mean)],
+    ['E2E p50 (ms)', num((r.latency_ms||{}).p50)], ['Throughput (req/s)', num(r.requests_per_sec)],
+    ['Output (tok/s)', num(r.output_tokens_per_sec)], ['Peak GPU mem (MB)', num(r.peak_mem_mb)],
+    ['Succeeded', (r.succeeded||0)+' / '+((r.succeeded||0)+(r.failed||0))],
+    null,
+    ['OS', s.os||'—'], ['Python', s.python||'—'], ['infermesh', s.infermesh||'—'],
+    ['CPU', (s.cpu||'—')+' · '+num(s.cpu_cores)+' cores'], ['RAM (GB)', num(s.ram_gb)],
+  ];
+  const w=Math.max.apply(null, rows.filter(Boolean).map(rw=>rw[0].length));
+  return rows.map(rw=> rw? (rw[0].padEnd(w)+'  '+rw[1]) : '').join('\n');
+}
 function bmTerminal(x){
   const p=x.params||{};
   const body=JSON.stringify({model:x.model,requests:p.requests,concurrency:p.concurrency,max_tokens:p.max_tokens,mode:p.mode,device:p.device});
-  const cmd="curl -s http://HOST:PORT/api/benchmark -H 'content-type: application/json' \\\n  -d '"+body+"'";
+  const cmd="curl -s http://HOST:PORT/api/benchmark \\\n  -H 'content-type: application/json' \\\n  -d '"+body+"'";
   const raw=JSON.stringify({params:p,system:x.system||{},result:x.result||{}},null,2);
-  return '<details class="bm-term"><summary>'+T('Raw command')+' &amp; '+T('Raw result (terminal)')+'</summary>'+
-    '<div class="term-h">command</div><pre class="term">'+esc(cmd)+'</pre>'+
-    '<div class="term-h">result</div><pre class="term">'+esc(raw)+'</pre></details>';
+  return '<details class="bm-term"><summary>'+T('Raw command & terminal output')+'</summary>'+
+    '<div class="term-top"><button class="btn sm primary" onclick="bmCopyTerm(this)">'+T('Copy')+'</button></div>'+
+    '<div class="term-h">$ '+T('command')+'</div><pre class="term">'+esc(cmd)+'</pre>'+
+    '<div class="term-h">'+T('results')+'</div><pre class="term">'+esc(bmTermText(x))+'</pre>'+
+    '<details class="bm-raw"><summary>'+T('raw JSON')+'</summary><pre class="term">'+esc(raw)+'</pre></details></details>';
+}
+function bmCopyTerm(btn){
+  const det=btn.closest('details.bm-term'); if(!det) return;
+  const txt=Array.prototype.map.call(det.querySelectorAll('pre.term'),p=>p.textContent).join('\n\n');
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(()=>toast('copied')).catch(()=>toast('copy failed'));
+  else toast('clipboard unavailable');
 }
 $('#bmHist').addEventListener('click',e=>{ const b=e.target.closest('button.bm-exp'); if(!b) return;
   const det=document.getElementById('bm-det-'+b.dataset.i); if(!det) return;
