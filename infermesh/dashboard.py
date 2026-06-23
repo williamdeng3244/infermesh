@@ -55,8 +55,10 @@ a{color:var(--blue);text-decoration:none}
 .spacer{flex:1}
 .pill{font:500 12px var(--sans);padding:3px 10px;border-radius:999px;border:1px solid var(--border2);color:var(--muted);display:inline-flex;align-items:center;gap:7px}
 .seg{display:inline-flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}
-.seg-btn{background:transparent;border:0;color:var(--muted);padding:5px 15px;cursor:pointer;font:500 13px var(--sans)}
-.seg-btn.active{background:var(--blue);color:#0b1120}
+.seg-btn{background:transparent;border:0;color:var(--muted);padding:5px 15px;cursor:pointer;font:500 13px var(--sans);transition:background .15s ease,color .15s ease,transform .08s ease}
+.seg-btn:hover:not(.active){background:var(--mutedbg);color:var(--text)}
+.seg-btn:active{transform:scale(.95)}
+.seg-btn.active{background:var(--blue);color:#0b1120;box-shadow:0 1px 6px rgba(88,166,255,.35)}
 .prefill{color:var(--dim);font-style:italic}
 .msg-meta{font-size:11px;color:var(--dim);margin-top:4px}
 .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--dim)}
@@ -68,8 +70,11 @@ a{color:var(--blue);text-decoration:none}
 @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 input,select,textarea{font:14px var(--sans);background:var(--card2);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:8px 11px;outline:none}
 input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
-.btn{font:500 12.5px var(--sans);padding:6px 12px;border-radius:7px;border:1px solid var(--border2);background:var(--card2);color:var(--text);cursor:pointer;transition:.15s}
-.btn:hover:not(:disabled){border-color:var(--blue)}
+.btn{font:500 12.5px var(--sans);padding:6px 12px;border-radius:7px;border:1px solid var(--border2);background:var(--card2);color:var(--text);cursor:pointer;transition:transform .08s ease,border-color .15s ease,background .15s ease,box-shadow .15s ease}
+.btn:hover:not(:disabled){border-color:var(--blue);background:var(--mutedbg)}
+.btn:active:not(:disabled){transform:translateY(1px) scale(.98)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary:active:not(:disabled){transform:translateY(1px) scale(.98)}
 .btn:disabled{opacity:.35;cursor:default}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#06210f;font-weight:600}
 .btn.primary:hover{background:var(--accent2)}
@@ -97,6 +102,14 @@ tbody tr:hover{background:var(--card2)}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .badge{font:600 11px var(--mono);padding:2px 8px;border-radius:6px;border:1px solid var(--border2);color:var(--muted)}
 .badge.warn{color:var(--warn);border-color:var(--warn)}
+.chip{display:inline-block;font:600 10.5px var(--mono);padding:2px 8px;border-radius:999px;border:1px solid var(--border2);color:var(--muted);vertical-align:middle;letter-spacing:.3px}
+.chip.gpu{color:var(--blue);border-color:rgba(88,166,255,.55);background:rgba(88,166,255,.10)}
+.chip.cpu{color:var(--dim)}
+.bm-ctl{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px}
+.bm-field{display:flex;flex-direction:column;gap:5px}
+.bm-field label{font:600 10px var(--sans);text-transform:uppercase;letter-spacing:.6px;color:var(--dim)}
+.bm-field input[type=number]{width:92px}
+.bm-actions{display:flex;gap:8px;align-items:center}
 .badge.loaded{color:var(--accent);border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.08)}
 .badge.loading{color:var(--blue);border-color:rgba(88,166,255,.4)}
 .badge.pinned{color:var(--warn);border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.08)}
@@ -178,17 +191,22 @@ tbody tr:hover{background:var(--card2)}
         <div class="panel" style="margin-top:16px;padding:14px 16px">
           <div class="chat-bar" style="margin-bottom:10px">
             <label class="muted" style="font-size:12px" data-i18n="Per-model overrides">Per-model overrides</label>
-            <select id="msModel" style="min-width:190px"></select>
+            <select id="msModel" style="min-width:200px"></select>
+            <span id="msHas"></span>
+            <span class="spacer"></span>
             <span class="muted" style="font-size:11px" data-i18n="override the global generation defaults for one model">override the global generation defaults for one model</span>
           </div>
-          <div class="chat-bar" style="flex-wrap:wrap">
-            <input id="msTemp" type="number" min="0" max="2" step="0.05" placeholder="temperature" style="width:120px"/>
-            <input id="msTopP" type="number" min="0" max="1" step="0.05" placeholder="top_p" style="width:105px"/>
-            <input id="msTopK" type="number" min="0" step="1" placeholder="top_k" style="width:100px"/>
-            <input id="msMax" type="number" min="1" step="1" placeholder="max_tokens" style="width:120px"/>
-            <input id="msCtx" type="number" min="1" step="1" placeholder="max_context_window" title="approx, by characters" style="width:170px"/>
-            <button class="btn" id="msSave" data-i18n="Save">Save</button>
-            <button class="btn sm" id="msClear" data-i18n="Clear">Clear</button>
+          <div class="bm-ctl">
+            <div class="bm-field"><label>temperature</label><input id="msTemp" type="number" min="0" max="2" step="0.05" placeholder="default"/></div>
+            <div class="bm-field"><label>top_p</label><input id="msTopP" type="number" min="0" max="1" step="0.05" placeholder="default"/></div>
+            <div class="bm-field"><label>top_k</label><input id="msTopK" type="number" min="0" step="1" placeholder="default"/></div>
+            <div class="bm-field"><label>max_tokens</label><input id="msMax" type="number" min="1" step="1" placeholder="default"/></div>
+            <div class="bm-field"><label data-i18n="max ctx (approx)">max ctx (approx)</label><input id="msCtx" type="number" min="1" step="1" placeholder="off" title="approx, by characters"/></div>
+            <span class="spacer"></span>
+            <div class="bm-actions">
+              <button class="btn" id="msSave" data-i18n="Save">Save</button>
+              <button class="btn sm" id="msClear" data-i18n="Clear">Clear</button>
+            </div>
           </div>
           <div class="muted" style="font-size:11px;margin-top:8px" data-i18n="Per-model values win over the global defaults; a request's own value still wins. max_context_window rejects over-long prompts (approximate).">Per-model values win over the global defaults; a request's own value still wins. max_context_window rejects over-long prompts (approximate).</div>
         </div>
@@ -342,21 +360,21 @@ tbody tr:hover{background:var(--card2)}
       </section>
 
       <section class="section" id="sec-benchmark">
-        <div class="controls" style="flex-wrap:wrap;gap:12px">
-          <label class="muted" style="font-size:12px" data-i18n="Model">Model</label>
-          <select id="bmModel" style="min-width:180px"></select>
-          <label class="muted" style="font-size:12px" data-i18n="Requests">Requests</label>
-          <input id="bmReq" type="number" min="1" max="200" value="20" style="width:78px"/>
-          <label class="muted" style="font-size:12px" data-i18n="Concurrency">Concurrency</label>
-          <input id="bmConc" type="number" min="1" max="32" value="4" style="width:70px"/>
-          <label class="muted" style="font-size:12px" data-i18n="Max tokens">Max tokens</label>
-          <input id="bmTok" type="number" min="1" max="1024" value="64" style="width:78px"/>
-          <label class="muted" style="font-size:12px" data-i18n="Mode">Mode</label>
-          <select id="bmMode" style="width:140px"><option value="same" data-i18n="same prompt">same prompt</option><option value="different" data-i18n="different">different</option></select>
-          <button class="btn primary" id="bmRun" data-i18n="Run benchmark">Run benchmark</button>
-          <button class="btn sm" id="bmSingle" data-i18n="Single request">Single request</button>
-          <button class="btn sm" id="bmCopy" data-i18n="Copy">Copy</button>
-          <span id="bmStatus" class="muted" style="font-size:12px"></span>
+        <div class="panel" style="padding:15px 16px;margin-bottom:16px">
+          <div class="bm-ctl">
+            <div class="bm-field"><label data-i18n="Model">Model</label><select id="bmModel" style="min-width:200px"></select></div>
+            <div class="bm-field"><label data-i18n="Requests">Requests</label><input id="bmReq" type="number" min="1" max="200" value="20"/></div>
+            <div class="bm-field"><label data-i18n="Concurrency">Concurrency</label><input id="bmConc" type="number" min="1" max="32" value="4"/></div>
+            <div class="bm-field"><label data-i18n="Max tokens">Max tokens</label><input id="bmTok" type="number" min="1" max="1024" value="64"/></div>
+            <div class="bm-field"><label data-i18n="Mode">Mode</label><select id="bmMode"><option value="same" data-i18n="same prompt">same prompt</option><option value="different" data-i18n="different">different</option></select></div>
+            <span class="spacer"></span>
+            <div class="bm-actions">
+              <button class="btn primary" id="bmRun" data-i18n="Run benchmark">Run benchmark</button>
+              <button class="btn sm" id="bmSingle" data-i18n="Single request">Single request</button>
+              <button class="btn sm" id="bmCopy" data-i18n="Copy">Copy</button>
+            </div>
+          </div>
+          <div id="bmStatus" class="muted" style="font-size:12px;margin-top:11px;min-height:16px"></div>
         </div>
         <div class="cards" id="bmCards"></div>
         <div class="panel" id="bmDetail" style="display:none;padding:18px">
@@ -515,7 +533,9 @@ const I18N={
 "stats copied":"已复制统计","generation defaults saved":"已保存生成默认值","startup settings saved":"已保存启动设置","KV cache settings saved":"已保存 KV 缓存设置","HuggingFace endpoint saved":"已保存 HuggingFace 端点","Idle timeout saved":"已保存空闲超时",
 "Max concurrent requests":"最大并发请求","queue bound (0 = unbounded)":"队列上限（0 = 无限）","Admission cap applied live. Queue bound > 0 returns 503 once that many requests are waiting.":"准入上限实时生效。队列上限 > 0 时，等待数达到该值即返回 503。","concurrency saved":"已保存并发设置",
 "Per-model overrides":"按模型覆盖","override the global generation defaults for one model":"为单个模型覆盖全局生成默认值","Per-model values win over the global defaults; a request's own value still wins. max_context_window rejects over-long prompts (approximate).":"按模型的值优先于全局默认值；请求自带的值仍然最优先。max_context_window 会拒绝过长的 prompt（近似）。","model overrides saved":"已保存模型覆盖","model overrides cleared":"已清除模型覆盖",
-"ModelScope (by model ID)":"ModelScope（按模型 ID）"
+"ModelScope (by model ID)":"ModelScope（按模型 ID）",
+"Prefill (PP)":"预填充 (PP)","Decode (TG)":"解码 (TG)","Throughput":"吞吐","Output":"输出","Peak GPU mem":"峰值显存","Succeeded":"成功","Run context":"运行配置","Prefill — PP TPS":"预填充 — PP TPS","Decode — TG TPS":"解码 — TG TPS","Single-request latency / E2E (ms)":"单请求延迟 / E2E (ms)","Peak GPU memory":"峰值显存",
+"max ctx (approx)":"最大上下文（近似）","overrides":"项覆盖","using global defaults":"使用全局默认值"
 };
 let lang='en';
 function T(s){ return (lang==='zh' && I18N[s]!=null) ? I18N[s] : s; }
@@ -735,16 +755,19 @@ $('#saveConc').onclick=saveConc;
 /* Per-model generation overrides */
 let msAll={};
 async function refreshModelSettings(){
-  try{ const d=await api('/v1/models'); const sel=$('#msModel'); const cur=sel.value;
-    sel.innerHTML=(d.data||[]).map(m=>'<option value="'+esc(m.id)+'">'+esc(m.id)+'</option>').join('');
+  try{ const ms=await api('/api/model-settings'); msAll=ms.settings||{};
+    const d=await api('/v1/models'); const sel=$('#msModel'); const cur=sel.value;
+    sel.innerHTML=(d.data||[]).map(m=>{ const has=msAll[m.id]&&Object.keys(msAll[m.id]).length; return '<option value="'+esc(m.id)+'">'+esc(m.id)+(has?' ●':'')+'</option>'; }).join('');
     if(cur) sel.value=cur;
-    const ms=await api('/api/model-settings'); msAll=ms.settings||{}; loadMsFields();
+    loadMsFields();
   }catch(e){}
 }
 function loadMsFields(){
   const o=msAll[$('#msModel').value]||{};
   const set=(el,v)=>{ if($(el)) $(el).value=(v==null?'':v); };
   set('#msTemp',o.temperature); set('#msTopP',o.top_p); set('#msTopK',o.top_k); set('#msMax',o.max_tokens); set('#msCtx',o.max_context_window);
+  const n=Object.keys(o).length, has=$('#msHas');
+  if(has) has.innerHTML=n?('<span class="chip gpu">'+n+' '+T('overrides')+'</span>'):('<span class="muted" style="font-size:11px">'+T('using global defaults')+'</span>');
 }
 function msBody(clear){
   const m=$('#msModel').value; const num=el=>{ const v=$(el).value.trim(); return (clear||v==='')?null:Number(v); };
@@ -907,18 +930,18 @@ async function runBenchmark(){
     $('#bmStatus').textContent='done · '+(r.model||'')+' on '+(r.device||r.vendor||'cpu')+' · '+r.wall_time_s+'s · mode '+(r.mode||'same');
     const pk=(r.peak_mem_mb!=null)?(fmt(r.peak_mem_mb)+' MB'):'—';
     $('#bmCards').innerHTML=
-      '<div class="card"><div class="k">Prefill (PP)</div><div class="v">'+r.pp_tps.mean+'<small> tok/s</small></div></div>'+
-      '<div class="card"><div class="k">Decode (TG)</div><div class="v">'+r.tg_tps.mean+'<small> tok/s</small></div></div>'+
+      '<div class="card"><div class="k">'+T('Prefill (PP)')+'</div><div class="v">'+r.pp_tps.mean+'<small> tok/s</small></div></div>'+
+      '<div class="card"><div class="k">'+T('Decode (TG)')+'</div><div class="v">'+r.tg_tps.mean+'<small> tok/s</small></div></div>'+
       '<div class="card"><div class="k">TPOT</div><div class="v">'+r.tpot_ms.mean+'<small> ms/tok</small></div></div>'+
       '<div class="card"><div class="k">TTFT p50</div><div class="v">'+r.ttft_ms.p50+'<small> ms</small></div></div>'+
       '<div class="card"><div class="k">E2E p50</div><div class="v">'+r.latency_ms.p50+'<small> ms</small></div></div>'+
-      '<div class="card"><div class="k">Throughput</div><div class="v">'+r.requests_per_sec+'<small> req/s</small></div></div>'+
-      '<div class="card"><div class="k">Output</div><div class="v">'+r.output_tokens_per_sec+'<small> tok/s</small></div></div>'+
-      '<div class="card"><div class="k">Peak GPU mem</div><div class="v">'+pk+'</div></div>'+
-      '<div class="card"><div class="k">Succeeded</div><div class="v">'+r.succeeded+'<small> / '+(r.succeeded+r.failed)+'</small></div></div>';
-    const L=r.latency_ms, T=r.ttft_ms, P=r.tpot_ms;
+      '<div class="card"><div class="k">'+T('Throughput')+'</div><div class="v">'+r.requests_per_sec+'<small> req/s</small></div></div>'+
+      '<div class="card"><div class="k">'+T('Output')+'</div><div class="v">'+r.output_tokens_per_sec+'<small> tok/s</small></div></div>'+
+      '<div class="card"><div class="k">'+T('Peak GPU mem')+'</div><div class="v">'+pk+'</div></div>'+
+      '<div class="card"><div class="k">'+T('Succeeded')+'</div><div class="v">'+r.succeeded+'<small> / '+(r.succeeded+r.failed)+'</small></div></div>';
+    const L=r.latency_ms, TT=r.ttft_ms, P=r.tpot_ms;
     $('#bmLatency').innerHTML=['mean','p50','p90','p99','min','max'].map(k=>'<dt>'+k+'</dt><dd>'+L[k]+'</dd>').join('');
-    $('#bmTtft').innerHTML=['mean','p50','p90','p99'].map(k=>'<dt>'+k+'</dt><dd>'+T[k]+'</dd>').join('');
+    $('#bmTtft').innerHTML=['mean','p50','p90','p99'].map(k=>'<dt>'+k+'</dt><dd>'+TT[k]+'</dd>').join('');
     $('#bmTpot').innerHTML=['mean','p50','p90','p99'].map(k=>'<dt>'+k+'</dt><dd>'+P[k]+'</dd>').join('');
     $('#bmDetail').style.display='block';
     drawBars('bmChart', [['p50',L.p50],['p90',L.p90],['p99',L.p99],['max',L.max]]);
@@ -968,6 +991,7 @@ async function refreshBenchHistory(){
   }catch(e){}
 }
 function bmn(v){ return v!=null?v:'—'; }
+function devChip(r){ const d=r&&r.device, v=r&&r.vendor; if(!d&&!v) return ''; const gpu=!!(v&&v!=='cpu'); return '<span class="chip '+(gpu?'gpu':'cpu')+'" title="device: '+esc(d||'')+'">'+(gpu?esc(v)+' · '+esc(d||'gpu'):'cpu')+'</span>'; }
 function bmKv(obj,keys){ return '<dl class="kv kv-sm">'+keys.map(k=>'<dt>'+k+'</dt><dd>'+bmn(obj&&obj[k])+'</dd>').join('')+'</dl>'; }
 function bmRows(pairs){ return '<dl class="kv kv-sm">'+pairs.map(p=>'<dt>'+p[0]+'</dt><dd>'+bmn(p[1])+'</dd>').join('')+'</dl>'; }
 function bmBlock(title,body){ return '<div class="bm-block"><div class="bm-bt">'+title+'</div>'+body+'</div>'; }
@@ -975,7 +999,7 @@ function bmSummaryRow(x,i){
   const r=x.result||{}, L=r.latency_ms||{}, p=x.params||{};
   let when=''; try{ when=new Date((x.t||0)*1000).toLocaleString(); }catch(_){ }
   return '<tr><td><button class="btn sm bm-exp" data-i="'+i+'" aria-label="expand">&#9656;</button></td>'+
-    '<td class="muted">'+esc(when)+'</td><td><strong>'+esc(x.model||'')+'</strong> <span class="muted" style="font-size:11px">'+esc(r.mode||'')+(r.device?(' · '+esc(r.device)):'')+'</span></td>'+
+    '<td class="muted">'+esc(when)+'</td><td><strong>'+esc(x.model||'')+'</strong> '+devChip(r)+' <span class="muted" style="font-size:11px">'+esc(r.mode||'')+'</span></td>'+
     '<td class="num">'+bmn(p.requests)+'&times;'+bmn(p.concurrency)+'</td>'+
     '<td class="num">'+bmn(r.requests_per_sec)+'</td><td class="num">'+bmn(r.output_tokens_per_sec)+'</td>'+
     '<td class="num">'+bmn(L.p50)+'</td><td class="num">'+bmn(L.p99)+'</td></tr>';
@@ -985,19 +1009,19 @@ function bmDetailRow(x,i){
 }
 function bmDetail(x){
   const r=x.result||{}, p=x.params||{};
-  const L=r.latency_ms||{}, T=r.ttft_ms||{}, P=r.tpot_ms||{}, pp=r.pp_tps||{}, tg=r.tg_tps||{};
+  const L=r.latency_ms||{}, TT=r.ttft_ms||{}, P=r.tpot_ms||{}, pp=r.pp_tps||{}, tg=r.tg_tps||{};
   const single=(p.requests==1&&p.concurrency==1);
   const pk=r.peak_mem_mb!=null?(fmt(r.peak_mem_mb)+' MB'):'—';
   const succ=(r.succeeded!=null?r.succeeded+' / '+((r.succeeded||0)+(r.failed||0)):'—');
   return '<div class="bm-grid">'+
-    bmBlock('Context', bmRows([['model',esc(r.model||x.model||'')],['device',esc(r.device||'—')],['accelerator',esc(r.vendor||'—')],['mode',esc(r.mode||'—')],['type',single?'single request':'continuous batching'],['requests',p.requests],['concurrency',p.concurrency],['max tokens',p.max_tokens],['wall time (s)',r.wall_time_s],['succeeded',succ]]))+
-    bmBlock('Throughput', bmRows([['requests / s',r.requests_per_sec],['output tok / s',r.output_tokens_per_sec]]))+
-    bmBlock('Prefill &mdash; PP TPS', bmRows([['mean',pp.mean],['max',pp.max],['prompt tokens',r.total_prompt_tokens]]))+
-    bmBlock('Decode &mdash; TG TPS', bmRows([['mean',tg.mean],['max',tg.max],['output tokens',r.total_output_tokens]]))+
-    bmBlock('Single-request latency / E2E (ms)', bmKv(L,['mean','p50','p90','p99','min','max']))+
-    bmBlock('Time to first token (ms)', bmKv(T,['mean','p50','p90','p99','min','max']))+
-    bmBlock('Time per output token (ms)', bmKv(P,['mean','p50','p90','p99']))+
-    bmBlock('Peak GPU memory', bmRows([['peak',pk]]))+
+    bmBlock(T('Run context'), bmRows([['model',esc(r.model||x.model||'')],['device',esc(r.device||'—')],['accelerator',esc(r.vendor||'—')],['mode',esc(r.mode||'—')],['type',single?'single request':'continuous batching'],['requests',p.requests],['concurrency',p.concurrency],['max tokens',p.max_tokens],['wall time (s)',r.wall_time_s],['succeeded',succ]]))+
+    bmBlock(T('Throughput'), bmRows([['requests / s',r.requests_per_sec],['output tok / s',r.output_tokens_per_sec]]))+
+    bmBlock(T('Prefill — PP TPS'), bmRows([['mean',pp.mean],['max',pp.max],['prompt tokens',r.total_prompt_tokens]]))+
+    bmBlock(T('Decode — TG TPS'), bmRows([['mean',tg.mean],['max',tg.max],['output tokens',r.total_output_tokens]]))+
+    bmBlock(T('Single-request latency / E2E (ms)'), bmKv(L,['mean','p50','p90','p99','min','max']))+
+    bmBlock(T('Time to first token (ms)'), bmKv(TT,['mean','p50','p90','p99','min','max']))+
+    bmBlock(T('Time per output token (ms)'), bmKv(P,['mean','p50','p90','p99']))+
+    bmBlock(T('Peak GPU memory'), bmRows([['peak',pk]]))+
   '</div>';
 }
 $('#bmHist').addEventListener('click',e=>{ const b=e.target.closest('button.bm-exp'); if(!b) return;

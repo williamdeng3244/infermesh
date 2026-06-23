@@ -128,12 +128,26 @@ async def run_benchmark(
                 "ttft_ms": ttft, "tokens": comp, "prompt_tokens": prompt_toks, "ok": ok,
             })
 
-    # Best-effort peak-GPU-memory sampler (stops immediately if nvidia-smi absent).
+    # Best-effort peak device-memory sampler: nvidia-smi first, else the backend's
+    # own report via pool.get_status() (covers Enflame GCU / any accelerator).
     peak = [0]
     stop = asyncio.Event()
 
+    def _mem_now() -> Optional[int]:
+        m = _gpu_mem_used_mb()
+        if m is not None:
+            return m
+        try:
+            for mm in pool.get_status().get("models", []):
+                if mm.get("id") == model_id:
+                    um = (mm.get("stats") or {}).get("used_mem_mb") or 0
+                    return int(um) or None
+        except Exception:
+            pass
+        return None
+
     async def _sampler() -> None:
-        first = await asyncio.to_thread(_gpu_mem_used_mb)
+        first = await asyncio.to_thread(_mem_now)
         if first is None:
             return
         peak[0] = max(peak[0], first)
@@ -142,7 +156,7 @@ async def run_benchmark(
                 await asyncio.wait_for(stop.wait(), timeout=0.25)
             except asyncio.TimeoutError:
                 pass
-            m = await asyncio.to_thread(_gpu_mem_used_mb)
+            m = await asyncio.to_thread(_mem_now)
             if m is not None:
                 peak[0] = max(peak[0], m)
 

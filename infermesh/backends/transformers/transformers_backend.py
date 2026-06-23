@@ -402,6 +402,22 @@ class TransformersBackend(InferenceBackend):
                           prompt_tokens=prompt_len, completion_tokens=completion_tokens)
 
     # ------------------------------ stats ---------------------------------- #
+    def _device_mem_used_mb(self) -> int:
+        """Actual device memory allocated (MB) on the active accelerator; 0 on CPU
+        or if unavailable. Uses torch.cuda / torch.gcu — backend-local (this file
+        is under backends/), so the control plane stays vendor-free."""
+        try:
+            import torch
+            d = str(self._device)
+            if d.startswith("cuda") and torch.cuda.is_available():
+                return int(torch.cuda.memory_allocated() // (1024 * 1024))
+            if d.startswith("gcu"):
+                import torch_gcu  # noqa: F401
+                return int(torch.gcu.memory_allocated() // (1024 * 1024))
+        except Exception:
+            pass
+        return 0
+
     def stats(self) -> EngineStats:
         extra = {"device": self._device, "vendor": self.hardware().vendor}
         if self._kv_cache is not None:
@@ -409,6 +425,6 @@ class TransformersBackend(InferenceBackend):
         return EngineStats(
             model_id=self._spec.model_id if self._spec else "",
             loaded=self._loaded,
-            used_mem_mb=self._estimated_mb if self._loaded else 0,
+            used_mem_mb=(self._device_mem_used_mb() or self._estimated_mb) if self._loaded else 0,
             extra=extra,
         )
