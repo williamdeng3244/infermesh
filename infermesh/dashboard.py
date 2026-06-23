@@ -110,6 +110,22 @@ tbody tr:hover{background:var(--card2)}
 .bm-field label{font:600 10px var(--sans);text-transform:uppercase;letter-spacing:.6px;color:var(--dim)}
 .bm-field input[type=number]{width:92px}
 .bm-actions{display:flex;gap:8px;align-items:center}
+.mref{margin-top:18px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);padding:4px 14px 14px}
+.mref>summary{cursor:pointer;font:600 13px var(--sans);padding:10px 0;list-style:none}
+.mref>summary::-webkit-details-marker{display:none}
+.mref>summary::before{content:"▸ ";color:var(--muted)}
+.mref[open]>summary::before{content:"▾ "}
+.mref-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:6px}
+.mref-item{border:1px solid var(--border);border-radius:8px;padding:11px 13px;background:var(--card2)}
+.mref-h{font-size:13px;margin-bottom:6px}.mref-h .muted{font-size:11px;font-weight:500}
+.mref-en{font-size:12px;color:var(--muted);line-height:1.5}
+.mref-zh{font-size:12px;color:var(--dim);line-height:1.6;margin-top:4px}
+.bm-term{margin-top:12px}
+.bm-term>summary{cursor:pointer;font:600 12px var(--sans);color:var(--muted);padding:6px 0;list-style:none}
+.bm-term>summary::-webkit-details-marker{display:none}
+.bm-term>summary::before{content:"▸ "}.bm-term[open]>summary::before{content:"▾ "}
+.term-h{font:600 10px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin:8px 0 3px}
+pre.term{background:#0a0e1a;color:#c9d4e3;border:1px solid var(--border);border-radius:7px;padding:11px 13px;font:11.5px/1.5 var(--mono);overflow:auto;white-space:pre;max-height:340px;margin:0}
 .badge.loaded{color:var(--accent);border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.08)}
 .badge.loading{color:var(--blue);border-color:rgba(88,166,255,.4)}
 .badge.pinned{color:var(--warn);border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.08)}
@@ -230,11 +246,17 @@ tbody tr:hover{background:var(--card2)}
       </section>
 
       <section class="section" id="sec-logs">
-        <div class="chat-bar" style="margin-bottom:12px">
+        <div class="chat-bar" style="margin-bottom:8px;flex-wrap:wrap;gap:12px">
           <span class="muted" style="font-size:12px" data-i18n="Live tail of infermesh logs (pool · server · backends)">Live tail of infermesh logs (pool · server · backends)</span>
           <span class="spacer"></span>
+          <label class="muted" style="font-size:12px" data-i18n="Lines:">Lines:</label>
+          <select id="logLines"><option>200</option><option selected>300</option><option>500</option><option>1000</option><option>2000</option></select>
+          <label class="muted" style="font-size:12px" data-i18n="Min display level">Min display level</label>
+          <select id="logLevel" title="filters the view only — not the saved log file" data-i18n-title="filters the view only — not the saved log file"><option value="" data-i18n="All">All</option><option value="debug">DEBUG</option><option value="info">INFO</option><option value="warning">WARNING</option><option value="error">ERROR</option></select>
           <label class="muted" style="font-size:12px"><input type="checkbox" id="logsPause"/> <span data-i18n="pause">pause</span></label>
+          <button class="btn sm" id="logRefresh" data-i18n="Refresh">Refresh</button>
         </div>
+        <div class="muted" id="logShowing" style="font-size:11px;margin-bottom:6px"></div>
         <div class="logs" id="logs"><div class="muted" data-i18n="loading…">loading&hellip;</div></div>
       </section>
 
@@ -394,6 +416,20 @@ tbody tr:hover{background:var(--card2)}
             <tbody id="bmHist"><tr><td colspan="8" class="muted" data-i18n="no past runs">no past runs</td></tr></tbody>
           </table>
         </div>
+        <details class="mref" open>
+          <summary data-i18n="Metrics Reference">Metrics Reference</summary>
+          <div class="mref-grid">
+            <div class="mref-item"><div class="mref-h"><b>TTFT</b> <span class="muted">Time to First Token · 首令牌时间</span></div><div class="mref-en">Wait until the first output token appears — measures prefill (prompt-reading) speed; longer prompts raise it. Lower is better.</div><div class="mref-zh">从发起请求到产出第一个 token 的等待,衡量 prefill(读完整 prompt)速度;prompt 越长越高。越低越好。</div></div>
+            <div class="mref-item"><div class="mref-h"><b>TPOT</b> <span class="muted">Time Per Output Token · 每输出令牌时间</span></div><div class="mref-en">Average gap between output tokens during decode. e.g. 20 ms/tok ≈ 50 tok/s. Lower is better.</div><div class="mref-zh">解码阶段相邻输出 token 的平均间隔。例:20ms/tok ≈ 50 tok/s。越低越好。</div></div>
+            <div class="mref-item"><div class="mref-h"><b>tg TPS</b> <span class="muted">Token Generation · 解码吞吐</span></div><div class="mref-en">Output tokens per second during decode — the inverse of TPOT and the main "how fast it writes" metric. Higher is better.</div><div class="mref-zh">解码阶段每秒生成的 token 数,是 TPOT 的倒数,衡量"写得多快"。越高越好。</div></div>
+            <div class="mref-item"><div class="mref-h"><b>pp TPS</b> <span class="muted">Prompt Processing · 预填充吞吐</span></div><div class="mref-en">Input tokens processed per second during prefill. Faster prefill → lower TTFT; matters most for long context. Higher is better.</div><div class="mref-zh">prefill 阶段每秒处理的输入 token;越快 TTFT 越低,长上下文尤其重要。越高越好。</div></div>
+            <div class="mref-item"><div class="mref-h"><b>E2E Latency</b> <span class="muted">End-to-End · 端到端延迟</span></div><div class="mref-en">Total wall-clock from request to full response ≈ TTFT + TPOT × output tokens.</div><div class="mref-zh">从发请求到收到完整回复的总墙钟时间 ≈ TTFT + TPOT × 输出 token 数。</div></div>
+            <div class="mref-item"><div class="mref-h"><b>Total Throughput</b> <span class="muted">总吞吐</span></div><div class="mref-en">Combined input + output tokens per second across the run — overall system utilization.</div><div class="mref-zh">整个测试每秒处理的输入+输出 token 总数,反映系统整体利用率。</div></div>
+            <div class="mref-item"><div class="mref-h"><b>Batch Size</b> <span class="muted">Concurrency · 批大小/并发</span></div><div class="mref-en">Requests processed at once. Larger batches raise total throughput but add per-request latency; 2× batch ≠ 2× speed (bandwidth limits).</div><div class="mref-zh">同时处理的请求数(并发)。批越大总吞吐越高,但单请求延迟增加;2× 批 ≠ 2× 速度(受带宽限制)。</div></div>
+            <div class="mref-item"><div class="mref-h"><b>Peak GPU Mem</b> <span class="muted">峰值显存</span></div><div class="mref-en">Max accelerator memory used during the run — weights + KV cache + activations. Estimates the largest model your hardware can hold.</div><div class="mref-zh">运行中加速器占用的最大显存(权重+KV 缓存+中间激活),可估算硬件能装多大的模型。</div></div>
+            <div class="mref-item"><div class="mref-h"><b>Speedup</b> <span class="muted">加速比</span></div><div class="mref-en">Token-generation throughput vs the single-request baseline (1×). Above 1× means batching uses the accelerator more efficiently.</div><div class="mref-zh">相对单请求基线(1×)的生成吞吐倍数;>1× 表示批处理更高效地利用了加速器。</div></div>
+          </div>
+        </details>
         <p id="bm-err" class="err"></p>
       </section>
 
@@ -537,7 +573,10 @@ const I18N={
 "ModelScope (by model ID)":"ModelScope（按模型 ID）",
 "Prefill (PP)":"预填充 (PP)","Decode (TG)":"解码 (TG)","Throughput":"吞吐","Output":"输出","Peak GPU mem":"峰值显存","Succeeded":"成功","Run context":"运行配置","Prefill — PP TPS":"预填充 — PP TPS","Decode — TG TPS":"解码 — TG TPS","Single-request latency / E2E (ms)":"单请求延迟 / E2E (ms)","Peak GPU memory":"峰值显存",
 "max ctx (approx)":"最大上下文（近似）","overrides":"项覆盖","using global defaults":"使用全局默认值",
-"Device":"设备","auto (current)":"自动（当前）","connected":"已连接","offline":"离线"
+"Device":"设备","auto (current)":"自动（当前）","connected":"已连接","offline":"离线",
+"Models loaded":"已加载模型","Committed memory":"已占用内存","Live used / ceiling":"实时使用 / 上限","Host RAM":"主机内存","loading":"加载中","loaded":"已加载","idle":"空闲","pinned":"已固定","Load":"加载","Unload":"卸载","Pin":"固定","Unpin":"取消固定","no models discovered":"未发现模型","single request":"单次请求","continuous batching":"连续批处理",
+"Lines:":"行数：","Min display level":"最低显示级别","filters the view only — not the saved log file":"仅过滤此处显示 — 不影响日志文件的保存级别","Showing":"显示","lines":"行","no logs yet":"暂无日志",
+"Metrics Reference":"指标说明","System":"系统","Raw command":"原始命令","Raw result (terminal)":"原始结果（终端）"
 };
 let lang='en';
 function T(s){ return (lang==='zh' && I18N[s]!=null) ? I18N[s] : s; }
@@ -551,7 +590,13 @@ function applyLang(l){
   var lb=$('#langBtn'); if(lb) lb.textContent=(lang==='zh')?'EN':'中';
   var tl=$('#title'); if(tl && typeof active!=='undefined' && active) tl.textContent=T(TITLES[active]||'');
   try{ if(typeof tick==='function') tick(); }catch(e){}
-  try{ if(typeof active!=='undefined' && active==='settings' && typeof loadSettings==='function') loadSettings(); }catch(e){}
+  try{   // re-render the active section's dynamic content immediately in the new language
+    if(active==='benchmark'){ loadBenchDevices(); refreshBenchHistory(); }
+    else if(active==='devices'){ refreshDevices(); }
+    else if(active==='settings'){ loadSettings(); }
+    else if(active==='models'){ refreshModelSettings(); }
+    else if(active==='metrics'){ refreshStats(); refreshLive(); refreshPerModel(); }
+  }catch(e){}
 }
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>(n==null?'—':Number(n).toLocaleString());
@@ -591,22 +636,22 @@ function switchSection(sec){
 function renderModels(s){
   const pct=s.ceiling_mb?Math.min(100,Math.round(100*s.used_mb_live/s.ceiling_mb)):0;
   $('#cards').innerHTML=
-    '<div class="card"><div class="k">Models loaded</div><div class="v">'+s.loaded_count+'<small> / '+s.model_count+'</small></div></div>'+
-    '<div class="card"><div class="k">Committed memory</div><div class="v">'+fmt(s.current_model_memory_mb)+'<small> MB</small></div></div>'+
-    '<div class="card"><div class="k">Live used / ceiling</div><div class="v">'+fmt(s.used_mb_live)+'<small> / '+fmt(s.ceiling_mb)+' MB</small></div><div class="bar"><i style="width:'+pct+'%"></i></div></div>'+
-    '<div class="card"><div class="k">Host RAM</div><div class="v">'+fmt(s.total_mb)+'<small> MB</small></div></div>';
+    '<div class="card"><div class="k">'+T('Models loaded')+'</div><div class="v">'+s.loaded_count+'<small> / '+s.model_count+'</small></div></div>'+
+    '<div class="card"><div class="k">'+T('Committed memory')+'</div><div class="v">'+fmt(s.current_model_memory_mb)+'<small> MB</small></div></div>'+
+    '<div class="card"><div class="k">'+T('Live used / ceiling')+'</div><div class="v">'+fmt(s.used_mb_live)+'<small> / '+fmt(s.ceiling_mb)+' MB</small></div><div class="bar"><i style="width:'+pct+'%"></i></div></div>'+
+    '<div class="card"><div class="k">'+T('Host RAM')+'</div><div class="v">'+fmt(s.total_mb)+'<small> MB</small></div></div>';
   $('#rows').innerHTML=(s.models||[]).map(m=>{
-    const st=m.is_loading?'<span class="badge loading">loading</span>':m.loaded?'<span class="badge loaded">loaded</span>':'<span class="badge">idle</span>';
-    const pin=m.pinned?' <span class="badge pinned">pinned</span>':'';
+    const st=m.is_loading?'<span class="badge loading">'+T('loading')+'</span>':m.loaded?'<span class="badge loaded">'+T('loaded')+'</span>':'<span class="badge">'+T('idle')+'</span>';
+    const pin=m.pinned?' <span class="badge pinned">'+T('pinned')+'</span>':'';
     const tps=m.stats?m.stats.generation_tps:null, mem=m.stats?m.stats.used_mem_mb:m.estimated_mb, id=esc(m.id);
     return '<tr><td><strong>'+id+'</strong></td><td class="muted">'+m.model_type+'</td><td class="muted mono">'+(m.backend||'—')+'</td>'+
       '<td>'+st+pin+'</td><td class="num">'+fmt(mem)+'</td><td class="num">'+(tps==null?'—':tps.toFixed(1))+'</td><td class="num">'+m.in_use+'</td>'+
       '<td class="rowact">'+
-        '<button class="btn sm" data-id="'+id+'" data-act="load" '+(m.loaded?'disabled':'')+'>Load</button>'+
-        '<button class="btn sm" data-id="'+id+'" data-act="unload?force=true" '+(m.loaded?'':'disabled')+'>Unload</button>'+
-        '<button class="btn sm" data-id="'+id+'" data-act="'+(m.pinned?'unpin':'pin')+'">'+(m.pinned?'Unpin':'Pin')+'</button>'+
+        '<button class="btn sm" data-id="'+id+'" data-act="load" '+(m.loaded?'disabled':'')+'>'+T('Load')+'</button>'+
+        '<button class="btn sm" data-id="'+id+'" data-act="unload?force=true" '+(m.loaded?'':'disabled')+'>'+T('Unload')+'</button>'+
+        '<button class="btn sm" data-id="'+id+'" data-act="'+(m.pinned?'unpin':'pin')+'">'+(m.pinned?T('Unpin'):T('Pin'))+'</button>'+
       '</td></tr>';
-  }).join('')||'<tr><td colspan="8" class="muted">no models discovered</td></tr>';
+  }).join('')||'<tr><td colspan="8" class="muted">'+T('no models discovered')+'</td></tr>';
 }
 $('#rows').addEventListener('click',async e=>{
   const b=e.target.closest('button[data-act]'); if(!b) return;
@@ -670,12 +715,17 @@ $('#chatInput').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey)
 /* Logs */
 async function refreshLogs(){
   if(logsPaused) return;
-  try{ const d=await api('/api/logs?limit=300'); const el=$('#logs');
+  const lines=($('#logLines')&&$('#logLines').value)||300, lvl=($('#logLevel')&&$('#logLevel').value)||'';
+  try{ const d=await api('/api/logs?limit='+lines+(lvl?('&level='+lvl):'')); const el=$('#logs');
     const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<40;
-    el.innerHTML=(d.lines||[]).map(l=>'<div class="logline '+esc(l.level)+'">'+esc(l.line)+'</div>').join('')||'<div class="muted">no logs yet</div>';
+    el.innerHTML=(d.lines||[]).map(l=>'<div class="logline '+esc(l.level)+'">'+esc(l.line)+'</div>').join('')||'<div class="muted">'+T('no logs yet')+'</div>';
+    if($('#logShowing')) $('#logShowing').textContent=T('Showing')+' '+(d.lines||[]).length+' / '+(d.total||0)+' '+T('lines')+(lvl?(' · ≥ '+lvl.toUpperCase()):'');
     if(atBottom) el.scrollTop=el.scrollHeight;
   }catch(e){}
 }
+$('#logLines')&&($('#logLines').onchange=refreshLogs);
+$('#logLevel')&&($('#logLevel').onchange=refreshLogs);
+$('#logRefresh')&&($('#logRefresh').onclick=refreshLogs);
 $('#logsPause').onchange=e=>{ logsPaused=e.target.checked; };
 
 /* Settings */
@@ -1024,13 +1074,14 @@ function bmDetailRow(x,i){
   return '<tr class="bm-det" id="bm-det-'+i+'" style="display:none"><td colspan="8" style="padding:0">'+bmDetail(x)+'</td></tr>';
 }
 function bmDetail(x){
-  const r=x.result||{}, p=x.params||{};
+  const r=x.result||{}, p=x.params||{}, sys=x.system||{};
   const L=r.latency_ms||{}, TT=r.ttft_ms||{}, P=r.tpot_ms||{}, pp=r.pp_tps||{}, tg=r.tg_tps||{};
   const single=(p.requests==1&&p.concurrency==1);
   const pk=r.peak_mem_mb!=null?(fmt(r.peak_mem_mb)+' MB'):'—';
   const succ=(r.succeeded!=null?r.succeeded+' / '+((r.succeeded||0)+(r.failed||0)):'—');
+  const g0=(sys.gpus&&sys.gpus[0])||null, gpu=g0?(g0.name+(g0.mem_total_mb?(' · '+fmt(g0.mem_total_mb)+' MB'):'')):(r.device_name||'—');
   return '<div class="bm-grid">'+
-    bmBlock(T('Run context'), bmRows([['model',esc(r.model||x.model||'')],['GPU',esc(r.device_name||'—')],['device',esc(r.device||'—')],['accelerator',esc(r.vendor||'—')],['mode',esc(r.mode||'—')],['type',single?'single request':'continuous batching'],['requests',p.requests],['concurrency',p.concurrency],['max tokens',p.max_tokens],['wall time (s)',r.wall_time_s],['succeeded',succ]]))+
+    bmBlock(T('Run context'), bmRows([['model',esc(r.model||x.model||'')],['GPU',esc(r.device_name||'—')],['device',esc(r.device||'—')],['accelerator',esc(r.vendor||'—')],['mode',esc(r.mode||'—')],['type',single?T('single request'):T('continuous batching')],['requests',p.requests],['concurrency',p.concurrency],['max tokens',p.max_tokens],['wall time (s)',r.wall_time_s],['succeeded',succ]]))+
     bmBlock(T('Throughput'), bmRows([['requests / s',r.requests_per_sec],['output tok / s',r.output_tokens_per_sec]]))+
     bmBlock(T('Prefill — PP TPS'), bmRows([['mean',pp.mean],['max',pp.max],['prompt tokens',r.total_prompt_tokens]]))+
     bmBlock(T('Decode — TG TPS'), bmRows([['mean',tg.mean],['max',tg.max],['output tokens',r.total_output_tokens]]))+
@@ -1038,7 +1089,17 @@ function bmDetail(x){
     bmBlock(T('Time to first token (ms)'), bmKv(TT,['mean','p50','p90','p99','min','max']))+
     bmBlock(T('Time per output token (ms)'), bmKv(P,['mean','p50','p90','p99']))+
     bmBlock(T('Peak GPU memory'), bmRows([['peak',pk]]))+
-  '</div>';
+    bmBlock(T('System'), bmRows([['os',esc(sys.os||'—')],['python',esc(sys.python||'—')],['infermesh',esc(sys.infermesh||'—')],['cpu',esc((sys.cpu||'—')+' · '+(sys.cpu_cores||'?')+' cores')],['ram',sys.ram_gb?(sys.ram_gb+' GB'):'—'],['gpu',esc(gpu)],['host',esc(sys.hostname||'—')]]))+
+  '</div>'+bmTerminal(x);
+}
+function bmTerminal(x){
+  const p=x.params||{};
+  const body=JSON.stringify({model:x.model,requests:p.requests,concurrency:p.concurrency,max_tokens:p.max_tokens,mode:p.mode,device:p.device});
+  const cmd="curl -s http://HOST:PORT/api/benchmark -H 'content-type: application/json' \\\n  -d '"+body+"'";
+  const raw=JSON.stringify({params:p,system:x.system||{},result:x.result||{}},null,2);
+  return '<details class="bm-term"><summary>'+T('Raw command')+' &amp; '+T('Raw result (terminal)')+'</summary>'+
+    '<div class="term-h">command</div><pre class="term">'+esc(cmd)+'</pre>'+
+    '<div class="term-h">result</div><pre class="term">'+esc(raw)+'</pre></details>';
 }
 $('#bmHist').addEventListener('click',e=>{ const b=e.target.closest('button.bm-exp'); if(!b) return;
   const det=document.getElementById('bm-det-'+b.dataset.i); if(!det) return;

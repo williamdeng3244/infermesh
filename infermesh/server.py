@@ -240,6 +240,35 @@ def _approx_prompt_tokens(request) -> int:
     return chars // 4
 
 
+def _sysinfo() -> dict:
+    """Software + hardware snapshot for benchmark records (OS, Python, infermesh
+    version, CPU, RAM, accelerators). Vendor-free — enumerate_devices is CLI-based."""
+    import os as _os
+    import platform as _pf
+    gpus = []
+    try:
+        from infermesh.core.devices import enumerate_devices
+        gpus = [{"name": d.get("name"), "vendor": d.get("vendor"), "mem_total_mb": d.get("mem_total_mb")}
+                for d in enumerate_devices() if d.get("vendor") != "cpu"]
+    except Exception:
+        pass
+    ram_gb = None
+    try:
+        ram_gb = round(_os.sysconf("SC_PAGE_SIZE") * _os.sysconf("SC_PHYS_PAGES") / (1024 ** 3), 1)
+    except Exception:
+        pass
+    return {
+        "os": _pf.platform(),
+        "python": _pf.python_version(),
+        "infermesh": __version__,
+        "hostname": _pf.node(),
+        "cpu": _pf.processor() or _pf.machine(),
+        "cpu_cores": _os.cpu_count(),
+        "ram_gb": ram_gb,
+        "gpus": gpus,
+    }
+
+
 def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     """Build the FastAPI app around a (pre-populated) ModelPool."""
     settings = settings or Settings()
@@ -604,10 +633,17 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/api/logs")
     async def api_logs(
-        limit: int = Query(default=200, ge=1, le=500),
+        limit: int = Query(default=200, ge=1, le=2000),
+        level: str = Query(default=""),
         _: None = Depends(require_auth),
     ):
-        return {"lines": list(_LOG_BUFFER)[-limit:]}
+        lines = list(_LOG_BUFFER)
+        total = len(lines)
+        if level:  # min-level view filter (does not affect the saved log file)
+            rank = {"debug": 0, "info": 1, "warning": 2, "error": 3}
+            minr = rank.get(level.lower(), 0)
+            lines = [ln for ln in lines if rank.get(str(ln.get("level", "")).lower(), 1) >= minr]
+        return {"lines": lines[-limit:], "total": total}
 
     @app.get("/api/metrics")
     async def api_metrics(_: None = Depends(require_auth)):
@@ -616,6 +652,10 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     @app.get("/api/devices")
     async def api_devices(_: None = Depends(require_auth)):
         return {"devices": enumerate_devices()}
+
+    @app.get("/api/sysinfo")
+    async def api_sysinfo(_: None = Depends(require_auth)):
+        return _sysinfo()
 
     @app.get("/api/stats")
     async def api_stats(scope: str = Query(default="session"), model: str = Query(default=""),
@@ -719,8 +759,10 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             )
         append_benchmark({
             "t": time.time(), "model": model_id,
-            "params": {"requests": n, "concurrency": c, "max_tokens": mt},
+            "params": {"requests": n, "concurrency": c, "max_tokens": mt,
+                       "mode": req.mode, "device": req.device},
             "result": result,
+            "system": _sysinfo(),
         })
         return result
 
