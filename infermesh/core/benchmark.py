@@ -92,6 +92,7 @@ async def run_benchmark(
     mode = "different" if str(mode).lower() == "different" else "same"
     sem = asyncio.Semaphore(max(1, concurrency))
     samples: list[dict] = []
+    dev = {"device": None, "vendor": None}   # captured from the backend during the run
 
     async def _one(i: int) -> None:
         async with sem:
@@ -107,6 +108,12 @@ async def run_benchmark(
             ok = True
             try:
                 async with pool.acquire(model_id) as backend:
+                    if dev["device"] is None:
+                        try:
+                            _e = backend.stats().extra or {}
+                            dev["device"], dev["vendor"] = _e.get("device"), _e.get("vendor")
+                        except Exception:
+                            pass
                     async for chunk in backend.chat_stream(req):
                         if ttft is None and (chunk.text or chunk.reasoning_content):
                             ttft = (time.perf_counter() - start) * 1000.0
@@ -169,6 +176,8 @@ async def run_benchmark(
 
     return {
         "model": model_id,
+        "device": dev["device"],
+        "vendor": dev["vendor"],
         "mode": mode,
         "requests": requests,
         "concurrency": concurrency,

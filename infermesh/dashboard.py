@@ -904,7 +904,7 @@ async function runBenchmark(){
   try{
     const r=await api('/api/benchmark','POST',body);
     lastBench=r;
-    $('#bmStatus').textContent='done in '+r.wall_time_s+'s · mode: '+(r.mode||'same');
+    $('#bmStatus').textContent='done · '+(r.model||'')+' on '+(r.device||r.vendor||'cpu')+' · '+r.wall_time_s+'s · mode '+(r.mode||'same');
     const pk=(r.peak_mem_mb!=null)?(fmt(r.peak_mem_mb)+' MB'):'—';
     $('#bmCards').innerHTML=
       '<div class="card"><div class="k">Prefill (PP)</div><div class="v">'+r.pp_tps.mean+'<small> tok/s</small></div></div>'+
@@ -975,7 +975,7 @@ function bmSummaryRow(x,i){
   const r=x.result||{}, L=r.latency_ms||{}, p=x.params||{};
   let when=''; try{ when=new Date((x.t||0)*1000).toLocaleString(); }catch(_){ }
   return '<tr><td><button class="btn sm bm-exp" data-i="'+i+'" aria-label="expand">&#9656;</button></td>'+
-    '<td class="muted">'+esc(when)+'</td><td><strong>'+esc(x.model||'')+'</strong> <span class="muted" style="font-size:11px">'+esc(r.mode||'')+'</span></td>'+
+    '<td class="muted">'+esc(when)+'</td><td><strong>'+esc(x.model||'')+'</strong> <span class="muted" style="font-size:11px">'+esc(r.mode||'')+(r.device?(' · '+esc(r.device)):'')+'</span></td>'+
     '<td class="num">'+bmn(p.requests)+'&times;'+bmn(p.concurrency)+'</td>'+
     '<td class="num">'+bmn(r.requests_per_sec)+'</td><td class="num">'+bmn(r.output_tokens_per_sec)+'</td>'+
     '<td class="num">'+bmn(L.p50)+'</td><td class="num">'+bmn(L.p99)+'</td></tr>';
@@ -990,7 +990,7 @@ function bmDetail(x){
   const pk=r.peak_mem_mb!=null?(fmt(r.peak_mem_mb)+' MB'):'—';
   const succ=(r.succeeded!=null?r.succeeded+' / '+((r.succeeded||0)+(r.failed||0)):'—');
   return '<div class="bm-grid">'+
-    bmBlock('Context', bmRows([['model',esc(r.model||x.model||'')],['mode',esc(r.mode||'—')],['type',single?'single request':'continuous batching'],['requests',p.requests],['concurrency',p.concurrency],['max tokens',p.max_tokens],['wall time (s)',r.wall_time_s],['succeeded',succ]]))+
+    bmBlock('Context', bmRows([['model',esc(r.model||x.model||'')],['device',esc(r.device||'—')],['accelerator',esc(r.vendor||'—')],['mode',esc(r.mode||'—')],['type',single?'single request':'continuous batching'],['requests',p.requests],['concurrency',p.concurrency],['max tokens',p.max_tokens],['wall time (s)',r.wall_time_s],['succeeded',succ]]))+
     bmBlock('Throughput', bmRows([['requests / s',r.requests_per_sec],['output tok / s',r.output_tokens_per_sec]]))+
     bmBlock('Prefill &mdash; PP TPS', bmRows([['mean',pp.mean],['max',pp.max],['prompt tokens',r.total_prompt_tokens]]))+
     bmBlock('Decode &mdash; TG TPS', bmRows([['mean',tg.mean],['max',tg.max],['output tokens',r.total_output_tokens]]))+

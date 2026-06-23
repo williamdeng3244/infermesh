@@ -67,9 +67,34 @@ def _amd() -> list[dict]:
     ]
 
 
+def _enflame() -> list[dict]:
+    """Enflame GCU accelerators (e.g. S60) via the ``efsmi`` CLI. Best-effort parse
+    of the management table: pair each ``Enflame <model>`` line with its ``NNNNMiB``
+    total-memory token. Stays vendor-free (subprocess only, no torch/SDK import)."""
+    out = _run(["efsmi"])
+    if not out:
+        return []
+    import re
+    devices: list[dict] = []
+    name: Optional[str] = None
+    for line in out.splitlines():
+        m = re.search(r"Enflame\s+[A-Za-z0-9-]+", line)
+        if m:
+            name = m.group(0).strip()
+        mem = re.search(r"(\d{3,})\s*MiB", line)
+        if name and mem:
+            total = int(mem.group(1))
+            devices.append({
+                "id": f"gcu:{len(devices)}", "vendor": "enflame", "name": name,
+                "mem_total_mb": total, "mem_used_mb": 0, "mem_free_mb": total,
+            })
+            name = None
+    return devices
+
+
 def enumerate_devices() -> list[dict]:
-    """Detected accelerators (NVIDIA, then AMD) followed by a ``cpu`` entry."""
-    devices = _nvidia() + _amd()
+    """Detected accelerators (NVIDIA, AMD, Enflame GCU) followed by a ``cpu`` entry."""
+    devices = _nvidia() + _amd() + _enflame()
     devices.append({
         "id": "cpu", "vendor": "cpu", "name": "CPU",
         "mem_total_mb": 0, "mem_used_mb": 0, "mem_free_mb": 0,

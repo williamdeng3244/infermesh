@@ -90,6 +90,11 @@ class TransformersBackend(InferenceBackend):
             vendor = "amd" if getattr(torch.version, "hip", None) else "nvidia"
             total_mb = int(torch.cuda.get_device_properties(0).total_memory // (1024 * 1024))
             return HardwareInfo(vendor=vendor, device_count=count, mem_per_device_mb=total_mb)
+        try:
+            import torch_gcu  # noqa: F401  -- Enflame GCU plugin registers the 'gcu' device
+            return HardwareInfo(vendor="enflame", device_count=1)
+        except Exception:
+            pass
         if getattr(getattr(torch, "backends", None), "mps", None) and torch.backends.mps.is_available():
             return HardwareInfo(vendor="apple", device_count=1)
         return HardwareInfo(vendor="cpu", device_count=0)
@@ -110,10 +115,21 @@ class TransformersBackend(InferenceBackend):
         import torch
 
         extra = spec.extra or {}
-        device = extra.get("device") or ("cuda" if torch.cuda.is_available() else "cpu")
+        device = extra.get("device")
+        if not device:
+            if torch.cuda.is_available():
+                device = "cuda"
+            else:
+                try:
+                    import torch_gcu  # noqa: F401  -- Enflame GCU auto-detect
+                    device = "gcu"
+                except Exception:
+                    device = "cpu"
+        if str(device).startswith("gcu"):
+            import torch_gcu  # noqa: F401  -- register the 'gcu' device before .to(device)
         dtype_name = _DTYPES.get(str(extra.get("dtype", "")).lower())
         if dtype_name is None:
-            dtype_name = "float16" if str(device).startswith("cuda") else "float32"
+            dtype_name = "float16" if str(device).startswith(("cuda", "gcu")) else "float32"
         torch_dtype = getattr(torch, dtype_name)
         trust = bool(extra.get("trust_remote_code", False))
 
