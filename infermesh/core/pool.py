@@ -233,6 +233,15 @@ class ModelPool:
             )
         return mid
 
+    def remove_spec(self, model_id: str) -> bool:
+        """Drop a model from the registry (e.g. its files were deleted) — the inverse
+        of add_spec. Skips a model that is still loaded; unload it first."""
+        entry = self._entries.get(model_id)
+        if entry is None or entry.backend is not None:
+            return False
+        self._entries.pop(model_id, None)
+        return True
+
     def _case_insensitive_match(self, name: str) -> Optional[str]:
         lower = name.lower()
         for mid in self._entries:

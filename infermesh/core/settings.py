@@ -41,6 +41,9 @@ class Settings:
     gen_top_p: Optional[float] = None        # default nucleus top_p when a request omits it
     gen_top_k: Optional[int] = None          # default top_k when a request omits it (0 => disabled)
     gen_max_tokens: Optional[int] = None     # default max output tokens when a request omits it
+    submitter_label: Optional[str] = None    # display name for shared community submissions (None => hostname)
+    auto_publish: bool = True                # auto-submit completed benchmarks to the community library
+    hub_url: Optional[str] = None            # remote community hub to submit to (None/"" => store locally / be the hub)
 
     @classmethod
     def load(cls, path: Path = SETTINGS_PATH) -> "Settings":

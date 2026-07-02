@@ -5,6 +5,8 @@
 import os
 import time
 
+import pytest
+
 import infermesh.core.downloader as dl
 from infermesh.core.backend import ModelSpec
 from infermesh.core.factory import BackendFactory
@@ -19,6 +21,18 @@ class _M:
 class _Info:
     def __init__(self, sizes):
         self.siblings = [type("S", (), {"size": s})() for s in sizes]
+
+
+@pytest.fixture(autouse=True)
+def _inprocess_downloads(monkeypatch):
+    """Run downloads in-process (production uses a killable subprocess) so the
+    _hf_snapshot/_ms_snapshot monkeypatches apply; isolate job state per test."""
+    monkeypatch.setattr(dl, "subprocess_downloads", False)
+    dl._JOBS.clear()
+    dl._PROCS.clear()
+    yield
+    dl._JOBS.clear()
+    dl._PROCS.clear()
 
 
 def test_search_models(monkeypatch):
@@ -184,6 +198,77 @@ def test_hf_download_endpoint_source_modelscope(tmp_path, monkeypatch):
     client, _ = _app(tmp_path)
     r = client.post("/api/hf/download", json={"repo_id": "org/M", "source": "modelscope"})
     assert r.status_code == 200 and r.json()["source"] == "modelscope"
+
+
+def test_pause_download_terminates_and_marks_paused():
+    class _H:
+        def __init__(self):
+            self.terminated = False
+
+        def terminate(self):
+            self.terminated = True
+
+        def wait(self, timeout=None):
+            return 0
+
+    dl._JOBS["org/Big"] = {"repo_id": "org/Big", "status": "downloading", "path": "/tmp/none",
+                           "total_bytes": 0, "downloaded_bytes": 0, "model_id": "Big",
+                           "error": None, "source": "hf"}
+    handle = _H()
+    dl._PROCS["org/Big"] = handle
+    res = dl.pause_download("org/Big")
+    assert res["status"] == "paused" and handle.terminated
+
+
+def _fake_snap(rid, dest):
+    os.makedirs(dest, exist_ok=True)
+    with open(os.path.join(dest, "config.json"), "w") as fh:
+        fh.write("{}")
+    return dest
+
+
+def _wait_done(get_jobs, repo_id):
+    for _ in range(100):
+        st = {j["repo_id"]: j for j in get_jobs()}.get(repo_id, {})
+        if st.get("status") in ("done", "error"):
+            return st
+        time.sleep(0.02)
+    return {}
+
+
+def test_delete_download_removes_files_and_job(tmp_path, monkeypatch):
+    monkeypatch.setattr(dl, "_hf_model_info", lambda rid: _Info([10]))
+    monkeypatch.setattr(dl, "_hf_snapshot", _fake_snap)
+    dl.start_download("org/Del-Me", str(tmp_path))
+    _wait_done(dl.downloads_status, "org/Del-Me")
+    assert (tmp_path / "Del-Me" / "config.json").exists()
+    res = dl.delete_download("org/Del-Me")
+    assert res["deleted"] and res["files_removed"]
+    assert not (tmp_path / "Del-Me").exists()
+    assert "org/Del-Me" not in {j["repo_id"] for j in dl.downloads_status()}
+
+
+def test_download_delete_endpoint_also_drops_from_pool(tmp_path, monkeypatch):
+    monkeypatch.setattr(dl, "_hf_model_info", lambda rid: _Info([5]))
+    monkeypatch.setattr(dl, "_hf_snapshot", _fake_snap)
+    client, pool = _app(tmp_path)
+    client.post("/api/hf/download", json={"repo_id": "org/Gone"})
+    _wait_done(lambda: client.get("/api/hf/downloads").json()["downloads"], "org/Gone")
+    assert (tmp_path / "Gone").exists() and pool.get_entry("Gone") is not None
+    r = client.post("/api/hf/download/delete", json={"repo_id": "org/Gone"})
+    assert r.status_code == 200 and r.json()["deleted"] and r.json()["files_removed"]
+    assert not (tmp_path / "Gone").exists()
+    assert pool.get_entry("Gone") is None
+
+
+def test_delete_on_disk_model_without_job(tmp_path):
+    # a model on disk with no tracked job (discovered after a restart) is still deletable
+    (tmp_path / "Orphan").mkdir()
+    (tmp_path / "Orphan" / "config.json").write_text("{}")
+    client, _ = _app(tmp_path)
+    r = client.post("/api/hf/download/delete", json={"repo_id": "Orphan"})
+    assert r.status_code == 200 and r.json()["files_removed"]
+    assert not (tmp_path / "Orphan").exists()
 
 
 def test_require_ms_helpful_error_when_absent():

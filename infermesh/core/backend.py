@@ -32,6 +32,14 @@ from infermesh.api.adapters.base import (
 )
 
 
+class UnsupportedModelError(RuntimeError):
+    """The checkpoint isn't a generative causal LM (e.g. an embedding/encoder model).
+
+    Raised at load time, BEFORE any device op, so a non-generative model can't reach
+    the accelerator and trigger a fatal native driver fault that would abort the
+    whole server process."""
+
+
 @dataclass
 class ModelSpec:
     """A model the platform can serve. Backend-neutral."""

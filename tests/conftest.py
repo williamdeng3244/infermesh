@@ -11,6 +11,13 @@ from infermesh.core.settings import Settings
 from infermesh.server import create_app
 
 
+@pytest.fixture(autouse=True)
+def _isolate_community_db(tmp_path, monkeypatch):
+    """Redirect the shared-library SQLite DB to a per-test temp path so benchmark
+    auto-publish and community tests never write to the real ~/.infermesh."""
+    monkeypatch.setenv("INFERMESH_COMMUNITY_DB", str(tmp_path / "community.db"))
+
+
 @pytest.fixture
 def fake_model_dir(tmp_path):
     """Three empty fixture model directories under a temp root."""

@@ -164,6 +164,41 @@ pre.term{background:#0a0e1a;color:#c9d4e3;border:1px solid var(--border);border-
 .bm-exp{padding:3px 10px;line-height:1;font-size:13px}
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border2);padding:10px 18px;border-radius:9px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50}
 .toast.show{opacity:1}
+/* ---- Explorer (box-plot compare) + Community library ---- */
+.ex-build{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:13px;padding-top:13px;border-top:1px solid var(--border)}
+.ex-series{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}
+.ex-cards{display:flex;flex-direction:column;gap:9px;margin-top:13px}
+.ex-card{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;background:rgba(127,127,127,.05);border:1px solid var(--border2);border-radius:9px;padding:10px 12px}
+.ex-dot{width:12px;height:12px;border-radius:3px;flex:none;margin-bottom:7px}
+.ex-cardx{background:none;border:none;color:var(--dim);cursor:pointer;font-size:19px;line-height:1;padding:0 4px;margin-bottom:2px}
+.ex-cardx:hover{color:#ef4444}
+.ex-schip{display:inline-flex;align-items:center;gap:7px;background:rgba(127,127,127,.08);border:1px solid var(--border2);border-radius:20px;padding:4px 6px 4px 11px;font-size:12px}
+.ex-schip i{width:10px;height:10px;border-radius:3px;flex:none}
+.ex-schip button{background:none;border:none;color:var(--dim);cursor:pointer;font-size:15px;line-height:1;padding:0 3px}
+.ex-schip button:hover{color:#ef4444}
+.ex-check{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--dim);cursor:pointer;user-select:none}
+.ex-check input{cursor:pointer}
+#exLegend{display:flex;flex-wrap:wrap;gap:4px 16px;margin-bottom:10px;min-height:16px}
+.ex-leg{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text)}
+.ex-leg i{width:11px;height:11px;border-radius:3px;display:inline-block;flex:none}
+#exChart{display:block;width:100%}
+.ex-grid{stroke:var(--border);stroke-width:1}
+.ex-axis{stroke:var(--border2);stroke-width:1}
+.ex-yl{fill:var(--dim);font:11px ui-monospace,monospace;text-anchor:end}
+.ex-xl{fill:var(--dim);font:11px ui-monospace,monospace;text-anchor:middle}
+.ex-mlabel{fill:var(--dim);font:11px ui-sans-serif,system-ui}
+.cm-filters{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.cm-filters select,.cm-filters input{font-size:12.5px}
+tr.cm-det>td{background:rgba(127,127,127,.04);padding:0}
+.cm-detwrap{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px 28px}
+.ex-vgrid{stroke:var(--border);stroke-width:1;opacity:.35}
+.ex-axt{fill:var(--dim);font:12px ui-sans-serif,system-ui;text-anchor:middle;font-weight:500}
+.ex-box{cursor:pointer}
+.ex-tip{position:fixed;z-index:60;display:none;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 6px 22px rgba(0,0,0,.3);pointer-events:none;min-width:158px}
+.ex-tip-h{display:flex;align-items:center;gap:6px;font-weight:600;margin-bottom:5px}
+.ex-tip-h i{width:9px;height:9px;border-radius:2px;flex:none}
+.ex-tip-row{display:flex;justify-content:space-between;gap:18px;line-height:1.6;color:var(--dim)}
+.ex-tip-row b{color:var(--text);font-variant-numeric:tabular-nums;font-weight:600}
 </style>
 </head>
 <body>
@@ -178,11 +213,13 @@ pre.term{background:#0a0e1a;color:#c9d4e3;border:1px solid var(--border);border-
       <button data-sec="devices" aria-label="Devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="5" rx="1"/><rect x="2" y="13" width="20" height="5" rx="1"/><line x1="6" y1="8.5" x2="6.01" y2="8.5"/><line x1="6" y1="15.5" x2="6.01" y2="15.5"/></svg> <span data-i18n="Devices">Devices</span></button>
       <button data-sec="download" aria-label="Download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg> <span data-i18n="Download">Download</span></button>
       <button data-sec="benchmark" aria-label="Benchmark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19a9 9 0 1 1 15 0"/><path d="M12 14l3.5-3.5"/></svg> <span data-i18n="Benchmark">Benchmark</span></button>
+      <button data-sec="explorer" aria-label="Explorer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="20" x2="3" y2="11"/><line x1="9" y1="20" x2="9" y2="4"/><line x1="15" y1="20" x2="15" y2="13"/><line x1="21" y1="20" x2="21" y2="7"/></svg> <span data-i18n="Explorer">Explorer</span></button>
+      <button data-sec="community" aria-label="Community"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> <span data-i18n="Community">Community</span></button>
       <button data-sec="settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg> <span data-i18n="Settings">Settings</span></button>
     </nav>
     <div class="sb-foot">
       <span id="sb-health" class="pill"><span class="dot"></span> connecting</span>
-      <span id="sb-ver">v0.4.0 · mock / vllm / openai / transformers</span>
+      <span id="sb-ver">v0.5.0 · mock / vllm / openai / transformers</span>
     </div>
   </aside>
 
@@ -380,8 +417,8 @@ pre.term{background:#0a0e1a;color:#c9d4e3;border:1px solid var(--border);border-
         <div class="chat-bar" style="margin-bottom:8px"><span class="muted" style="font-size:12px" data-i18n="Download jobs">Download jobs</span></div>
         <div class="panel">
           <table>
-            <thead><tr><th data-i18n="Repo">Repo</th><th data-i18n="Status">Status</th><th data-i18n="Progress">Progress</th><th data-i18n="Size">Size</th></tr></thead>
-            <tbody id="dlJobs"><tr><td colspan="4" class="muted" data-i18n="no downloads yet">no downloads yet</td></tr></tbody>
+            <thead><tr><th data-i18n="Repo">Repo</th><th data-i18n="Status">Status</th><th data-i18n="Progress">Progress</th><th data-i18n="Size">Size</th><th data-i18n="Actions">Actions</th></tr></thead>
+            <tbody id="dlJobs"><tr><td colspan="5" class="muted" data-i18n="no downloads yet">no downloads yet</td></tr></tbody>
           </table>
         </div>
         <p id="dl-err" class="err"></p>
@@ -401,6 +438,7 @@ pre.term{background:#0a0e1a;color:#c9d4e3;border:1px solid var(--border);border-
               <button class="btn primary" id="bmRun" data-i18n="Run benchmark">Run benchmark</button>
               <button class="btn sm" id="bmSingle" data-i18n="Single request">Single request</button>
               <button class="btn sm" id="bmCopy" data-i18n="Copy">Copy</button>
+              <label class="ex-check" style="margin-left:4px" title="auto-publish this run to the shared library"><input type="checkbox" id="bmShare" checked/> <span data-i18n="Share to library">Share to library</span></label>
             </div>
           </div>
           <div id="bmStatus" class="muted" style="font-size:12px;margin-top:11px;min-height:16px"></div>
@@ -437,6 +475,69 @@ pre.term{background:#0a0e1a;color:#c9d4e3;border:1px solid var(--border);border-
           </div>
         </details>
         <p id="bm-err" class="err"></p>
+      </section>
+
+      <section class="section" id="sec-explorer">
+        <div class="panel" style="padding:15px 16px;margin-bottom:16px">
+          <div class="muted" style="font-size:12.5px;margin-bottom:4px" data-i18n="Visualize and compare model performance across context lengths — all data from the shared library.">Visualize and compare model performance across context lengths &mdash; all data from the shared library.</div>
+          <div class="bm-ctl">
+            <div class="bm-field"><label data-i18n="Metric">Metric</label>
+              <select id="exMetric" style="min-width:160px">
+                <option value="pp_tps">PP tok/s</option>
+                <option value="tg_tps">TG tok/s</option>
+                <option value="ttft_ms">TTFT (ms)</option>
+                <option value="tpot_ms">TPOT (ms/tok)</option>
+                <option value="peak_mem_gb">Peak Mem (GB)</option>
+                <option value="e2e_latency_s">E2E (s)</option>
+                <option value="total_throughput">Total tok/s</option>
+              </select>
+            </div>
+            <label class="ex-check"><input type="checkbox" id="exPoints"/> <span data-i18n="show data points">show data points</span></label>
+            <span class="spacer"></span>
+            <div class="bm-actions">
+              <button class="btn primary sm" id="exAdd" data-i18n="+ Add comparison">+ Add comparison</button>
+              <button class="btn sm" id="exCopy" data-i18n="Copy">Copy</button>
+              <button class="btn sm" id="exExport" data-i18n="Export CSV">Export CSV</button>
+            </div>
+          </div>
+          <div id="exSeries" class="ex-cards"></div>
+        </div>
+        <div class="panel" style="padding:18px">
+          <div id="exLegend"></div>
+          <svg id="exChart" preserveAspectRatio="xMidYMid meet" role="img" aria-label="benchmark comparison chart"></svg>
+          <div id="exTip" class="ex-tip"></div>
+          <div id="exEmpty" class="muted" style="text-align:center;padding:48px 10px;font-size:13px" data-i18n="No data yet — run a benchmark (auto-published) or pick a comparison above.">No data yet &mdash; run a benchmark (auto-published) or pick a comparison above.</div>
+        </div>
+      </section>
+
+      <section class="section" id="sec-community">
+        <div class="panel" style="padding:13px 14px;margin-bottom:14px">
+          <div class="cm-filters">
+            <select id="cmChip"><option value="" data-i18n="all chips">all chips</option></select>
+            <select id="cmVendor"><option value="" data-i18n="all variants">all variants</option></select>
+            <input id="cmModel" type="text" placeholder="search model…" data-i18n-ph="search model…" style="width:160px"/>
+            <select id="cmQuant"><option value="" data-i18n="all quants">all quants</option></select>
+            <select id="cmContext"><option value="" data-i18n="all contexts">all contexts</option></select>
+            <input id="cmMinPp" type="number" min="0" placeholder="Min pp" data-i18n-ph="Min pp" style="width:92px"/>
+            <input id="cmMinTg" type="number" min="0" placeholder="Min TG" data-i18n-ph="Min TG" style="width:92px"/>
+            <select id="cmSort">
+              <option value="recent" data-i18n="Recent">Recent</option>
+              <option value="pp" data-i18n="Highest pp">Highest pp</option>
+              <option value="tg" data-i18n="Highest TG">Highest TG</option>
+              <option value="model" data-i18n="Model">Model</option>
+              <option value="chip" data-i18n="Chip">Chip</option>
+            </select>
+            <button class="btn sm" id="cmExport" data-i18n="Export CSV">Export CSV</button>
+            <span class="spacer"></span>
+            <span class="muted" id="cmCount" style="font-size:12px"></span>
+          </div>
+        </div>
+        <div class="panel">
+          <table>
+            <thead><tr><th style="width:30px"></th><th data-i18n="Chip">Chip</th><th data-i18n="Model">Model</th><th data-i18n="Quant">Quant</th><th data-i18n="Context">Context</th><th>pp tok/s</th><th>TG tok/s</th><th data-i18n="Peak Mem">Peak Mem</th><th data-i18n="Submitter">Submitter</th><th data-i18n="Date">Date</th></tr></thead>
+            <tbody id="cmRows"><tr><td colspan="10" class="muted" data-i18n="no benchmarks yet">no benchmarks yet</td></tr></tbody>
+          </table>
+        </div>
       </section>
 
       <section class="section" id="sec-settings">
@@ -496,6 +597,19 @@ pre.term{background:#0a0e1a;color:#c9d4e3;border:1px solid var(--border);border-
             </div>
             <div class="hint" data-i18n="Blank = no server default (the client's value or the built-in fallback applies). A request's own values always win.">Blank = no server default (the client's value or the built-in fallback applies). A request's own values always win.</div>
           </div>
+          <h3 style="margin-top:26px" data-i18n="Shared library">Shared library</h3>
+          <div class="field">
+            <label for="setSubmitter" data-i18n="Display name — how your runs appear in the Community library">Display name &mdash; how your runs appear in the Community library</label>
+            <div class="row">
+              <input id="setSubmitter" type="text" placeholder="blank = hostname" data-i18n-ph="blank = hostname" style="width:260px" autocomplete="off"/>
+              <label class="ex-check" style="margin:0 4px"><input type="checkbox" id="setAutoPub"/> <span data-i18n="Auto-publish benchmarks">Auto-publish benchmarks</span></label>
+              <button class="btn" id="saveCommunity" data-i18n="Save">Save</button>
+            </div>
+            <div class="hint" data-i18n="Completed benchmarks are submitted to the shared library so colleagues can compare. Hub URL blank = this server is the hub.">Completed benchmarks are submitted to the shared library so colleagues can compare. Hub URL blank = this server is the hub.</div>
+            <div class="row" style="margin-top:8px">
+              <input id="setHubUrl" type="text" placeholder="hub URL — blank = this server is the hub" data-i18n-ph="hub URL — blank = this server is the hub" style="width:430px" autocomplete="off"/>
+            </div>
+          </div>
           <h3 style="margin-top:26px"><span data-i18n="Startup">Startup</span> <span class="badge warn" data-i18n="restart to apply">restart to apply</span></h3>
           <div class="field">
             <label data-i18n="Bind address, model dir &amp; default backend &mdash; saved now, applied on restart">Bind address, model dir &amp; default backend &mdash; saved now, applied on restart</label>
@@ -531,7 +645,7 @@ pre.term{background:#0a0e1a;color:#c9d4e3;border:1px solid var(--border);border-
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let active='models', logsPaused=false, lastBench=null;
-const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',devices:'Devices',download:'Download',benchmark:'Benchmark',settings:'Settings'};
+const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',devices:'Devices',download:'Download',benchmark:'Benchmark',explorer:'Explorer',community:'Community',settings:'Settings'};
 /* ---- i18n: keys are the English text; only ZH needs entries. Units (tok/s, ms, %, MB) + proper nouns stay. ---- */
 const I18N={
 "Models":"模型","Chat":"对话","Logs":"日志","Metrics":"指标","Devices":"设备","Download":"下载","Benchmark":"基准测试","Settings":"设置",
@@ -582,7 +696,17 @@ const I18N={
 "Device":"设备","auto (current)":"自动（当前）","connected":"已连接","offline":"离线",
 "Models loaded":"已加载模型","Committed memory":"已占用内存","Live used / ceiling":"实时使用 / 上限","Host RAM":"主机内存","loading":"加载中","loaded":"已加载","idle":"空闲","pinned":"已固定","Load":"加载","Unload":"卸载","Pin":"固定","Unpin":"取消固定","no models discovered":"未发现模型","single request":"单次请求","continuous batching":"连续批处理",
 "Lines:":"行数：","Min display level":"最低显示级别","filters the view only — not the saved log file":"仅过滤此处显示 — 不影响日志文件的保存级别","Showing":"显示","lines":"行","no logs yet":"暂无日志",
-"Metrics Reference":"指标说明","System":"系统","Raw command":"原始命令","Raw result (terminal)":"原始结果（终端）","Raw command & terminal output":"原始命令 & 终端输出","command":"命令","results":"结果","raw JSON":"原始 JSON","copied":"已复制"
+"Metrics Reference":"指标说明","System":"系统","Raw command":"原始命令","Raw result (terminal)":"原始结果（终端）","Raw command & terminal output":"原始命令 & 终端输出","command":"命令","results":"结果","raw JSON":"原始 JSON","copied":"已复制",
+"Explorer":"性能浏览器","Community":"社区基准","Share to library":"分享到库",
+"Metric":"指标","show data points":"显示数据点","Chip":"芯片","Quant":"量化","Context":"上下文","+ Add comparison":"+ 添加对比","any quant":"任意量化","remove":"移除","Peak Mem":"峰值显存","Submitter":"提交者","Date":"日期",
+"Visualize and compare model performance across context lengths — all data from the shared library.":"可视化并对比不同上下文长度下的模型性能 — 全部数据来自共享库。",
+"No data yet — run a benchmark (auto-published) or pick a comparison above.":"暂无数据 — 运行一次基准测试（会自动发布），或在上方选择一个对比。",
+"all chips":"全部芯片","all variants":"全部厂商","search model…":"搜索模型…","all quants":"全部量化","all contexts":"全部上下文","Min pp":"最小 pp","Min TG":"最小 TG","Highest pp":"pp 最高","Highest TG":"TG 最高","no benchmarks yet":"暂无基准测试记录",
+"Shared library":"共享库","Display name — how your runs appear in the Community library":"显示名称 — 你的测试在社区库中如何显示","blank = hostname":"留空 = 主机名","Auto-publish benchmarks":"自动发布基准测试","Completed benchmarks are submitted to the shared library so colleagues can compare. Hub URL blank = this server is the hub.":"完成的基准测试会提交到共享库，方便同事对比。Hub URL 留空 = 本服务器即为 Hub。","hub URL — blank = this server is the hub":"Hub URL — 留空 = 本服务器即为 Hub","community settings saved":"已保存共享库设置",
+"chart data copied":"已复制图表数据","no data to copy":"暂无数据可复制","runs":"条记录","samples":"样本","Reset":"重置",
+"Context length":"上下文长度","all":"全部","Raw command & results (terminal)":"原始命令 & 结果（终端）","benchmark command":"基准测试命令",
+"No comparisons yet — click + Add comparison.":"暂无对比 — 点击「+ 添加对比」。",
+"Pause":"暂停","Resume":"继续","Delete":"删除","paused":"已暂停","deleted":"已删除","resuming":"继续下载","delete model files from disk":"从磁盘删除模型文件","Delete this download and its files?":"删除此下载及其文件？","Delete this model and its files from disk?":"从磁盘删除此模型及其文件？"
 };
 let lang='en';
 function T(s){ return (lang==='zh' && I18N[s]!=null) ? I18N[s] : s; }
@@ -602,6 +726,8 @@ function applyLang(l){
     else if(active==='settings'){ loadSettings(); }
     else if(active==='models'){ refreshModelSettings(); }
     else if(active==='metrics'){ refreshStats(); refreshLive(); refreshPerModel(); }
+    else if(active==='explorer'){ renderExSeries(); drawExChart(); }
+    else if(active==='community'){ renderCommunity(); }
   }catch(e){}
 }
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -633,6 +759,8 @@ function switchSection(sec){
   if(sec==='settings') loadSettings();
   if(sec==='metrics'){ refreshMetrics(); refreshStats(); }
   if(sec==='benchmark'){ loadBenchModels(); loadBenchDevices(); refreshBenchHistory(); }
+  if(sec==='explorer') loadExplorer();
+  if(sec==='community') loadCommunity();
   if(sec==='devices') refreshDevices();
   if(sec==='download'){ refreshDownloads(); if(!dlLoaded){ dlLoaded=true; runHfSearch(); } }
   if(sec==='models'){ loadDevicePicker(); refreshModelSettings(); }
@@ -656,12 +784,19 @@ function renderModels(s){
         '<button class="btn sm" data-id="'+id+'" data-act="load" '+(m.loaded?'disabled':'')+'>'+T('Load')+'</button>'+
         '<button class="btn sm" data-id="'+id+'" data-act="unload?force=true" '+(m.loaded?'':'disabled')+'>'+T('Unload')+'</button>'+
         '<button class="btn sm" data-id="'+id+'" data-act="'+(m.pinned?'unpin':'pin')+'">'+(m.pinned?T('Unpin'):T('Pin'))+'</button>'+
+        '<button class="btn sm" data-id="'+id+'" data-act="delete" title="'+T('delete model files from disk')+'">'+T('Delete')+'</button>'+
       '</td></tr>';
   }).join('')||'<tr><td colspan="8" class="muted">'+T('no models discovered')+'</td></tr>';
 }
 $('#rows').addEventListener('click',async e=>{
   const b=e.target.closest('button[data-act]'); if(!b) return;
   let act=b.dataset.act;
+  if(act==='delete'){
+    if(!confirm(T('Delete this model and its files from disk?'))) return;
+    try{ await api('/api/hf/download/delete','POST',{repo_id:b.dataset.id}); toast('deleted'); }
+    catch(err){ $('#models-err').textContent=String(err); }
+    tick(); return;
+  }
   if(act==='load'){ const dev=$('#devSel')&&$('#devSel').value; if(dev) act='load?device='+encodeURIComponent(dev); }
   try{ await api('/v1/models/'+b.dataset.id+'/'+act,'POST'); }
   catch(err){ $('#models-err').textContent=String(err); }
@@ -745,6 +880,7 @@ async function loadSettings(){
     gv('#setGenTemp',s.gen_temperature); gv('#setGenTopP',s.gen_top_p); gv('#setGenTopK',s.gen_top_k); gv('#setGenMax',s.gen_max_tokens);
     gv('#setHost',s.host); gv('#setPort',s.port); gv('#setBackend',s.backend); gv('#setMaxMem',s.max_process_memory); gv('#setModelDir',s.model_dir);
     gv('#setConc',s.max_concurrent_requests); gv('#setQueue',s.max_queued_requests);
+    gv('#setSubmitter',s.submitter_label); gv('#setHubUrl',s.hub_url); if($('#setAutoPub')) $('#setAutoPub').checked=(s.auto_publish!==false);
     $('#keyState').textContent=s.api_key?'set':'unset';
     const order=['backend','model_dir','host','port','max_concurrent_requests','max_queued_requests','idle_timeout','max_process_memory','ttl_check_interval','sse_keepalive_interval','kv_hot_capacity','kv_cold_dir','hf_endpoint','gen_temperature','gen_top_p','gen_top_k','gen_max_tokens','api_key'];
     $('#settingsKv').innerHTML=order.filter(k=>k in s).map(k=>'<dt>'+k+'</dt><dd>'+(k==='api_key'?(s[k]?'set':'unset'):esc(s[k]==null?'—':s[k]))+'</dd>').join('');
@@ -992,7 +1128,7 @@ async function loadBenchDevices(){
 async function runBenchmark(){
   const model=$('#bmModel').value;
   if(!model){ $('#bm-err').textContent='pick a model'; return; }
-  const body={model:model, requests:(+$('#bmReq').value||20), concurrency:(+$('#bmConc').value||4), max_tokens:(+$('#bmTok').value||64), mode:($('#bmMode')?$('#bmMode').value:'same'), device:(($('#bmDevice')&&$('#bmDevice').value)||null)};
+  const body={model:model, requests:(+$('#bmReq').value||20), concurrency:(+$('#bmConc').value||4), max_tokens:(+$('#bmTok').value||64), mode:($('#bmMode')?$('#bmMode').value:'same'), device:(($('#bmDevice')&&$('#bmDevice').value)||null), share:($('#bmShare')?$('#bmShare').checked:true)};
   $('#bm-err').textContent=''; $('#bmStatus').textContent='running '+body.requests+'×'+body.concurrency+(body.device?(' on '+body.device):'')+'… (real models take a few s)';
   $('#bmRun').disabled=true;
   try{
@@ -1040,6 +1176,206 @@ $('#bmCopy').onclick=()=>{ if(!lastBench){ toast('run a benchmark first'); retur
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(()=>toast('results copied')).catch(()=>toast('copy failed')); }
   else { toast('clipboard unavailable in this context'); }
 };
+
+/* ===================== Explorer (box-plot compare) ===================== */
+const EXCOLORS=['#3b82f6','#22c55e','#a855f7','#f59e0b','#ef4444','#14b8a6','#ec4899','#0ea5e9'];
+let exFacets={chips:[],models:[],quants:[]}, exSel=[], exData=null, exTipData=[];
+const METRIC_LABELS={pp_tps:'PP tok/s',tg_tps:'TG tok/s',ttft_ms:'TTFT (ms)',tpot_ms:'TPOT (ms/tok)',peak_mem_gb:'Peak Mem (GB)',e2e_latency_s:'E2E (s)',total_throughput:'Total tok/s'};
+function metricLabel(m){ return METRIC_LABELS[m]||m; }
+const QUANTS=['2bit','3bit','4bit','4M','5bit','6bit','7bit','8bit','bf16','fp16'];
+function quantList(fq){ const s=QUANTS.slice(); (fq||[]).forEach(q=>{ if(q&&s.indexOf(q)<0) s.push(q); }); return s; }
+function quantOptions(fq){ return quantList(fq).map(q=>'<option value="'+esc(q)+'">'+esc(q)+'</option>').join(''); }
+function niceTicks(max){ if(!(max>0)) return [0,1]; const raw=max/4, mag=Math.pow(10,Math.floor(Math.log10(raw))), norm=raw/mag, step=(norm<1.5?1:norm<3?2:norm<7?5:10)*mag, top=Math.ceil(max/step)*step, t=[]; for(let v=0; v<=top+step*0.001; v+=step) t.push(Math.round(v*1e6)/1e6); return t; }
+function tipRow(k,v){ return '<div class="ex-tip-row"><span>'+k+'</span><b>'+v+'</b></div>'; }
+function ctxLabel(c){ c=+c; if(!c) return '—'; if(c>=1000000) return (Math.round(c/100000)/10)+'M'; if(c>=1000) return (Math.round(c/100)/10).toString().replace(/\.0$/,'')+'k'; return ''+c; }
+function exNum(v){ if(v==null||v==='') return '—'; v=+v; if(isNaN(v)) return '—'; if(v>=1000) return Math.round(v).toLocaleString(); if(v>=100) return ''+Math.round(v); if(v>=10) return ''+(Math.round(v*10)/10); return ''+(Math.round(v*100)/100); }
+async function exportCsv(qs){
+  try{ const k=$('#apikey').value.trim();
+    const r=await fetch('/api/community/export.csv'+(qs||''),{headers:k?{'Authorization':'Bearer '+k}:{}});
+    if(!r.ok){ toast('export failed'); return; }
+    const b=await r.blob(), u=URL.createObjectURL(b), a=document.createElement('a');
+    a.href=u; a.download='infermesh-community.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u);
+  }catch(e){ toast('export failed'); }
+}
+async function loadExplorer(){
+  try{ const d=await api('/api/community/runs?sort=recent&limit=200');
+    exFacets=d.facets||{chips:[],models:[],quants:[]};
+    if(exSel.length===0){
+      const seen=new Set(), combos=[];
+      (d.runs||[]).forEach(r=>{ const key=r.chip+'|'+r.model+'|'+r.quant; if(!seen.has(key)){ seen.add(key); combos.push({chip:r.chip,model:r.model,quant:r.quant}); } });
+      if(combos.length){ const m=combos[0].model, pref=combos.filter(c=>c.model===m); exSel=(pref.length>1?pref:combos).slice(0,5); }
+    }
+  }catch(e){ exFacets={chips:[],models:[],quants:[]}; }
+  renderExSeries(); refreshExplorer();
+}
+function exAddSeries(){
+  const chip=(exFacets.chips&&exFacets.chips[0])||'', model=(exFacets.models&&exFacets.models[0])||'';
+  exSel.push({chip:chip, model:model, quant:'*'});
+  renderExSeries(); refreshExplorer();
+}
+function renderExSeries(){
+  const el=$('#exSeries'); if(!el) return;
+  const optsel=(arr,v)=>(arr||[]).map(o=>'<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>').join('');
+  const qsel=v=>'<option value="*"'+((v==='*'||!v)?' selected':'')+'>'+T('all')+'</option>'+quantList(exFacets.quants).map(q=>'<option'+(q===v?' selected':'')+'>'+esc(q)+'</option>').join('');
+  el.innerHTML=exSel.length?exSel.map((s,i)=>
+    '<div class="ex-card"><i class="ex-dot" style="background:'+EXCOLORS[i%EXCOLORS.length]+'"></i>'+
+    '<div class="bm-field"><label>'+T('Chip')+'</label><select data-k="chip" data-i="'+i+'" style="min-width:150px">'+optsel(exFacets.chips,s.chip)+'</select></div>'+
+    '<div class="bm-field"><label>'+T('Model')+'</label><select data-k="model" data-i="'+i+'" style="min-width:160px">'+optsel(exFacets.models,s.model)+'</select></div>'+
+    '<div class="bm-field"><label>'+T('Quant')+'</label><select data-k="quant" data-i="'+i+'" style="min-width:104px">'+qsel(s.quant)+'</select></div>'+
+    '<span class="spacer"></span>'+
+    '<button class="ex-cardx" data-i="'+i+'" title="'+T('remove')+'" aria-label="remove">&times;</button></div>'
+  ).join(''):'<div class="muted" style="font-size:12.5px;padding:6px 2px">'+T('No comparisons yet — click + Add comparison.')+'</div>';
+  el.querySelectorAll('select').forEach(sel=>sel.onchange=()=>{ exSel[+sel.dataset.i][sel.dataset.k]=sel.value; refreshExplorer(); });
+  el.querySelectorAll('.ex-cardx').forEach(b=>b.onclick=()=>{ exSel.splice(+b.dataset.i,1); renderExSeries(); refreshExplorer(); });
+}
+async function refreshExplorer(){
+  const metric=($('#exMetric')&&$('#exMetric').value)||'pp_tps';
+  if(!exSel.length){ exData=null; drawExChart(); return; }
+  try{ exData=await api('/api/community/compare?metric='+encodeURIComponent(metric)+'&series='+encodeURIComponent(JSON.stringify(exSel))); }
+  catch(e){ exData=null; }
+  drawExChart();
+}
+function drawExChart(){
+  const svg=$('#exChart'); if(!svg) return;
+  const wrap=svg.parentElement, empty=$('#exEmpty'), leg=$('#exLegend'), tip=$('#exTip');
+  if(tip) tip.style.display='none';
+  const series=(exData&&exData.series)||[], contexts=(exData&&exData.contexts)||[];
+  const metric=($('#exMetric')&&$('#exMetric').value)||'pp_tps';
+  const hasData=series.some(s=>s.cells&&Object.keys(s.cells).length);
+  if(empty) empty.style.display=hasData?'none':'block';
+  if(leg) leg.innerHTML=hasData?series.map((s,i)=>'<span class="ex-leg"><i style="background:'+EXCOLORS[i%EXCOLORS.length]+'"></i>'+esc(s.key)+'</span>').join(''):'';
+  if(!hasData){ svg.innerHTML=''; svg.removeAttribute('viewBox'); return; }
+  const showPts=$('#exPoints')&&$('#exPoints').checked;
+  const W=Math.max(560,((wrap&&wrap.clientWidth)||820)-36), H=460;
+  const mL=68,mR=18,mT=14,mB=58, plotW=W-mL-mR, plotH=H-mT-mB;
+  let yMax=0; series.forEach(s=>contexts.forEach(c=>{ const cell=s.cells[c]; if(!cell||!cell.n) return; if(cell.max!=null) yMax=Math.max(yMax,cell.max); if(showPts&&cell.points) cell.points.forEach(p=>yMax=Math.max(yMax,p)); }));
+  const ticks=niceTicks(yMax||1); yMax=ticks[ticks.length-1]||1;
+  const yOf=v=>mT+plotH-(v/yMax)*plotH, groups=Math.max(1,contexts.length), gW=plotW/groups, sN=Math.max(1,series.length), bW=Math.min(34,(gW*0.72)/sN);
+  let out=''; exTipData=[];
+  // horizontal gridlines — nice round ticks that rescale with the selected metric
+  ticks.forEach(v=>{ const yy=yOf(v); out+='<line class="ex-grid" x1="'+mL+'" y1="'+yy.toFixed(1)+'" x2="'+(W-mR)+'" y2="'+yy.toFixed(1)+'"/>'; out+='<text class="ex-yl" x="'+(mL-8)+'" y="'+(yy+3.5).toFixed(1)+'">'+exNum(v)+'</text>'; });
+  // vertical gridlines separating context columns
+  for(let gi=0; gi<=groups; gi++){ const vx=(mL+gi*gW).toFixed(1); out+='<line class="ex-vgrid" x1="'+vx+'" y1="'+mT+'" x2="'+vx+'" y2="'+(mT+plotH).toFixed(1)+'"/>'; }
+  // axes + axis titles (Y title changes with the metric; X is always context length)
+  out+='<line class="ex-axis" x1="'+mL+'" y1="'+mT+'" x2="'+mL+'" y2="'+(mT+plotH).toFixed(1)+'"/>';
+  out+='<line class="ex-axis" x1="'+mL+'" y1="'+(mT+plotH).toFixed(1)+'" x2="'+(W-mR)+'" y2="'+(mT+plotH).toFixed(1)+'"/>';
+  out+='<text class="ex-axt" transform="translate(15,'+(mT+plotH/2).toFixed(1)+') rotate(-90)">'+esc(metricLabel(metric))+'</text>';
+  out+='<text class="ex-axt" x="'+(mL+plotW/2).toFixed(1)+'" y="'+(H-10)+'">'+T('Context length')+'</text>';
+  contexts.forEach((c,gi)=>{
+    const gx=mL+gi*gW+gW/2;
+    out+='<text class="ex-xl" x="'+gx.toFixed(1)+'" y="'+(mT+plotH+19)+'">'+ctxLabel(c)+'</text>';
+    series.forEach((s,si)=>{
+      const cell=s.cells[c]; if(!cell||!cell.n) return;
+      const cx=gx-(sN*bW)/2+si*bW+bW/2, col=EXCOLORS[si%EXCOLORS.length], half=bW*0.40, ci=exTipData.length;
+      exTipData.push('<div class="ex-tip-h"><i style="background:'+col+'"></i>'+esc(s.key)+'</div>'+
+        tipRow(T('Context length'),ctxLabel(c))+tipRow('median',exNum(cell.median))+tipRow('q1',exNum(cell.q1))+
+        tipRow('q3',exNum(cell.q3))+tipRow('mean',exNum(cell.mean))+tipRow('min',exNum(cell.min))+
+        tipRow('max',exNum(cell.max))+tipRow(T('samples'),cell.n));
+      let g='<g class="ex-box" data-ci="'+ci+'">';
+      g+='<line x1="'+cx.toFixed(1)+'" y1="'+yOf(cell.min).toFixed(1)+'" x2="'+cx.toFixed(1)+'" y2="'+yOf(cell.max).toFixed(1)+'" stroke="'+col+'" stroke-width="1.3" opacity=".5"/>';
+      if(cell.n===1){
+        g+='<line x1="'+(cx-half).toFixed(1)+'" y1="'+yOf(cell.median).toFixed(1)+'" x2="'+(cx+half).toFixed(1)+'" y2="'+yOf(cell.median).toFixed(1)+'" stroke="'+col+'" stroke-width="2.6"/>';
+      }else{
+        const top=yOf(cell.q3), bot=yOf(cell.q1);
+        g+='<rect x="'+(cx-half).toFixed(1)+'" y="'+top.toFixed(1)+'" width="'+(half*2).toFixed(1)+'" height="'+Math.max(1,bot-top).toFixed(1)+'" fill="'+col+'" fill-opacity=".20" stroke="'+col+'" stroke-width="1.3" rx="1.5"/>';
+        g+='<line x1="'+(cx-half).toFixed(1)+'" y1="'+yOf(cell.median).toFixed(1)+'" x2="'+(cx+half).toFixed(1)+'" y2="'+yOf(cell.median).toFixed(1)+'" stroke="'+col+'" stroke-width="2.2"/>';
+        g+='<line x1="'+(cx-half*0.55).toFixed(1)+'" y1="'+yOf(cell.max).toFixed(1)+'" x2="'+(cx+half*0.55).toFixed(1)+'" y2="'+yOf(cell.max).toFixed(1)+'" stroke="'+col+'" stroke-width="1.2" opacity=".5"/>';
+        g+='<line x1="'+(cx-half*0.55).toFixed(1)+'" y1="'+yOf(cell.min).toFixed(1)+'" x2="'+(cx+half*0.55).toFixed(1)+'" y2="'+yOf(cell.min).toFixed(1)+'" stroke="'+col+'" stroke-width="1.2" opacity=".5"/>';
+      }
+      if(showPts&&cell.points) cell.points.forEach(p=>{ g+='<circle cx="'+cx.toFixed(1)+'" cy="'+yOf(p).toFixed(1)+'" r="2.1" fill="'+col+'" opacity=".5"/>'; });
+      const hTop=yOf(cell.max)-5, hH=Math.max(12,(yOf(cell.min)-yOf(cell.max))+10);
+      g+='<rect class="ex-hit" x="'+(cx-bW*0.55).toFixed(1)+'" y="'+hTop.toFixed(1)+'" width="'+(bW*1.1).toFixed(1)+'" height="'+hH.toFixed(1)+'" fill="transparent"/>';
+      out+=g+'</g>';
+    });
+  });
+  svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.setAttribute('height',H); svg.innerHTML=out;
+}
+$('#exMetric')&&($('#exMetric').onchange=refreshExplorer);
+$('#exPoints')&&($('#exPoints').onchange=drawExChart);
+$('#exAdd')&&($('#exAdd').onclick=exAddSeries);
+$('#exExport')&&($('#exExport').onclick=()=>exportCsv(''));
+$('#exCopy')&&($('#exCopy').onclick=()=>{ if(!exData||!(exData.series||[]).length){ toast('no data to copy'); return; } const txt=JSON.stringify(exData,null,2); if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(()=>toast('chart data copied')).catch(()=>toast('copy failed')); } else toast('clipboard unavailable in this context'); });
+window.addEventListener('resize',()=>{ if(active==='explorer') drawExChart(); });
+(function(){ const svg=$('#exChart'), tip=$('#exTip'); if(!svg||!tip) return;
+  svg.addEventListener('mousemove', function(e){ const g=e.target.closest('.ex-box'); if(!g){ tip.style.display='none'; return; }
+    tip.innerHTML=exTipData[+g.dataset.ci]||''; tip.style.display='block';
+    let x=e.clientX+16, y=e.clientY+14; if(x+184>window.innerWidth) x=e.clientX-180; if(y+160>window.innerHeight) y=window.innerHeight-160;
+    tip.style.left=x+'px'; tip.style.top=Math.max(8,y)+'px'; });
+  svg.addEventListener('mouseleave', function(){ tip.style.display='none'; });
+})();
+
+/* ===================== Community Benchmarks ===================== */
+let cmFacets=null, cmRows=[], cmTimer=null;
+function cmQuery(){
+  const p=new URLSearchParams(), g=id=>{ const e=$(id); return e?e.value.trim():''; };
+  if(g('#cmChip'))p.set('chip',g('#cmChip')); if(g('#cmVendor'))p.set('vendor',g('#cmVendor'));
+  if(g('#cmModel'))p.set('model',g('#cmModel')); if(g('#cmQuant'))p.set('quant',g('#cmQuant'));
+  if(g('#cmContext'))p.set('context',g('#cmContext'));
+  if(g('#cmMinPp'))p.set('min_pp',g('#cmMinPp')); if(g('#cmMinTg'))p.set('min_tg',g('#cmMinTg'));
+  if(g('#cmSort'))p.set('sort',g('#cmSort'));
+  const s=p.toString(); return s?('?'+s):'';
+}
+async function loadCommunity(){ await refreshCommunity(true); }
+async function refreshCommunity(reloadFacets){
+  try{ const d=await api('/api/community/runs'+cmQuery());
+    cmRows=d.runs||[];
+    if(reloadFacets||!cmFacets){ cmFacets=d.facets; fillCmFilters(); }
+    renderCommunity();
+  }catch(e){ const tb=$('#cmRows'); if(tb) tb.innerHTML='<tr><td colspan="10" class="err">'+esc(String(e))+'</td></tr>'; }
+}
+function fillCmFilters(){
+  if(!cmFacets) return;
+  const fill=(id,vals,label)=>{ const el=$(id); if(!el) return; const cur=el.value; el.innerHTML='<option value="">'+T(label)+'</option>'+(vals||[]).map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join(''); el.value=cur; };
+  fill('#cmChip',cmFacets.chips,'all chips');
+  fill('#cmVendor',cmFacets.vendors,'all variants');
+  const cq=$('#cmQuant'); if(cq){ const cur=cq.value; cq.innerHTML='<option value="">'+T('all quants')+'</option>'+quantOptions(cmFacets.quants); cq.value=cur; }
+  fill('#cmContext',(cmFacets.contexts||[]).map(String),'all contexts');
+}
+function cmMem(g){ return g!=null?(exNum(g)+' GB'):'—'; }
+function cmRow(r,i){
+  let when=''; try{ when=new Date((r.created_at||0)*1000).toLocaleDateString(); }catch(_){}
+  const gpu=r.vendor&&r.vendor!=='cpu';
+  return '<tr><td><button class="btn sm cm-exp" data-i="'+i+'" aria-label="expand">&#9656;</button></td>'+
+    '<td><span class="chip '+(gpu?'gpu':'cpu')+'">'+esc(r.chip||'—')+'</span></td>'+
+    '<td><strong>'+esc(r.model||'—')+'</strong></td><td>'+esc(r.quant||'—')+'</td>'+
+    '<td class="num">'+(r.context_length!=null?ctxLabel(r.context_length):'—')+'</td>'+
+    '<td class="num">'+exNum(r.pp_tps)+'</td><td class="num">'+exNum(r.tg_tps)+'</td>'+
+    '<td class="num">'+cmMem(r.peak_mem_gb)+'</td><td>'+esc(r.submitter||'—')+'</td>'+
+    '<td class="muted">'+esc(when)+'</td></tr>';
+}
+function cmCmd(r){
+  const dev=(r.vendor&&r.vendor!=='cpu')?(',"device":"'+(r.vendor)+':0"'):'';
+  const body='{"model":"'+(r.model||'')+'","requests":20,"concurrency":'+(r.batch_size||1)+',"max_tokens":64'+dev+'}';
+  return 'curl -sX POST http://localhost:8188/api/benchmark \\\n  -H \'Content-Type: application/json\' \\\n  -d \''+body+'\'';
+}
+function cmResults(r){
+  const L=[['pp tok/s',exNum(r.pp_tps)],['TG tok/s',exNum(r.tg_tps)],['TTFT ms',exNum(r.ttft_ms)],['TPOT ms/tok',exNum(r.tpot_ms)],['E2E s',r.e2e_latency_s==null?'—':r.e2e_latency_s],['peak mem GB',exNum(r.peak_mem_gb)],['total tok/s',exNum(r.total_throughput)],['context',r.context_length==null?'—':r.context_length],['batch size',r.batch_size==null?'—':r.batch_size]];
+  return L.map(p=>('  '+p[0]).padEnd(20)+': '+p[1]).join('\n');
+}
+function cmDetail(r,i){
+  const rows=[['Backend',r.backend],['OS',r.os],['infermesh',r.infermesh_version],['Vendor',r.vendor],['Accel mem (GB)',r.accel_mem_gb],['Submitter',r.submitter]];
+  const grid=rows.map(p=>'<div><span class="muted" style="font-size:11.5px">'+T(p[0])+'</span><br><span class="mono">'+(p[1]==null||p[1]===''?'—':esc(String(p[1])))+'</span></div>').join('');
+  const term='<details class="bm-term" style="margin:0 16px 14px"><summary>'+T('Raw command & results (terminal)')+'</summary>'+
+    '<pre class="term"><span class="muted"># '+T('benchmark command')+'</span>\n$ '+esc(cmCmd(r))+'\n\n<span class="muted"># '+T('results')+'</span>\n'+esc(cmResults(r))+'\n\n<span class="muted"># '+T('raw JSON')+'</span>\n'+esc(JSON.stringify(r,null,2))+'</pre></details>';
+  return '<tr class="cm-det" id="cm-det-'+i+'" style="display:none"><td colspan="10"><div class="cm-detwrap">'+grid+'</div>'+term+'</td></tr>';
+}
+function renderCommunity(){
+  const tb=$('#cmRows'); if(!tb) return;
+  const open=new Set(); document.querySelectorAll('#cmRows tr.cm-det').forEach(tr=>{ if(tr.style.display!=='none') open.add(tr.id); });
+  const cc=$('#cmCount'); if(cc) cc.textContent=cmRows.length+' '+T('runs');
+  tb.innerHTML=cmRows.length?cmRows.map((r,i)=>cmRow(r,i)+cmDetail(r,i)).join(''):'<tr><td colspan="10" class="muted">'+T('no benchmarks yet')+'</td></tr>';
+  tb.querySelectorAll('button.cm-exp').forEach(b=>b.onclick=()=>{ const tr=document.getElementById('cm-det-'+b.dataset.i); if(!tr) return; const sh=tr.style.display==='none'; tr.style.display=sh?'table-row':'none'; b.innerHTML=sh?'&#9662;':'&#9656;'; });
+  open.forEach(id=>{ const tr=document.getElementById(id); if(tr){ tr.style.display='table-row'; const b=document.querySelector('#cmRows button.cm-exp[data-i="'+id.replace('cm-det-','')+'"]'); if(b) b.innerHTML='&#9662;'; } });
+}
+['#cmChip','#cmVendor','#cmQuant','#cmContext','#cmSort'].forEach(id=>{ const e=$(id); if(e) e.onchange=()=>refreshCommunity(false); });
+['#cmModel','#cmMinPp','#cmMinTg'].forEach(id=>{ const e=$(id); if(e) e.oninput=()=>{ clearTimeout(cmTimer); cmTimer=setTimeout(()=>refreshCommunity(false),300); }; });
+$('#cmExport')&&($('#cmExport').onclick=()=>exportCsv(cmQuery()));
+async function saveCommunity(){
+  try{ await api('/api/settings','PUT',{submitter_label:$('#setSubmitter').value, auto_publish:$('#setAutoPub').checked, hub_url:$('#setHubUrl').value});
+    toast('community settings saved'); loadSettings();
+  }catch(e){ $('#settings-err').textContent=String(e); }
+}
+$('#saveCommunity')&&($('#saveCommunity').onclick=saveCommunity);
 
 /* Devices */
 function devCell(n){ return n ? (fmt(n)+' MB') : '—'; }
@@ -1160,11 +1496,24 @@ async function refreshDownloads(){
   try{ const d=await api('/api/hf/downloads');
     $('#dlJobs').innerHTML=(d.downloads||[]).map(j=>{ const pctn=Math.round((j.progress||0)*100);
       const bar='<div class="bar" style="min-width:90px;display:inline-block;vertical-align:middle"><i style="width:'+pctn+'%"></i></div>';
-      const stat=j.status==='error'?'<span class="err">error</span>':esc(j.status);
-      return '<tr><td class="mono">'+esc(j.repo_id)+'</td><td>'+stat+(j.error?' <span class="muted">'+esc(j.error)+'</span>':'')+'</td><td>'+(j.status==='done'?'100%':bar+' '+pctn+'%')+'</td><td class="num">'+fmtBytes(j.total_bytes)+'</td></tr>';
-    }).join('')||'<tr><td colspan="4" class="muted">no downloads yet</td></tr>';
+      const stat=j.status==='error'?'<span class="err">error</span>':(j.status==='paused'?T('paused'):esc(j.status));
+      const act=(j.status==='downloading')
+        ? '<button class="btn sm dl-pause" data-repo="'+esc(j.repo_id)+'">'+T('Pause')+'</button>'
+        : (((j.status==='paused')||(j.status==='error')) ? '<button class="btn sm dl-resume" data-repo="'+esc(j.repo_id)+'" data-source="'+esc(j.source||'hf')+'">'+T('Resume')+'</button>' : '');
+      return '<tr><td class="mono">'+esc(j.repo_id)+'</td><td>'+stat+(j.error?' <span class="muted">'+esc(j.error)+'</span>':'')+'</td><td>'+(j.status==='done'?'100%':bar+' '+pctn+'%')+'</td><td class="num">'+fmtBytes(j.total_bytes)+'</td><td class="rowact">'+act+'<button class="btn sm dl-del" data-repo="'+esc(j.repo_id)+'">'+T('Delete')+'</button></td></tr>';
+    }).join('')||'<tr><td colspan="5" class="muted">'+T('no downloads yet')+'</td></tr>';
   }catch(e){}
 }
+$('#dlJobs').addEventListener('click',async e=>{
+  const b=e.target.closest('button[data-repo]'); if(!b) return;
+  const repo=b.dataset.repo;
+  try{
+    if(b.classList.contains('dl-pause')){ await api('/api/hf/download/pause','POST',{repo_id:repo}); toast('paused'); }
+    else if(b.classList.contains('dl-resume')){ await api('/api/hf/download','POST',{repo_id:repo, source:b.dataset.source||'hf'}); toast('resuming'); }
+    else if(b.classList.contains('dl-del')){ if(!confirm(T('Delete this download and its files?'))) return; await api('/api/hf/download/delete','POST',{repo_id:repo}); toast('deleted'); }
+    refreshDownloads();
+  }catch(err){ $('#dl-err').textContent=String(err); }
+});
 let dlLoaded=false;
 $('#dlBtn').onclick=runHfSearch;
 $('#dlSort').onchange=runHfSearch; $('#dlTask').onchange=runHfSearch;

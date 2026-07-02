@@ -38,6 +38,7 @@ from infermesh.core.backend import (
     HealthStatus,
     InferenceBackend,
     ModelSpec,
+    UnsupportedModelError,
 )
 
 logger = logging.getLogger("infermesh.backends.transformers")
@@ -134,6 +135,13 @@ class TransformersBackend(InferenceBackend):
         trust = bool(extra.get("trust_remote_code", False))
 
         self._vision = bool(extra.get("vision")) or self._detect_vision(spec.source)
+        if not self._vision and not extra.get("allow_non_causal") and self._detect_embedding(spec.source):
+            raise UnsupportedModelError(
+                f"'{spec.model_id}' looks like an embedding/encoder model "
+                "(sentence-transformers or a BERT-family encoder), not a generative causal "
+                "LM. infermesh serves text-generation models for chat & benchmarks — loading "
+                "this for generation yields random output and can fault the accelerator. "
+                "Set extra['allow_non_causal']=true to override.")
         if self._vision:
             from transformers import AutoProcessor
             try:
@@ -190,6 +198,30 @@ class TransformersBackend(InferenceBackend):
             return True
         archs = " ".join(data.get("architectures") or []).lower()
         return any(k in archs for k in ("vl", "vision", "imagetext", "idefics", "llava", "smolvlm"))
+
+    @staticmethod
+    def _detect_embedding(source: str) -> bool:
+        """True for an embedding/encoder checkpoint (sentence-transformers or a
+        BERT-family encoder) — these have no real text-generation head, so loading
+        them as a causal LM produces garbage and can fault some accelerators."""
+        import json as _json
+        from pathlib import Path as _Path
+        p = _Path(str(source)).expanduser()
+        if any((p / m).exists() for m in (
+                "modules.json", "sentence_bert_config.json", "config_sentence_transformers.json")):
+            return True
+        try:
+            data = _json.loads((p / "config.json").read_text())
+        except (OSError, ValueError):
+            return False
+        mt = str(data.get("model_type") or "").lower()
+        encoder_only = {"bert", "roberta", "distilbert", "albert", "electra", "mpnet",
+                        "deberta", "deberta-v2", "xlm-roberta", "camembert", "convbert",
+                        "ernie", "nezha", "luke", "mobilebert", "xlm"}
+        if mt in encoder_only:
+            archs = " ".join(data.get("architectures") or []).lower()
+            return not ("causallm" in archs or "lmheadmodel" in archs)
+        return False
 
     @staticmethod
     def _load_images(refs) -> list:

@@ -100,7 +100,13 @@ def model_size_bytes(repo_id: str) -> int:
 
 
 _JOBS: dict[str, dict] = {}
+_PROCS: dict[str, object] = {}   # repo_id -> killable handle (Popen, or a thread handle in tests)
 _LOCK = threading.Lock()
+
+# Production downloads run as a killable subprocess so they can be paused/cancelled
+# (a daemon thread running snapshot_download can't be stopped). Tests flip this to
+# run the (monkeypatched) snapshot in-process.
+subprocess_downloads = True
 
 
 def _dir_size(path: str) -> int:
@@ -118,47 +124,143 @@ def _dest_for(repo_id: str, model_dir: str) -> Path:
     return Path(model_dir).expanduser() / repo_id.split("/")[-1]
 
 
+class _ThreadHandle:
+    """In-process fallback handle (tests / no-subprocess). Not killable — terminate
+    is a no-op, which is fine because the snapshot seam is mocked to be instant."""
+
+    def __init__(self, fn):
+        self._rc = None
+        self._t = threading.Thread(target=self._run, args=(fn,), daemon=True)
+        self._t.start()
+
+    def _run(self, fn):
+        try:
+            fn()
+            self._rc = 0
+        except Exception:  # noqa: BLE001
+            self._rc = 1
+
+    def wait(self, timeout=None):
+        self._t.join(timeout)
+        return 0 if self._rc is None else self._rc
+
+    def poll(self):
+        return self._rc
+
+    def terminate(self):
+        pass
+
+
+def _spawn_worker(repo_id: str, dest: str, source: str):
+    """Start the download and return a killable handle. The single seam for tests."""
+    if not subprocess_downloads:
+        snap = _ms_snapshot if source == "modelscope" else _hf_snapshot
+        return _ThreadHandle(lambda: snap(repo_id, dest))
+    import subprocess
+    import sys
+    argv = [sys.executable, "-m", "infermesh.core._dlworker", repo_id, dest, source, _endpoint or ""]
+    return subprocess.Popen(argv)
+
+
 def start_download(repo_id: str, model_dir: str, source: str = "hf") -> dict:
-    """Kick off a background snapshot download; returns the initial job record.
-    ``source`` is ``"hf"`` (HuggingFace) or ``"modelscope"``."""
+    """Kick off a background (killable) snapshot download; returns the job record.
+    ``source`` is ``"hf"`` (HuggingFace) or ``"modelscope"``. Re-calling a paused or
+    errored repo *resumes* it — snapshot_download skips already-fetched files."""
     dest = _dest_for(repo_id, model_dir)
-    snapshot = _ms_snapshot if source == "modelscope" else _hf_snapshot
     with _LOCK:
         existing = _JOBS.get(repo_id)
-        if existing and existing["status"] in ("queued", "downloading"):
+        if existing and existing["status"] == "downloading" and repo_id in _PROCS:
             return dict(existing)
         _JOBS[repo_id] = {
-            "repo_id": repo_id, "status": "queued", "total_bytes": 0,
+            "repo_id": repo_id, "status": "downloading",
+            "total_bytes": (existing or {}).get("total_bytes", 0),
             "downloaded_bytes": 0, "path": str(dest), "model_id": dest.name,
             "error": None, "source": source,
         }
-
-    def _run() -> None:
-        try:
-            total = 0 if source == "modelscope" else model_size_bytes(repo_id)  # ms: size via dir scan
-            with _LOCK:
-                _JOBS[repo_id]["total_bytes"] = total
-                _JOBS[repo_id]["status"] = "downloading"
-            snapshot(repo_id, str(dest))
-            with _LOCK:
-                _JOBS[repo_id]["status"] = "done"
-                _JOBS[repo_id]["downloaded_bytes"] = _JOBS[repo_id]["total_bytes"] or _dir_size(str(dest))
-        except Exception as exc:  # noqa: BLE001 - surface to the UI, never crash
-            with _LOCK:
-                _JOBS[repo_id]["status"] = "error"
-                _JOBS[repo_id]["error"] = str(exc)[:300]
-
-    threading.Thread(target=_run, daemon=True).start()
+    handle = _spawn_worker(repo_id, str(dest), source)
+    with _LOCK:
+        _PROCS[repo_id] = handle
+    threading.Thread(target=_monitor, args=(repo_id, source), daemon=True).start()
     with _LOCK:
         return dict(_JOBS[repo_id])
 
 
+def _monitor(repo_id: str, source: str) -> None:
+    if source != "modelscope":  # repo size (a network call) — kept off the request path
+        try:
+            total = model_size_bytes(repo_id)
+            with _LOCK:
+                if repo_id in _JOBS and not _JOBS[repo_id].get("total_bytes"):
+                    _JOBS[repo_id]["total_bytes"] = total
+        except Exception:  # noqa: BLE001
+            pass
+    handle = _PROCS.get(repo_id)
+    if handle is None:
+        return
+    try:
+        rc = handle.wait()
+    except Exception:  # noqa: BLE001
+        rc = -1
+    with _LOCK:
+        job = _JOBS.get(repo_id)
+        _PROCS.pop(repo_id, None)
+        if job is None or job["status"] == "paused":
+            return  # deleted, or deliberately paused — don't overwrite the status
+        if rc == 0:
+            job["status"] = "done"
+            job["downloaded_bytes"] = job.get("total_bytes") or _dir_size(job["path"])
+        else:
+            job["status"] = "error"
+            job["error"] = job.get("error") or ("download worker exited with code %s" % rc)
+
+
+def pause_download(repo_id: str) -> dict:
+    """Stop an in-progress download, keeping partial files; resume by downloading again."""
+    with _LOCK:
+        job = _JOBS.get(repo_id)
+        handle = _PROCS.get(repo_id)
+        if job is not None and job["status"] in ("downloading", "queued"):
+            job["status"] = "paused"
+    if handle is not None:
+        try:
+            handle.terminate()
+        except Exception:  # noqa: BLE001
+            pass
+    with _LOCK:
+        return dict(_JOBS.get(repo_id) or {"repo_id": repo_id, "status": "unknown"})
+
+
+def delete_download(repo_id: str) -> dict:
+    """Cancel (if running) and remove a download job + its files from disk."""
+    import shutil
+    with _LOCK:
+        job = _JOBS.pop(repo_id, None)
+        handle = _PROCS.pop(repo_id, None)
+    if handle is not None:
+        try:
+            handle.terminate()
+            handle.wait(timeout=5)
+        except Exception:  # noqa: BLE001
+            pass
+    removed = False
+    path = (job or {}).get("path")
+    if path:
+        try:
+            shutil.rmtree(path)
+            removed = True
+        except FileNotFoundError:
+            removed = True
+        except OSError:
+            pass
+    return {"repo_id": repo_id, "deleted": True, "files_removed": removed, "path": path}
+
+
 def downloads_status() -> list[dict]:
-    """All jobs, with live progress (downloading jobs are sized from disk)."""
+    """All jobs, with live progress (active/paused jobs are sized from disk)."""
     with _LOCK:
         jobs = [dict(j) for j in _JOBS.values()]
     for j in jobs:
-        if j["status"] == "downloading":
+        if j["status"] in ("downloading", "paused"):
             j["downloaded_bytes"] = _dir_size(j["path"])
         total = j.get("total_bytes") or 0
         if total:

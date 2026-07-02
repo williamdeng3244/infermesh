@@ -70,6 +70,8 @@ from infermesh.core.history import (
     load_metrics,
     truncate_on_startup,
 )
+from infermesh.core.backend import UnsupportedModelError
+from infermesh.core import community as _community
 from infermesh.dashboard import DASHBOARD_HTML
 
 logger = logging.getLogger("infermesh.server")
@@ -128,6 +130,9 @@ class SettingsPatch(BaseModel):
     model_dir: Optional[str] = None
     backend: Optional[str] = None
     max_process_memory: Optional[str] = None
+    submitter_label: Optional[str] = None   # community display name ("" clears => hostname)
+    auto_publish: Optional[bool] = None      # auto-submit benchmarks to the shared library
+    hub_url: Optional[str] = None            # remote community hub ("" => store locally / be the hub)
 
 
 class ModelSettingsPatch(BaseModel):
@@ -151,6 +156,7 @@ class BenchmarkRequest(BaseModel):
     prompt: str = "Write one concise sentence about distributed systems."
     mode: str = "same"  # "same" (shared prompt, prefix-cacheable) | "different"
     device: Optional[str] = None  # run on a specific accelerator (e.g. "gcu:0", "cpu"); None = current
+    share: Optional[bool] = True  # publish this run to the shared community library (per-run opt-out)
 
 
 class HFDownloadRequest(BaseModel):
@@ -267,6 +273,97 @@ def _sysinfo() -> dict:
         "ram_gb": ram_gb,
         "gpus": gpus,
     }
+
+
+def _detect_quant(pool: "ModelPool", model_id: str) -> Optional[str]:
+    """Best-effort quantization label for the community store (metadata only).
+
+    Reads the model's local ``config.json`` (``quantization_config.bits`` or
+    ``torch_dtype``) when the source is a directory. Control-plane pure — only
+    reads JSON, never imports torch. Returns None if it can't tell; the caller
+    then defaults by device (CPU => fp32, accelerator => fp16)."""
+    import json as _json
+    import os as _os
+    try:
+        entry = pool.get_entry(model_id)
+        src = getattr(getattr(entry, "spec", None), "source", None)
+        if src and _os.path.isdir(str(src)):
+            cfg_path = _os.path.join(str(src), "config.json")
+            if _os.path.exists(cfg_path):
+                with open(cfg_path) as fh:
+                    cfg = _json.load(fh)
+                bits = (cfg.get("quantization_config") or {}).get("bits")
+                if bits:
+                    return f"{int(bits)}bit"
+                td = str(cfg.get("torch_dtype") or "").lower()
+                if "bfloat16" in td:
+                    return "bf16"
+                if "float16" in td:
+                    return "fp16"
+                if "float32" in td:
+                    return "fp32"
+    except Exception:
+        pass
+    return None
+
+
+def _community_record(result: dict, params: dict, sysinfo: dict,
+                      submitter: str, quant: str, backend: Optional[str]) -> dict:
+    """Map an infermesh benchmark result into a flat community-store row."""
+    import uuid as _uuid
+    vendor = result.get("vendor")
+    accel_gb = None
+    gpu_name = None
+    for g in (sysinfo.get("gpus") or []):
+        if g.get("vendor") == vendor:
+            if g.get("mem_total_mb"):
+                accel_gb = round(g["mem_total_mb"] / 1024, 1)
+            gpu_name = g.get("name") or gpu_name
+            break
+    # resolve a clean chip name: explicit device_name > the matching GPU's name in
+    # sysinfo > the bare vendor (keeps old records that predate device_name capture
+    # from splitting "Enflame S60" and "enflame" into two chips)
+    chip = result.get("device_name") or gpu_name or (vendor if vendor and vendor != "cpu" else "CPU")
+    succ = max(1, int(result.get("succeeded") or 1))
+    ctx = round((result.get("total_prompt_tokens") or 0) / succ) or None
+    peak_gb = round(result["peak_mem_mb"] / 1024, 2) if result.get("peak_mem_mb") else None
+    wall = result.get("wall_time_s") or 0
+    tput = None
+    if wall > 0:
+        tput = round(((result.get("total_output_tokens") or 0) +
+                      (result.get("total_prompt_tokens") or 0)) / wall, 1)
+    e2e = (result.get("latency_ms") or {}).get("p50")
+    group = _uuid.uuid4().hex[:12]
+    return {
+        "submitter": submitter, "submission_group": group, "run_id": group,
+        "chip": chip,
+        "vendor": vendor, "accel_mem_gb": accel_gb, "cores": None,
+        "infermesh_version": sysinfo.get("infermesh"), "os": sysinfo.get("os"), "backend": backend,
+        "model": result.get("model"), "quant": quant,
+        "context_length": ctx, "batch_size": params.get("concurrency"),
+        "pp_tps": (result.get("pp_tps") or {}).get("mean"),
+        "tg_tps": (result.get("tg_tps") or {}).get("mean"),
+        "ttft_ms": (result.get("ttft_ms") or {}).get("p50"),
+        "tpot_ms": (result.get("tpot_ms") or {}).get("mean"),
+        "peak_mem_gb": peak_gb,
+        "e2e_latency_s": round(e2e / 1000, 3) if e2e else None,
+        "total_throughput": tput,
+    }
+
+
+async def _publish_to_hub(hub_url: str, rec: dict) -> None:
+    """POST one record to a remote community hub (when this node isn't the hub)."""
+    import json as _json
+    import urllib.request as _ur
+
+    def _post():
+        url = hub_url.rstrip("/") + "/api/community/submit"
+        body = _json.dumps(rec).encode()
+        req = _ur.Request(url, data=body, method="POST",
+                          headers={"Content-Type": "application/json"})
+        _ur.urlopen(req, timeout=10).read()
+
+    await asyncio.to_thread(_post)
 
 
 def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
@@ -678,6 +775,75 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     async def api_history(_: None = Depends(require_auth)):
         return {"benchmarks": load_benchmarks(), "metrics": load_metrics()}
 
+    # -------------------- shared community benchmark library -------------------- #
+    @app.get("/api/community/runs")
+    async def api_community_runs(
+        chip: str = Query(default=""), vendor: str = Query(default=""),
+        model: str = Query(default=""), quant: str = Query(default=""),
+        context: Optional[int] = Query(default=None), min_pp: Optional[float] = Query(default=None),
+        min_tg: Optional[float] = Query(default=None), submitter: str = Query(default=""),
+        sort: str = Query(default="recent"), limit: int = Query(default=500, ge=1, le=5000),
+        _: None = Depends(require_auth),
+    ):
+        runs = await asyncio.to_thread(
+            lambda: _community.query_runs(chip=chip, vendor=vendor, model=model, quant=quant,
+                                          context=context, min_pp=min_pp, min_tg=min_tg,
+                                          submitter=submitter, sort=sort, limit=limit))
+        facets = await asyncio.to_thread(_community.facets)
+        return {"runs": runs, "facets": facets}
+
+    @app.get("/api/community/compare")
+    async def api_community_compare(metric: str = Query(default="pp_tps"),
+                                    series: str = Query(default="[]"),
+                                    _: None = Depends(require_auth)):
+        import json as _json
+        try:
+            sel = _json.loads(series)
+            if not isinstance(sel, list):
+                sel = []
+        except (ValueError, TypeError):
+            sel = []
+        return await asyncio.to_thread(_community.compare, metric, sel)
+
+    @app.get("/api/community/run/{run_id}")
+    async def api_community_run(run_id: str, _: None = Depends(require_auth)):
+        rec = await asyncio.to_thread(_community.get, run_id)
+        if not rec:
+            raise HTTPException(status_code=404, detail="run not found")
+        return rec
+
+    @app.post("/api/community/submit")
+    async def api_community_submit(payload: dict, _: None = Depends(require_auth)):
+        recs = payload.get("runs") if "runs" in payload else payload
+        if isinstance(recs, list):
+            return await asyncio.to_thread(_community.submit_many, recs)
+        return await asyncio.to_thread(_community.submit, recs if isinstance(recs, dict) else payload)
+
+    @app.get("/api/community/export.csv")
+    async def api_community_export(
+        chip: str = Query(default=""), vendor: str = Query(default=""),
+        model: str = Query(default=""), quant: str = Query(default=""),
+        context: Optional[int] = Query(default=None), min_pp: Optional[float] = Query(default=None),
+        min_tg: Optional[float] = Query(default=None), sort: str = Query(default="recent"),
+        _: None = Depends(require_auth),
+    ):
+        import csv
+        import io
+        runs = await asyncio.to_thread(
+            lambda: _community.query_runs(chip=chip, vendor=vendor, model=model, quant=quant,
+                                          context=context, min_pp=min_pp, min_tg=min_tg,
+                                          sort=sort, limit=5000))
+        cols = ["created_at", "submitter", "chip", "vendor", "model", "quant", "context_length",
+                "batch_size", "pp_tps", "tg_tps", "ttft_ms", "tpot_ms", "peak_mem_gb",
+                "e2e_latency_s", "total_throughput", "backend", "os", "infermesh_version", "id"]
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(cols)
+        for r in runs:
+            w.writerow([r.get(c) for c in cols])
+        return StreamingResponse(io.BytesIO(buf.getvalue().encode()), media_type="text/csv",
+                                 headers={"Content-Disposition": "attachment; filename=infermesh-community.csv"})
+
     def _register_downloaded() -> None:
         """Add freshly-downloaded models to the pool (so they appear without a restart)."""
         from infermesh.core import downloader
@@ -727,6 +893,34 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         _register_downloaded()
         return {"downloads": downloader.downloads_status(), "model_dir": settings.model_dir}
 
+    @app.post("/api/hf/download/pause")
+    async def api_hf_download_pause(req: HFDownloadRequest, _: None = Depends(require_auth)):
+        from infermesh.core import downloader
+        return await asyncio.to_thread(downloader.pause_download, req.repo_id)
+
+    @app.post("/api/hf/download/delete")
+    async def api_hf_download_delete(req: HFDownloadRequest, _: None = Depends(require_auth)):
+        from infermesh.core import downloader
+        res = await asyncio.to_thread(downloader.delete_download, req.repo_id)
+        mid = req.repo_id.split("/")[-1]   # model_id == repo basename
+        if not res.get("files_removed") and settings.model_dir:  # on-disk model with no tracked job
+            import os as _os
+            import shutil as _shutil
+            p = _os.path.join(_os.path.expanduser(settings.model_dir), mid)
+            if _os.path.isdir(p):
+                try:
+                    await asyncio.to_thread(_shutil.rmtree, p)
+                    res["files_removed"] = True
+                    res["path"] = p
+                except OSError as exc:
+                    logger.warning("delete of '%s' failed: %s", p, exc)
+        try:  # also drop it from the pool so a deleted model doesn't linger in Models
+            await pool.unload_if_idle_unpinned(mid, force=True)
+            pool.remove_spec(mid)
+        except Exception as exc:  # pool cleanup is best-effort
+            logger.warning("pool cleanup after delete failed: %s", exc)
+        return res
+
     @app.post("/api/benchmark")
     async def api_benchmark(req: BenchmarkRequest, _: None = Depends(require_auth)):
         from infermesh.core.benchmark import run_benchmark
@@ -743,6 +937,8 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             pool.set_device(model_id, req.device)
             await pool.unload_if_idle_unpinned(model_id, force=True)
         try:
+            async with pool.acquire(model_id):  # load once up front so an unsupported
+                pass                              # model (embedding/encoder) fails fast & clean here, not as silent per-request failures
             _bench = run_benchmark(pool, model_id, requests=n, concurrency=c,
                                    max_tokens=mt, prompt=req.prompt, mode=req.mode)
             # a device-pinned run reloads the model there; some accelerators (e.g. a CPU
@@ -752,18 +948,35 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             return JSONResponse(openai_adapter.create_error_response(
                 f"benchmark on device '{req.device}' timed out — that accelerator may be "
                 f"unavailable in this environment", "device_timeout", 503), status_code=503)
+        except UnsupportedModelError as exc:
+            return JSONResponse(openai_adapter.create_error_response(
+                str(exc), "unsupported_model", 422), status_code=422)
         except (ModelTooLargeError, InsufficientMemoryError) as exc:
             return JSONResponse(
                 openai_adapter.create_error_response(str(exc), "insufficient_memory", 503),
                 status_code=503,
             )
+        sysinfo = _sysinfo()
         append_benchmark({
             "t": time.time(), "model": model_id,
             "params": {"requests": n, "concurrency": c, "max_tokens": mt,
                        "mode": req.mode, "device": req.device},
             "result": result,
-            "system": _sysinfo(),
+            "system": sysinfo,
         })
+        # auto-publish to the shared community library (per-run opt-out via req.share)
+        if settings.auto_publish and req.share is not False:
+            try:
+                submitter = settings.submitter_label or sysinfo.get("hostname") or "anonymous"
+                quant = _detect_quant(pool, model_id) or ("fp32" if result.get("vendor") == "cpu" else "fp16")
+                bk = getattr(getattr(pool.get_entry(model_id), "spec", None), "backend", None) or settings.backend
+                rec = _community_record(result, {"concurrency": c}, sysinfo, submitter, quant, bk)
+                if settings.hub_url:
+                    await _publish_to_hub(settings.hub_url, rec)
+                else:
+                    await asyncio.to_thread(_community.submit, rec)
+            except Exception as exc:  # publishing must never fail the benchmark
+                logger.warning("community auto-publish failed: %s", exc)
         return result
 
     @app.get("/api/settings")
@@ -833,6 +1046,15 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             new = patch.max_process_memory.strip() or settings.max_process_memory
             if new != settings.max_process_memory:
                 settings.max_process_memory = new; changed.append("max_process_memory")
+        if patch.submitter_label is not None:
+            settings.submitter_label = patch.submitter_label.strip() or None
+            changed.append("submitter_label")
+        if patch.auto_publish is not None:
+            settings.auto_publish = bool(patch.auto_publish)
+            changed.append("auto_publish")
+        if patch.hub_url is not None:
+            settings.hub_url = patch.hub_url.strip() or None
+            changed.append("hub_url")
         if "kv_hot_capacity" in changed or "kv_cold_dir" in changed:
             pool.default_extra = _kv_defaults(settings)
         if changed:
