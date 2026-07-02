@@ -1,0 +1,1483 @@
+<!doctype html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>infermesh · 控制台</title>
+<style>
+/* ================= infermesh console — "instrument bench" theme =================
+   Tokens: graphite-blue ground, signal-amber accent, categorical chip palette,
+   datasheet numerics (mono + tabular-nums). No CDN, no webfonts, no localStorage. */
+:root{
+  --bg:#0C1117; --bg2:#0E141B; --panel:#121A23; --panel2:#0F161E; --inset:#0A0F14;
+  --line:#1D2833; --line2:#2C3A4A; --linesoft:rgba(140,160,180,.10);
+  --text:#E7EDF4; --mut:#8DA0B3; --dim:#5D7183;
+  --sig:#FFB224; --sig-soft:rgba(255,178,36,.14); --sig-ink:#221500;
+  --ok:#3FB950; --warn:#D29922; --err:#F85149; --info:#58A6FF;
+  --c1:#FFB224; --c2:#38BDF8; --c3:#A78BFA; --c4:#F472B6; --c5:#9AA8B6;
+  --r:10px; --sb:240px; --dot:rgba(141,160,179,.16);
+  --mono:ui-monospace,"SFMono-Regular","Cascadia Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,"Segoe UI",system-ui,Roboto,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
+  --shadow:0 1px 0 rgba(0,0,0,.25), 0 8px 24px -18px rgba(0,0,0,.6);
+}
+:root[data-theme="light"]{
+  --bg:#F2F4F7; --bg2:#ECEFF3; --panel:#FFFFFF; --panel2:#F7F9FB; --inset:#EDF0F4;
+  --line:#DFE5EC; --line2:#C6D0DB; --linesoft:rgba(40,60,80,.08);
+  --text:#1B2430; --mut:#54677A; --dim:#8C9BAB;
+  --sig:#B36D00; --sig-soft:rgba(179,109,0,.12); --sig-ink:#FFFFFF;
+  --ok:#1A7F37; --warn:#9A6700; --err:#CF222E; --info:#0969DA;
+  --c1:#C77800; --c2:#0284C7; --c3:#7C3AED; --c4:#DB2777; --c5:#64748B;
+  --dot:rgba(60,80,100,.14);
+  --shadow:0 1px 2px rgba(16,24,40,.06), 0 8px 24px -18px rgba(16,24,40,.25);
+}
+*{box-sizing:border-box} html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:13.5px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+::selection{background:var(--sig-soft)}
+a{color:var(--info);text-decoration:none}
+.num,td.num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:var(--sb) 1fr;min-height:100dvh}
+.sidebar{background:var(--bg2);border-right:1px solid var(--line);position:sticky;top:0;height:100dvh;display:flex;flex-direction:column;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:18px 16px 10px}
+.brand .mark{width:22px;height:22px;color:var(--sig);flex:none}
+.brand b{font-size:15.5px;font-weight:650;letter-spacing:.02em}
+.brand .ver{margin-left:auto;font:600 10px var(--mono);color:var(--dim);border:1px solid var(--line2);border-radius:99px;padding:2px 7px}
+.navgrp{padding:10px 10px 2px}
+.navgrp .glabel{font:650 10px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);padding:6px 8px 4px}
+:root[lang-zh] .navgrp .glabel{letter-spacing:.28em}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--mut);font:500 13px var(--sans);cursor:pointer;text-align:left;transition:background .15s,color .15s}
+.nav button:hover{background:var(--panel);color:var(--text)}
+.nav button.active{background:var(--panel);color:var(--text);border-color:var(--line)}
+.nav button.active .ico{color:var(--sig)}
+.nav .ico{width:16px;height:16px;flex:none;color:var(--dim)}
+.sb-foot{margin-top:auto;padding:12px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;font-size:11.5px;color:var(--dim)}
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:10px;padding:11px 22px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:blur(8px);position:sticky;top:0;z-index:20}
+.topbar h1{margin:0;font-size:15px;font-weight:650;letter-spacing:.01em}
+.crumb{font:600 10px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.spacer{flex:1}
+.content{padding:22px;overflow:auto}
+.page{display:none;animation:fade .18s ease}
+.page.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+/* ---------- primitives ---------- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
+.card.tight{padding:12px 14px}
+.card h3{margin:0 0 4px;font-size:13.5px;font-weight:650}
+.eyebrow{font:650 10px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.sub{color:var(--mut);font-size:12px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}.g6{grid-template-columns:repeat(6,minmax(0,1fr))}
+@media(max-width:1100px){.g6{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:780px){.app{grid-template-columns:1fr}.sidebar{display:none}.g3,.g2,.g6,.g4{grid-template-columns:1fr}}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:7px;font:500 11.5px var(--sans);padding:3px 10px;border-radius:99px;border:1px solid var(--line2);color:var(--mut);white-space:nowrap}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--dim);flex:none}
+.pill.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,transparent)}.pill.ok .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.pill.err{color:var(--err);border-color:color-mix(in srgb,var(--err) 45%,transparent)}.pill.err .dot{background:var(--err)}
+.pill.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent)}.pill.warn .dot{background:var(--warn)}
+.tag{display:inline-flex;align-items:center;font:600 10.5px var(--mono);padding:2px 7px;border-radius:6px;border:1px solid var(--line2);color:var(--mut)}
+.tag.sig{color:var(--sig);border-color:color-mix(in srgb,var(--sig) 50%,transparent);background:var(--sig-soft)}
+.tag.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+.tag.err{color:var(--err);border-color:color-mix(in srgb,var(--err) 40%,transparent)}
+.tag.dim{color:var(--dim)}
+.btn{font:550 12.5px var(--sans);padding:6.5px 13px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--text);cursor:pointer;transition:border-color .15s,background .15s,transform .06s}
+.btn:hover:not(:disabled){border-color:var(--sig);background:var(--panel)}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.primary{background:var(--sig);border-color:var(--sig);color:var(--sig-ink);font-weight:650}
+.btn.primary:hover:not(:disabled){filter:brightness(1.06);background:var(--sig)}
+.btn.ghost{background:transparent}
+.btn.danger:hover:not(:disabled){border-color:var(--err);color:var(--err)}
+.btn.sm{padding:4px 9px;font-size:11.5px;border-radius:7px}
+input,select,textarea{font:13px var(--sans);background:var(--inset);border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:7px 10px;outline:none;transition:border-color .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--sig)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--sig);outline-offset:1px}
+label.fl{display:flex;flex-direction:column;gap:5px;font:600 11px var(--sans);color:var(--mut)}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--inset)}
+.seg button{border:0;background:transparent;color:var(--mut);padding:5px 13px;font:550 12px var(--sans);cursor:pointer}
+.seg button.active{background:var(--sig);color:var(--sig-ink);font-weight:650}
+.seg.mini button{padding:3.5px 10px;font-size:11px}
+/* filter chips */
+.fchip{display:inline-flex;align-items:center;gap:7px;font:550 11.5px var(--sans);padding:4.5px 11px;border-radius:99px;border:1px solid var(--line2);background:var(--inset);color:var(--mut);cursor:pointer;transition:border-color .15s,color .15s}
+.fchip .sw{width:8px;height:8px;border-radius:2px;flex:none}
+.fchip.on{color:var(--text);border-color:var(--line2);background:var(--panel)}
+.fchip.on.tinted{border-color:currentColor}
+.fchip.off{opacity:.45}
+/* readout (signature numeric) */
+.ro{font:650 24px/1.05 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.ro small{font:550 11px var(--sans);color:var(--dim);margin-left:5px;letter-spacing:.02em}
+.ro.sig{color:var(--sig)}
+.kpi{display:flex;flex-direction:column;gap:7px}
+.kpi .delta{font:600 11px var(--mono)}
+.delta.up{color:var(--ok)}.delta.down{color:var(--err)}.delta.flat{color:var(--dim)}
+/* meters */
+.meter{height:7px;border-radius:99px;background:var(--inset);border:1px solid var(--line);overflow:hidden;display:flex}
+.meter i{display:block;height:100%;background:var(--sig)}
+.meter i.b2{background:var(--info)}
+.meter.thin{height:5px}
+/* tables */
+table.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th{font:650 10.5px var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:default}
+.tbl th.sortable{cursor:pointer}
+.tbl th.sortable:hover{color:var(--mut)}
+.tbl th .arr{font-family:var(--mono);color:var(--sig)}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--linesoft);vertical-align:middle}
+.tbl td.num,.tbl th.num{text-align:right}
+.tbl tbody tr{transition:background .12s}
+.tbl tbody tr.hoverable:hover{background:var(--panel2);cursor:pointer}
+.tbl .exp-row td{background:var(--inset);padding:14px}
+.tbl .caret{color:var(--dim);font-family:var(--mono);transition:transform .15s;display:inline-block}
+.tbl tr.open .caret{transform:rotate(90deg);color:var(--sig)}
+/* terminal */
+.term{background:#07090C;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font:12px/1.65 var(--mono);color:#C6D3DF;overflow-x:auto;white-space:pre;position:relative}
+:root[data-theme="light"] .term{background:#101820;color:#C6D3DF}
+.term .p{color:var(--sig)} .term .g{color:var(--ok)} .term .d{color:#5D7183} .term .w{color:var(--warn)} .term .e{color:var(--err)} .term .b{color:#58A6FF}
+.term .copy{position:absolute;top:8px;right:8px}
+/* plot canvas — signature dot grid */
+.plotwrap{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:6px 4px 2px;background-image:radial-gradient(var(--dot) 1px,transparent 1.4px);background-size:22px 22px;background-position:11px 9px}
+.plotwrap svg{display:block;width:100%;height:auto}
+.axis{font:500 10.5px var(--mono);fill:var(--dim)}
+.axis-t{font:600 10px var(--sans);letter-spacing:.12em;text-transform:uppercase;fill:var(--dim)}
+.gridln{stroke:var(--linesoft);stroke-width:1}
+.tooltip{position:fixed;z-index:99;pointer-events:none;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:9px 11px;font:11.5px/1.5 var(--mono);color:var(--text);box-shadow:0 12px 30px -12px rgba(0,0,0,.7);opacity:0;transform:translateY(3px);transition:opacity .1s,transform .1s;max-width:280px}
+.tooltip.show{opacity:1;transform:none}
+.tooltip .tt-h{font:650 11.5px var(--sans);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.tooltip .sw{width:8px;height:8px;border-radius:2px;display:inline-block}
+.tooltip table{border-collapse:collapse}
+.tooltip td{padding:1px 0}.tooltip td:first-child{color:var(--dim);padding-right:14px}
+.tooltip td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+/* comparison cards */
+.cmpcard{border:1px solid var(--line);border-left:3px solid var(--cc,var(--sig));border-radius:var(--r);background:var(--panel);padding:13px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow)}
+.cmpcard .hd{display:flex;align-items:center;gap:8px}
+.cmpcard .hd b{font-size:12.5px}
+.cmpcard .mini{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:11px;color:var(--mut)}
+.cmpcard .mini b{font:600 12px var(--mono);color:var(--text);font-variant-numeric:tabular-nums}
+/* device cards */
+.dev{display:flex;flex-direction:column;gap:10px}
+.dev .hd{display:flex;align-items:center;gap:10px}
+.dev .hd .nm{font-weight:650;font-size:13.5px}
+.dev.ghost{opacity:.55;border-style:dashed}
+.dl{display:grid;grid-template-columns:auto 1fr;gap:3px 16px;font-size:11.5px;color:var(--mut)}
+.dl b{font:600 11.5px var(--mono);color:var(--text);font-variant-numeric:tabular-nums;text-align:right}
+/* logs */
+.logbox{background:var(--inset);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:11.8px/1.7 var(--mono);height:460px;overflow:auto}
+.logline{white-space:pre-wrap}
+.logline .lv{font-weight:650;margin-right:8px}
+.logline.INFO .lv{color:var(--info)}.logline.WARN .lv{color:var(--warn)}.logline.ERROR .lv{color:var(--err)}.logline.DEBUG .lv{color:var(--dim)}
+.logline .ts{color:var(--dim);margin-right:8px}
+/* chat */
+.chatbox{display:flex;flex-direction:column;height:520px}
+.msgs{flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:6px 2px}
+.msg{max-width:76%;padding:9px 13px;border-radius:12px;font-size:13px;line-height:1.6}
+.msg.user{align-self:flex-end;background:var(--sig);color:var(--sig-ink);border-bottom-right-radius:4px}
+.msg.asst{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg .meta{font:500 10.5px var(--mono);color:var(--dim);margin-top:6px}
+.msg.user .meta{color:rgba(0,0,0,.45)}
+/* toast */
+.toasts{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:100}
+.toast{background:var(--panel);border:1px solid var(--line2);border-left:3px solid var(--ok);border-radius:8px;padding:10px 14px;font-size:12.5px;box-shadow:0 12px 30px -10px rgba(0,0,0,.6);animation:fade .2s ease}
+.toast.warn{border-left-color:var(--warn)}
+/* download rows */
+.dlrow{display:flex;align-items:center;gap:14px;padding:11px 4px;border-bottom:1px solid var(--linesoft)}
+.dlrow:last-child{border-bottom:0}
+.dlrow .nm{font:600 12.5px var(--mono);min-width:240px}
+.dlrow .meter{flex:1;min-width:120px}
+details.ref{border:1px solid var(--line);border-radius:var(--r);background:var(--panel2)}
+details.ref summary{cursor:pointer;padding:11px 14px;font-weight:650;font-size:12.5px;list-style:none;display:flex;align-items:center;gap:8px}
+details.ref summary::before{content:"▸";font-family:var(--mono);color:var(--sig);transition:transform .15s}
+details.ref[open] summary::before{transform:rotate(90deg)}
+details.ref .inner{padding:0 14px 14px}
+.hint{font-size:11.5px;color:var(--dim);display:flex;gap:6px;align-items:baseline}
+.hint::before{content:"›";color:var(--sig);font-family:var(--mono)}
+.legend{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.divider{height:1px;background:var(--line);margin:14px 0}
+.empty{padding:36px;text-align:center;color:var(--dim);font-size:12.5px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8l8-5 8 5v8l-8 5-8-5z"/><path d="M4 8l8 5 8-5M12 13v8" opacity=".55"/></svg>
+      <b>infermesh</b><span class="ver">v0.6.0</span>
+    </div>
+    <div id="navRoot"></div>
+    <div class="sb-foot">
+      <span class="mono" id="sbHost">s60-node-01 · :8188</span>
+      <span id="sbUp"></span>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="crumb" id="tbCrumb"></div>
+        <h1 id="tbTitle"></h1>
+      </div>
+      <div class="spacer"></div>
+      <span class="pill ok" id="tbHealth"><span class="dot"></span><span id="tbHealthT"></span></span>
+      <span class="pill mono" id="tbMem"></span>
+      <div class="seg mini" role="group" aria-label="language">
+        <button id="langZh" onclick="setLang('zh')">中文</button>
+        <button id="langEn" onclick="setLang('en')">EN</button>
+      </div>
+      <button class="btn sm ghost" id="themeBtn" onclick="toggleTheme()" aria-label="theme">◐</button>
+    </div>
+    <div class="content"><div id="view"></div></div>
+  </main>
+</div>
+<div class="tooltip" id="tt"></div>
+<div class="toasts" id="toasts"></div>
+<script>
+"use strict";
+/* =============================== i18n =============================== */
+/* Keys are the English strings themselves; ZH maps EN -> 中文 (mirrors the
+   dashboard's i18n-coverage approach: a missing key falls back to EN). */
+const ZH = {
+"Overview":"总览","Serving":"服务","Models":"模型","model":"模型","Chat":"对话","Logs":"日志",
+"Observe":"观测","Metrics":"指标","Devices":"设备","Benchmark":"基准测试",
+"Run benchmark":"运行基准","Performance Explorer":"性能探索器","Community":"社区基准",
+"Manage":"管理","Downloads":"模型下载","Settings":"设置",
+"healthy":"运行正常","unreachable":"无法连接","uptime":"已运行","GCU memory":"GCU 显存",
+"Console":"控制台","online":"在线","offline":"离线","disabled":"已禁用",
+"Loaded models":"已加载模型","Active requests":"活跃请求","Requests today":"今日请求",
+"p95 TTFT":"p95 首字延迟","Rejected (503)":"拒绝 (503)","decode":"解码","prefill":"预填充",
+"Model pool":"模型池","memory ceiling":"显存上限","LRU order":"LRU 顺序","pinned":"已固定",
+"loaded":"已加载","not loaded":"未加载","idle":"空闲","Load":"加载","Unload":"卸载",
+"Pin":"固定","Unpin":"取消固定","Delete":"删除","Actions":"操作","Status":"状态",
+"Backend":"后端","Device":"设备","Quant":"量化","Memory":"显存","est.":"预估",
+"TTL in":"TTL 剩余","Removes files and unregisters the model.":"删除文件并取消注册该模型。",
+"Recent benchmarks":"最近基准测试","View in Explorer":"在探索器中查看","Insight":"洞察",
+"Fleet":"节点","Node":"节点","Driver":"驱动","Last benchmark":"最近基准","Utilization":"利用率",
+"Temperature":"温度","Processes":"进程","last seen 3 days ago":"最后在线于 3 天前",
+"CPU inference is disabled on this node: torch_gcu hooks `import torch` and CPU decode hangs. Treating the box as GCU-only.":"该节点已禁用 CPU 推理：torch_gcu 劫持 `import torch`，CPU 解码会挂起。此机器按 GCU 专用处理。",
+"Model":"模型","Context":"上下文","Iterations":"迭代次数","Batch":"批大小",
+"Publish to community library":"发布到社区基准库","auto-publish on completion; opt out per run":"完成后自动发布；可按单次运行选择不发布",
+"Start benchmark":"开始基准测试","Running…":"运行中…","Metrics reference":"指标说明",
+"Run history":"运行历史","Date":"日期","Result":"结果","view":"查看","running":"运行中","done":"已完成","failed":"失败",
+"System info":"系统信息","Raw output":"原始输出","Copy":"复制","Copied":"已复制",
+"Export CSV":"导出 CSV","Metric":"指标","All contexts":"全部上下文",
+"Decode speed":"解码速度","Prefill speed":"预填充速度","Time to first token":"首字延迟",
+"Per-token latency":"每 token 延迟","End-to-end":"端到端耗时","Peak memory":"峰值显存","Total throughput":"总吞吐",
+"context length (tokens)":"上下文长度 (tokens)","samples":"样本","median":"中位数","mean":"均值",
+"Chips":"芯片","toggle series":"点击切换序列","No data for this filter.":"当前筛选无数据。",
+"Search model…":"搜索模型…","All quants":"全部量化","All chips":"全部芯片","Min":"最低",
+"Sort":"排序","Submitter":"提交者","runs":"次运行","in-house sample":"自研·样例",
+"Published automatically by benchmark runs. Hostname + optional label identifies the submitter.":"由基准运行自动发布。提交者 = 主机名 + 可选标签。",
+"Search the hub":"搜索模型库","Search":"搜索","Source":"源","Size":"大小","Progress":"进度",
+"Pause":"暂停","Resume":"续传","downloading":"下载中","paused":"已暂停","complete":"已完成",
+"Resumes from partial files.":"从已下载的部分继续。","Download":"下载",
+"GitHub and huggingface.co are blocked on this node — using mirrors.":"该节点无法访问 GitHub 与 huggingface.co — 已使用镜像源。",
+"Requests / min":"请求 / 分","Queue depth":"队列深度","Tokens served":"已服务 token",
+"Cache efficiency":"缓存命中率","Requests (24 h)":"请求量 (24 小时)","Per-model":"按模型",
+"Requests":"请求数","Send":"发送","Clear":"清空","System prompt":"系统提示词",
+"Type a message…":"输入消息…","Temperature":"温度","Max tokens":"最大 token",
+"This is a design preview — replies are canned.":"这是设计预览 — 回复为预置内容。",
+"Follow":"跟随","All levels":"全部级别","Search logs…":"搜索日志…",
+"Server":"服务","Host":"主机","Port":"端口","Model directory":"模型目录",
+"Pool":"模型池","Memory ceiling (MB)":"显存上限 (MB)","Idle TTL (s)":"空闲 TTL (秒)",
+"Community hub":"社区中心","Hub URL":"中心地址","Default auto-publish":"默认自动发布",
+"Submitter label":"提交者标签","Interface":"界面","Default language":"默认语言",
+"Save changes":"保存更改","Saved":"已保存","requires restart":"需要重启",
+"Overloaded responses return 503 with Retry-After.":"过载时返回 503 并携带 Retry-After。",
+"Max concurrent requests":"最大并发请求","Max queued requests":"最大排队请求",
+"connected":"已连接","peak":"峰值","chip":"芯片","quant":"量化","context":"上下文",
+"speedup vs fp16":"相对 fp16 加速","Coverage":"覆盖矩阵","pass":"通过","untested":"未测试","fails to fit":"显存不足",
+"model × quant coverage on selected chip":"所选芯片的 模型 × 量化 覆盖情况",
+"Comparison cards update with the filters above.":"对比卡随上方筛选即时更新。",
+"What each benchmark metric means, in both languages.":"每个基准指标的含义（中英对照）。",
+"Embedding / encoder models are rejected before any device op (422) — loading one for generation faulted the GCU driver.":"Embedding / encoder 模型会在任何设备操作前被拒绝（422）— 曾因误加载导致 GCU 驱动故障。",
+"decode tok/s by chip, grouped by context length":"各芯片解码速度 · 按上下文长度分组",
+"box = q1–q3 · line = median · whiskers = min/max · hover for detail":"箱体 = q1–q3 · 中线 = 中位数 · 须 = 最小/最大 · 悬停查看明细",
+"int8 on GX-1 lifts Qwen2.5-7B decode by ~32% and cuts peak memory ~45%. The S60 runs fp16 only — quantized inference is roadmap item #2 and the key single-card enabler for 70B-class models.":"GX-1 上的 int8 量化使 Qwen2.5-7B 解码提速约 32%，峰值显存降低约 45%。S60 目前仅运行 fp16 — 量化推理是路线图第 2 项，也是单卡承载 70B 级模型的关键。",
+"Newest":"最新","tg high → low":"解码速度 高→低","pp high → low":"预填充 高→低","Lowest memory":"显存最低",
+};
+let lang="zh";
+const t=(k)=>lang==="zh"?(ZH[k]??k):k;
+const esc=(s)=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const $=(q,el=document)=>el.querySelector(q);
+const fmt=(x,d=1)=>x==null?"—":Number(x).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmt0=(x)=>x==null?"—":Number(x).toLocaleString("en-US",{maximumFractionDigits:0});
+/* ============================ mock dataset ============================ */
+/* Seeded, deterministic. Anchored to real S60 numbers: Qwen2.5-7B fp16
+   ≈ 12 tok/s decode, ~14.5 GB peak. Other chips are plausible references. */
+let _seed=42; const rnd=()=>{_seed=(_seed*1103515245+12345)&0x7fffffff;return _seed/0x7fffffff;};
+const jitter=(v,pct)=>v*(1+(rnd()*2-1)*pct);
+const CHIPS=[
+ {id:"s60",  name:"Enflame S60",      color:"var(--c1)", hex:"#FFB224", mem:49.1, tg:12.0, pp:380,  ov:0.35, quants:["fp16"]},
+ {id:"a100", name:"NVIDIA A100 40G",  color:"var(--c2)", hex:"#38BDF8", mem:40,   tg:38.5, pp:5200, ov:0.08, quants:["fp16","int8"]},
+ {id:"4090", name:"NVIDIA RTX 4090",  color:"var(--c3)", hex:"#A78BFA", mem:24,   tg:45.2, pp:4400, ov:0.07, quants:["fp16","int8","4bit"]},
+ {id:"m3max",name:"Apple M3 Max",     color:"var(--c4)", hex:"#F472B6", mem:96,   tg:21.8, pp:920,  ov:0.12, quants:["fp16","4bit"]},
+ {id:"gx1",  name:"GX-1",             color:"var(--c5)", hex:"#9AA8B6", mem:64,   tg:17.5, pp:1500, ov:0.15, quants:["fp16","int8"], sample:true},
+];
+const MODELS=[
+ {id:"Qwen2.5-7B-Instruct", b:7},
+ {id:"Qwen2.5-14B-Instruct", b:14},
+ {id:"Llama-3.1-8B-Instruct", b:8},
+];
+const QUANTS=[{id:"fp16",spd:1,mem:1},{id:"int8",spd:1.32,mem:0.55},{id:"4bit",spd:1.55,mem:0.34}];
+const CTXS=[512,1024,2048,4096,8192];
+const GEN_TOKENS=256;
+function combos(){
+  const runs=[];
+  for(const c of CHIPS) for(const m of MODELS) for(const q of QUANTS){
+    if(!c.quants.includes(q.id)) continue;
+    const memGB=m.b*2.07*q.mem*1.0+0.9;                 // weights + overhead
+    if(memGB>c.mem*0.92) continue;                       // doesn't fit → no runs (real!)
+    for(const ctx of CTXS){
+      const scale=Math.pow(7/m.b,0.9);
+      const degr=1-0.048*Math.log2(ctx/512);
+      const tgBase=c.tg*scale*q.spd*degr;
+      const ppBase=c.pp*Math.pow(7/m.b,0.6);
+      const n=6+Math.floor(rnd()*7);
+      const samples=[];
+      for(let i=0;i<n;i++){
+        const tg=jitter(tgBase,0.05), pp=jitter(ppBase,0.06);
+        const ttft=(ctx/pp+c.ov)*1000;                   // ms
+        const tpot=1000/tg;
+        const e2e=ttft/1000+GEN_TOKENS*tpot/1000;        // s
+        samples.push({tg,pp,ttft,tpot,e2e,mem:jitter(memGB,0.015),total:(ctx+GEN_TOKENS)/e2e});
+      }
+      runs.push({chip:c.id,model:m.id,quant:q.id,ctx,batch:1,samples,
+                 date:"2026-0"+(5+Math.floor(rnd()*2))+"-"+String(3+Math.floor(rnd()*25)).padStart(2,"0")});
+    }
+  }
+  return runs;
+}
+const RUNS=combos();
+const SUBMITTERS={s60:"s60-node-01 · prod",a100:"lab-a100-08",["4090"]:"dev-ws-4090",m3max:"macstudio-lee",gx1:"bringup-rig-02"};
+const chipById=(id)=>CHIPS.find(c=>c.id===id);
+const METRICS={
+ tg:  {label:"Decode speed",   unit:"tok/s", d:1, higher:true,  get:s=>s.tg},
+ pp:  {label:"Prefill speed",  unit:"tok/s", d:0, higher:true,  get:s=>s.pp},
+ ttft:{label:"Time to first token", unit:"ms", d:0, higher:false, get:s=>s.ttft},
+ tpot:{label:"Per-token latency", unit:"ms", d:1, higher:false, get:s=>s.tpot},
+ e2e: {label:"End-to-end",     unit:"s",     d:2, higher:false, get:s=>s.e2e},
+ mem: {label:"Peak memory",    unit:"GB",    d:1, higher:false, get:s=>s.mem},
+ total:{label:"Total throughput", unit:"tok/s", d:0, higher:true, get:s=>s.total},
+};
+function boxStats(vals){
+  const v=[...vals].sort((a,b)=>a-b), n=v.length;
+  const q=(p)=>{const i=(n-1)*p, lo=Math.floor(i), hi=Math.ceil(i);return v[lo]+(v[hi]-v[lo])*(i-lo);};
+  return {min:v[0],q1:q(.25),med:q(.5),q3:q(.75),max:v[n-1],mean:v.reduce((a,b)=>a+b,0)/n,n};
+}
+/* ============================ svg helpers ============================ */
+const SVG_NS="http://www.w3.org/2000/svg";
+function niceTicks(min,max,count=5){
+  if(min===max){max=min+1;}
+  const span=max-min, step0=span/count, mag=Math.pow(10,Math.floor(Math.log10(step0)));
+  const norm=step0/mag; const step=(norm<1.5?1:norm<3?2:norm<7?5:10)*mag;
+  const lo=Math.floor(min/step)*step, hi=Math.ceil(max/step)*step;
+  const ticks=[]; for(let v=lo;v<=hi+step*0.5;v+=step) ticks.push(+v.toFixed(10));
+  return {lo,hi,ticks};
+}
+function sparkPath(vals,w,h,pad=2){
+  const min=Math.min(...vals), max=Math.max(...vals), span=(max-min)||1;
+  return vals.map((v,i)=>(i?"L":"M")+(pad+i*(w-2*pad)/(vals.length-1)).toFixed(1)+","+(h-pad-(v-min)/span*(h-2*pad)).toFixed(1)).join(" ");
+}
+function sparkSVG(vals,{w=120,h=34,area=false,color="var(--sig)"}={}){
+  const p=sparkPath(vals,w,h);
+  const last=p.split(" ").pop();
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true">`+
+    (area?`<path d="${p} L${w-2},${h-2} L2,${h-2} Z" fill="${color}" opacity=".12"/>`:"")+
+    `<path d="${p}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+}
+/* tooltip */
+const tt=$("#tt");
+function showTT(html,x,y){tt.innerHTML=html;tt.classList.add("show");
+  const r=tt.getBoundingClientRect();
+  tt.style.left=Math.min(x+14,innerWidth-r.width-10)+"px";
+  tt.style.top=Math.max(8,Math.min(y-r.height/2,innerHeight-r.height-10))+"px";}
+function hideTT(){tt.classList.remove("show");}
+function toast(msg,warn=false){const d=document.createElement("div");d.className="toast"+(warn?" warn":"");d.textContent=msg;
+  $("#toasts").appendChild(d);setTimeout(()=>d.remove(),3200);}
+async function copyText(s,btn){try{await navigator.clipboard.writeText(s);}catch(e){}
+  if(btn){const o=btn.textContent;btn.textContent=t("Copied");setTimeout(()=>btn.textContent=o,1200);}else toast(t("Copied"));}
+/* ============================ box plot ============================ */
+/* Grouped box plot: X = context groups, one box per active series within a
+   group. Series = {key,label,color,hex,statsByCtx:{ctx:{min,q1,med,q3,max,mean,n}}} */
+function boxPlotSVG(series,ctxs,metric,{w=920,h=380}={}){
+  const padL=64,padR=16,padT=18,padB=44;
+  const iw=w-padL-padR, ih=h-padT-padB;
+  let vmin=Infinity,vmax=-Infinity;
+  series.forEach(s=>ctxs.forEach(c=>{const st=s.statsByCtx[c];if(st){vmin=Math.min(vmin,st.min);vmax=Math.max(vmax,st.max);}}));
+  if(!isFinite(vmin)) return `<div class="empty">${esc(t("No data for this filter."))}</div>`;
+  const pad=(vmax-vmin)*0.08||1; vmin=Math.max(0,vmin-pad); vmax+=pad;
+  const {lo,hi,ticks}=niceTicks(vmin,vmax,5);
+  const Y=v=>padT+ih-(v-lo)/(hi-lo)*ih;
+  const groupW=iw/ctxs.length;
+  const bw=Math.min(26,Math.max(12,groupW/(series.length+1.6)*0.72));
+  let el=`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="box plot">`;
+  ticks.forEach(v=>{el+=`<line class="gridln" x1="${padL}" x2="${w-padR}" y1="${Y(v)}" y2="${Y(v)}"/>`+
+    `<text class="axis" x="${padL-8}" y="${Y(v)+3.5}" text-anchor="end">${fmt(v,METRICS[metric].d>1?1:METRICS[metric].d)}</text>`;});
+  el+=`<text class="axis-t" x="${padL}" y="${padT-6}">${esc(t(METRICS[metric].label))} · ${METRICS[metric].unit}</text>`;
+  ctxs.forEach((c,gi)=>{
+    const gx=padL+gi*groupW+groupW/2;
+    el+=`<text class="axis" x="${gx}" y="${h-padB+18}" text-anchor="middle">${c>=1024?(c/1024)+"k":c}</text>`;
+    const act=series.length, span=bw*1.15;
+    series.forEach((s,si)=>{
+      const st=s.statsByCtx[c]; if(!st) return;
+      const x=gx+(si-(act-1)/2)*span;
+      const cap=bw*0.42;
+      el+=`<g class="box" data-s="${s.key}" data-ctx="${c}" style="cursor:crosshair">`+
+        `<line x1="${x}" x2="${x}" y1="${Y(st.min)}" y2="${Y(st.q1)}" stroke="${s.color}" stroke-width="1.3"/>`+
+        `<line x1="${x}" x2="${x}" y1="${Y(st.q3)}" y2="${Y(st.max)}" stroke="${s.color}" stroke-width="1.3"/>`+
+        `<line x1="${x-cap}" x2="${x+cap}" y1="${Y(st.min)}" y2="${Y(st.min)}" stroke="${s.color}" stroke-width="1.3"/>`+
+        `<line x1="${x-cap}" x2="${x+cap}" y1="${Y(st.max)}" y2="${Y(st.max)}" stroke="${s.color}" stroke-width="1.3"/>`+
+        `<rect x="${x-bw/2}" y="${Y(st.q3)}" width="${bw}" height="${Math.max(1.5,Y(st.q1)-Y(st.q3))}" rx="2.5" fill="${s.hex}22" stroke="${s.color}" stroke-width="1.4"/>`+
+        `<line x1="${x-bw/2}" x2="${x+bw/2}" y1="${Y(st.med)}" y2="${Y(st.med)}" stroke="${s.color}" stroke-width="2.4"/>`+
+        `<rect x="${x-span/2}" y="${padT}" width="${span}" height="${ih}" fill="transparent"/></g>`;
+    });
+  });
+  el+=`<text class="axis-t" x="${w-padR}" y="${h-8}" text-anchor="end">${esc(t("context length (tokens)"))}</text></svg>`;
+  return el;
+}
+function bindBoxTT(rootEl,seriesMap,metric){
+  rootEl.querySelectorAll("g.box").forEach(g=>{
+    const s=seriesMap[g.dataset.s], st=s.statsByCtx[g.dataset.ctx];
+    const md=METRICS[metric];
+    const html=`<div class="tt-h"><span class="sw" style="background:${s.hex}"></span>${esc(s.label)} · ${g.dataset.ctx}</div>`+
+      `<table>`+[["median",st.med],["q1 / q3",fmt(st.q1,md.d)+" / "+fmt(st.q3,md.d)],["mean",st.mean],["min / max",fmt(st.min,md.d)+" / "+fmt(st.max,md.d)],[t("samples"),st.n]]
+      .map(([k,v])=>`<tr><td>${esc(typeof k==="string"?t(k):k)}</td><td>${typeof v==="number"?fmt(v,k==="samples"?0:md.d):v}</td></tr>`).join("")+`</table>`;
+    g.addEventListener("mousemove",e=>showTT(html,e.clientX,e.clientY));
+    g.addEventListener("mouseleave",hideTT);
+  });
+}
+/* ============================ navigation ============================ */
+const IC={
+ overview:'<path d="M3 3h7v7H3zM14 3h7v4h-7zM14 11h7v10h-7zM3 14h7v7H3z"/>',
+ models:'<path d="M12 2l8 4.5v9L12 20l-8-4.5v-9z"/><path d="M4 6.5l8 4.5 8-4.5M12 11v9" opacity=".5"/>',
+ chat:'<path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/>',
+ logs:'<path d="M4 5h16M4 10h16M4 15h10M4 20h7"/>',
+ metrics:'<path d="M3 20h18M6 16l4-6 3 3 5-8"/>',
+ devices:'<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
+ bench:'<path d="M7 3h10M12 3v7l6 9H6l6-9z"/>',
+ explorer:'<path d="M4 20V10M10 20V4M16 20v-8M4 20h17"/>',
+ community:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/>',
+ analysis:'<path d="M3 21h18M3 21V6m0 15L10 8l4 6 7-11"/><path d="M3 6h8M14 21V10" opacity=".4"/>',
+ compare:'<path d="M9 4v16M15 4v16M4 9l3 3-3 3M20 9l-3 3 3 3"/>',
+ downloads:'<path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"/>',
+ settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>',
+};
+const NAV=[
+ {items:[{id:"overview",label:"Overview",ic:"overview"}]},
+ {label:"Serving",items:[{id:"models",label:"Models",ic:"models"},{id:"chat",label:"Chat",ic:"chat"},{id:"logs",label:"Logs",ic:"logs"}]},
+ {label:"Observe",items:[{id:"metrics",label:"Metrics",ic:"metrics"},{id:"devices",label:"Devices",ic:"devices"}]},
+ {label:"Benchmark",items:[{id:"benchmark",label:"Run benchmark",ic:"bench"},{id:"explorer",label:"Performance Explorer",ic:"explorer"},{id:"analysis",label:"Hardware Analysis",ic:"analysis"},{id:"compare",label:"Compare A/B",ic:"compare"},{id:"community",label:"Community",ic:"community"}]},
+ {label:"Manage",items:[{id:"downloads",label:"Downloads",ic:"downloads"},{id:"settings",label:"Settings",ic:"settings"}]},
+];
+let page="overview";
+function renderNav(){
+  $("#navRoot").innerHTML=NAV.map(g=>`<div class="navgrp">`+(g.label?`<div class="glabel">${esc(t(g.label))}</div>`:"")+
+    `<div class="nav">`+g.items.map(it=>
+      `<button data-nav="${it.id}" class="${page===it.id?"active":""}" onclick="go('${it.id}')">`+
+      `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${IC[it.ic]}</svg>`+
+      `<span>${esc(t(it.label))}</span></button>`).join("")+`</div></div>`).join("");
+}
+function navLabel(id){for(const g of NAV)for(const it of g.items)if(it.id===id)return it.label;return id;}
+function go(id){page=id;location.hash="/"+id;renderNav();renderPage();}
+window.addEventListener("hashchange",()=>{const id=location.hash.replace(/^#\//,"");
+  if(id&&id!==page&&document.querySelector(`[data-nav="${id}"]`)){page=id;renderNav();renderPage();}});
+function renderTop(){
+  $("#tbCrumb").textContent="infermesh · "+t("Console");
+  $("#tbTitle").textContent=t(navLabel(page));
+  $("#tbHealthT").textContent=t("healthy");
+  $("#tbMem").textContent="GCU 14.5 / 49.1 GB";
+  $("#sbUp").textContent=t("uptime")+" 6d 21:14";
+  $("#langZh").classList.toggle("active",lang==="zh");
+  $("#langEn").classList.toggle("active",lang==="en");
+}
+/* ============================ pages ============================ */
+const P={};
+/* ------- overview ------- */
+P.overview=()=>{
+  const spark=Array.from({length:36},(_,i)=>18+12*Math.sin(i/5)+rnd()*8);
+  const kpi=(lbl,val,unit,extra="")=>`<div class="card tight kpi"><div class="eyebrow">${esc(t(lbl))}</div><div class="ro">${val}<small>${unit}</small></div>${extra}</div>`;
+  return `
+  <div class="grid g6" style="margin-bottom:14px">
+    ${kpi("Loaded models","2","/ 3")}
+    ${kpi("GCU memory","14.5","/ 49.1 GB",`<div class="meter thin"><i style="width:29.5%"></i></div>`)}
+    ${kpi("Active requests","3","")}
+    ${kpi("Requests today","1,842","",`<div>${sparkSVG(spark,{w:118,h:26})}</div>`)}
+    ${kpi("p95 TTFT","1.21","s")}
+    ${kpi("Rejected (503)","0.4","%")}
+  </div>
+  <div class="grid g3">
+    <div class="card" style="grid-column:span 2">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <h3>${esc(t("Recent benchmarks"))}</h3>
+        <button class="btn sm" onclick="go('explorer')">${esc(t("View in Explorer"))} →</button>
+      </div>
+      <table class="tbl"><thead><tr><th>${esc(t("Model"))}</th><th>${esc(t("chip"))}</th><th>${esc(t("quant"))}</th><th class="num">tg tok/s</th><th class="num">TTFT ms</th><th class="num">${esc(t("Peak memory"))}</th><th>${esc(t("Date"))}</th></tr></thead><tbody>
+      ${RUNS.filter(r=>r.chip==="s60"&&r.ctx===2048).slice(0,4).map(r=>{const st=boxStats(r.samples.map(s=>s.tg));const tf=boxStats(r.samples.map(s=>s.ttft));const mm=boxStats(r.samples.map(s=>s.mem));
+        return `<tr><td class="mono">${esc(r.model)}</td><td><span class="tag" style="color:${chipById(r.chip).hex}">${esc(chipById(r.chip).name)}</span></td><td class="mono">${r.quant}</td><td class="num">${fmt(st.med,1)}</td><td class="num">${fmt0(tf.med)}</td><td class="num">${fmt(mm.med,1)} GB</td><td class="mono sub">${r.date}</td></tr>`;}).join("")}
+      </tbody></table>
+    </div>
+    <div class="card" style="border-left:3px solid var(--sig)">
+      <div class="eyebrow">${esc(t("Insight"))}</div>
+      <p style="margin:6px 0 10px;font-size:12.5px;line-height:1.7">${esc(t("int8 on GX-1 lifts Qwen2.5-7B decode by ~32% and cuts peak memory ~45%. The S60 runs fp16 only — quantized inference is roadmap item #2 and the key single-card enabler for 70B-class models."))}</p>
+      <div class="hint">${esc(t("Comparison cards update with the filters above."))}</div>
+    </div>
+  </div>`;
+};
+/* ------- models ------- */
+const MODEL_ROWS=[
+ {id:"Qwen2.5-7B-Instruct",backend:"transformers",device:"gcu:0",quant:"fp16",mem:14.5,status:"loaded",pinned:true,tg:12.0},
+ {id:"Qwen2.5-14B-Instruct",backend:"transformers",device:"gcu:0",quant:"fp16",mem:29.9,status:"idle",ttl:"12:41",tg:6.4},
+ {id:"Llama-3.1-8B-Instruct",backend:"transformers",device:"gcu:0",quant:"fp16",mem:17.4,status:"unloaded"},
+];
+P.models=()=>{
+  const used=MODEL_ROWS.filter(m=>m.status!=="unloaded").reduce((a,m)=>a+m.mem,0);
+  const ceil=41.0;
+  return `
+  <div class="card" style="margin-bottom:14px">
+    <div class="row" style="justify-content:space-between">
+      <div><div class="eyebrow">${esc(t("Model pool"))}</div>
+        <div class="ro">${fmt(used,1)}<small>/ ${fmt(ceil,1)} GB · ${esc(t("memory ceiling"))}</small></div></div>
+      <div style="min-width:280px;flex:1;max-width:460px">
+        <div class="meter"><i style="width:${(14.5/ceil*100).toFixed(1)}%"></i><i class="b2" style="width:${(29.9/ceil*100).toFixed(1)}%"></i></div>
+        <div class="row sub" style="margin-top:7px;gap:14px">
+          <span>${esc(t("LRU order"))}:</span>
+          <span class="tag" style="color:var(--sig)">Qwen2.5-7B ◈ ${esc(t("pinned"))}</span>
+          <span class="tag dim">Qwen2.5-14B · ${esc(t("TTL in"))} 12:41</span>
+        </div></div>
+    </div>
+  </div>
+  <div class="card">
+  <table class="tbl"><thead><tr><th>${esc(t("Model"))}</th><th>${esc(t("Status"))}</th><th>${esc(t("Backend"))}</th><th>${esc(t("Device"))}</th><th>${esc(t("Quant"))}</th><th class="num">${esc(t("Memory"))}</th><th class="num">tg tok/s</th><th>${esc(t("Actions"))}</th></tr></thead><tbody>
+  ${MODEL_ROWS.map(m=>{
+    const st=m.status==="loaded"?`<span class="pill ok"><span class="dot"></span>${esc(t("loaded"))}${m.pinned?" ◈":""}</span>`
+      :m.status==="idle"?`<span class="pill warn"><span class="dot"></span>${esc(t("idle"))} · ${m.ttl}</span>`
+      :`<span class="pill"><span class="dot"></span>${esc(t("not loaded"))}</span>`;
+    const act=m.status==="unloaded"
+      ?`<button class="btn sm" onclick="toast('${esc(m.id)} — ${esc(t("Load"))}')">${esc(t("Load"))}</button>`
+      :`<button class="btn sm" ${m.pinned?"disabled":""} onclick="toast('${esc(m.id)} — ${esc(t("Unload"))}')">${esc(t("Unload"))}</button>
+        <button class="btn sm ghost" onclick="toast('${esc(m.id)} — ${m.pinned?esc(t("Unpin")):esc(t("Pin"))}')">${m.pinned?esc(t("Unpin")):esc(t("Pin"))}</button>`;
+    return `<tr><td class="mono" style="font-weight:600">${esc(m.id)}</td><td>${st}</td><td class="mono sub">${m.backend}</td><td class="mono sub">${m.device}</td><td class="mono">${m.quant}</td><td class="num">${fmt(m.mem,1)} GB${m.status==="unloaded"?` <span class="sub">(${esc(t("est."))})</span>`:""}</td><td class="num">${m.tg?fmt(m.tg,1):"—"}</td><td><div class="row" style="gap:6px">${act}<button class="btn sm danger ghost" title="${esc(t("Removes files and unregisters the model."))}" onclick="toast('${esc(m.id)} — ${esc(t("Delete"))}',true)">${esc(t("Delete"))}</button></div></td></tr>`;}).join("")}
+  </tbody></table>
+  <div class="hint" style="margin-top:10px">${esc(t("Embedding / encoder models are rejected before any device op (422) — loading one for generation faulted the GCU driver."))}</div>
+  </div>`;
+};
+/* ------- devices ------- */
+P.devices=()=>{
+  const gcuUtil=37;
+  return `
+  <div class="grid g3" style="margin-bottom:14px">
+    <div class="card dev">
+      <div class="hd"><span class="pill ok"><span class="dot"></span>${esc(t("online"))}</span><span class="nm">Enflame S60</span><span class="tag dim mono">gcu:0</span></div>
+      <div class="dl">
+        <span>${esc(t("Driver"))}</span><b>efsmi 2.5.136</b>
+        <span>${esc(t("Memory"))}</span><b>14.5 / 49.1 GB</b>
+        <span>${esc(t("Utilization"))}</span><b>${gcuUtil} %</b>
+        <span>${esc(t("Temperature"))}</span><b>56 °C</b>
+        <span>${esc(t("Processes"))}</span><b>2</b>
+      </div>
+      <div class="meter"><i style="width:29.5%"></i></div>
+    </div>
+    <div class="card dev">
+      <div class="hd"><span class="pill"><span class="dot"></span>${esc(t("disabled"))}</span><span class="nm">CPU</span><span class="tag dim mono">cpu</span></div>
+      <p class="sub" style="margin:2px 0 0;line-height:1.7">${esc(t("CPU inference is disabled on this node: torch_gcu hooks `import torch` and CPU decode hangs. Treating the box as GCU-only."))}</p>
+    </div>
+    <div class="card dev ghost">
+      <div class="hd"><span class="pill"><span class="dot"></span>${esc(t("offline"))}</span><span class="nm">NVIDIA A100 40G</span><span class="tag dim mono">lab-a100-08</span></div>
+      <div class="dl"><span>${esc(t("Status"))}</span><b>${esc(t("last seen 3 days ago"))}</b><span>${esc(t("Memory"))}</span><b>— / 40.0 GB</b></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:8px">${esc(t("Fleet"))}</h3>
+    <table class="tbl"><thead><tr><th>${esc(t("Node"))}</th><th>${esc(t("chip"))}</th><th>${esc(t("Driver"))}</th><th class="num">${esc(t("Memory"))}</th><th>${esc(t("Status"))}</th><th>${esc(t("Last benchmark"))}</th></tr></thead><tbody>
+      <tr><td class="mono">s60-node-01</td><td>Enflame S60</td><td class="mono">2.5.136</td><td class="num">49.1 GB</td><td><span class="tag ok">${esc(t("online"))}</span></td><td class="mono sub">2026-06-28</td></tr>
+      <tr><td class="mono">bringup-rig-02</td><td>GX-1 <span class="tag sig">${esc(t("in-house sample"))}</span></td><td class="mono">0.9.2-rc3</td><td class="num">64.0 GB</td><td><span class="tag ok">${esc(t("online"))}</span></td><td class="mono sub">2026-06-27</td></tr>
+      <tr><td class="mono">lab-a100-08</td><td>NVIDIA A100 40G</td><td class="mono">550.54</td><td class="num">40.0 GB</td><td><span class="tag dim">${esc(t("offline"))}</span></td><td class="mono sub">2026-06-19</td></tr>
+    </tbody></table>
+  </div>`;
+};
+/* ------- metrics ------- */
+P.metrics=()=>{
+  const req=Array.from({length:48},(_,i)=>26+16*Math.sin(i/6)+rnd()*10);
+  const card=(lbl,val,unit,vals,color)=>`<div class="card tight kpi"><div class="eyebrow">${esc(t(lbl))}</div><div class="ro">${val}<small>${unit}</small></div><div>${sparkSVG(vals,{w:130,h:28,color})}</div></div>`;
+  return `
+  <div class="grid g4" style="margin-bottom:14px">
+    ${card("Requests / min","31","",req.slice(-24),"var(--sig)")}
+    ${card("p95 TTFT","1.21","s",req.map(v=>2-v/40),"var(--info)")}
+    ${card("Tokens served","4.1","M",req.map((v,i)=>i*3+v),"var(--ok)")}
+    ${card("Cache efficiency","38","%",req.map(v=>30+v/4),"var(--c3)")}
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="eyebrow" style="margin-bottom:8px">${esc(t("Requests (24 h)"))}</div>
+    <div class="plotwrap" style="padding:8px">${(()=>{const w=940,h=180,p=sparkPath(req,w,h,8);
+      return `<svg viewBox="0 0 ${w} ${h}"><path d="${p} L${w-8},${h-8} L8,${h-8} Z" fill="var(--sig)" opacity=".10"/><path d="${p}" fill="none" stroke="var(--sig)" stroke-width="1.8"/></svg>`;})()}</div>
+  </div>
+  <div class="card"><h3 style="margin-bottom:8px">${esc(t("Per-model"))}</h3>
+    <table class="tbl"><thead><tr><th>${esc(t("Model"))}</th><th class="num">${esc(t("Requests"))}</th><th class="num">tg tok/s</th><th class="num">${esc(t("Tokens served"))}</th><th class="num">${esc(t("Cache efficiency"))}</th></tr></thead><tbody>
+      <tr><td class="mono">Qwen2.5-7B-Instruct</td><td class="num">1,538</td><td class="num">12.0</td><td class="num">3,214,502</td><td class="num">41 %</td></tr>
+      <tr><td class="mono">Qwen2.5-14B-Instruct</td><td class="num">289</td><td class="num">6.4</td><td class="num">861,377</td><td class="num">22 %</td></tr>
+    </tbody></table></div>`;
+};
+/* ------- explorer (centerpiece) ------- */
+const EX={metric:"tg",model:"Qwen2.5-7B-Instruct",chips:new Set(CHIPS.map(c=>c.id)),quants:new Set(["fp16","int8","4bit"])};
+function exSeries(){
+  const out=[],map={};
+  for(const c of CHIPS){ if(!EX.chips.has(c.id)) continue;
+    for(const q of QUANTS){ if(!EX.quants.has(q.id)) continue;
+      const rs=RUNS.filter(r=>r.chip===c.id&&r.model===EX.model&&r.quant===q.id);
+      if(!rs.length) continue;
+      const statsByCtx={};
+      rs.forEach(r=>statsByCtx[r.ctx]=boxStats(r.samples.map(METRICS[EX.metric].get)));
+      const s={key:c.id+"·"+q.id,label:c.name+" · "+q.id,chip:c.id,quant:q.id,color:c.color,hex:c.hex,statsByCtx,
+               dash:q.id==="fp16"?null:q.id};
+      out.push(s); map[s.key]=s;
+    }}
+  return {out,map};
+}
+function exCSV(series){
+  const md=METRICS[EX.metric];
+  let rows=[["chip","quant","model","context","metric","unit","median","q1","q3","mean","min","max","n"].join(",")];
+  series.forEach(s=>CTXS.forEach(c=>{const st=s.statsByCtx[c];if(!st)return;
+    rows.push([chipById(s.chip).name,s.quant,EX.model,c,EX.metric,md.unit,st.med.toFixed(3),st.q1.toFixed(3),st.q3.toFixed(3),st.mean.toFixed(3),st.min.toFixed(3),st.max.toFixed(3),st.n].join(","));}));
+  return rows.join("\n");
+}
+P.explorer=()=>{
+  return `
+  <div class="card" style="margin-bottom:14px">
+    <div class="row" style="justify-content:space-between;margin-bottom:12px">
+      <div class="row">
+        <label class="fl">${esc(t("Metric"))}
+          <select onchange="EX.metric=this.value;rerender()">${Object.entries(METRICS).map(([k,m])=>`<option value="${k}" ${k===EX.metric?"selected":""}>${esc(t(m.label))} · ${m.unit}</option>`).join("")}</select></label>
+        <label class="fl">${esc(t("Model"))}
+          <select onchange="EX.model=this.value;rerender()">${MODELS.map(m=>`<option ${m.id===EX.model?"selected":""}>${esc(m.id)}</option>`).join("")}</select></label>
+        <label class="fl">${esc(t("Quant"))}
+          <div class="row" style="gap:6px">${QUANTS.map(q=>`<button class="fchip ${EX.quants.has(q.id)?"on":"off"}" onclick="tgSet(EX.quants,'${q.id}')">${q.id}</button>`).join("")}</div></label>
+      </div>
+      <div class="row">
+        <button class="btn sm" onclick="copyText(exCSV(exSeries().out),this)">${esc(t("Copy"))}</button>
+        <button class="btn sm" onclick="dlCSV()">${esc(t("Export CSV"))}</button>
+      </div>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <span class="eyebrow" style="margin:0 4px 0 0">${esc(t("Chips"))}</span>
+      ${CHIPS.map(c=>`<button class="fchip tinted ${EX.chips.has(c.id)?"on":"off"}" style="color:${EX.chips.has(c.id)?c.hex:"var(--dim)"}" onclick="tgSet(EX.chips,'${c.id}')"><span class="sw" style="background:${c.hex}"></span>${esc(c.name)}${c.sample?` <span class="tag sig" style="margin-left:2px">${esc(t("in-house sample"))}</span>`:""}</button>`).join("")}
+      <span class="sub" style="margin-left:auto">${esc(t("toggle series"))}</span>
+    </div>
+    <div class="plotwrap" id="exPlot"></div>
+    <div class="hint" style="margin-top:9px">${esc(t("box = q1–q3 · line = median · whiskers = min/max · hover for detail"))}</div>
+  </div>
+  <div class="grid g4" id="exCards"></div>`;
+};
+function tgSet(set,id){set.has(id)?set.delete(id):set.add(id);rerender();}
+function dlCSV(){const blob=new Blob([exCSV(exSeries().out)],{type:"text/csv"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download=`infermesh_${EX.metric}_${EX.model}.csv`;a.click();URL.revokeObjectURL(a.href);}
+function mountExplorer(){
+  const {out,map}=exSeries();
+  const plot=$("#exPlot"); if(!plot) return;
+  plot.innerHTML=boxPlotSVG(out,CTXS,EX.metric);
+  bindBoxTT(plot,map,EX.metric);
+  const md=METRICS[EX.metric];
+  $("#exCards").innerHTML=out.map(s=>{
+    const at=s.statsByCtx[2048]||Object.values(s.statsByCtx)[0];
+    const tg=boxStats(RUNS.filter(r=>r.chip===s.chip&&r.model===EX.model&&r.quant===s.quant&&r.ctx===2048).flatMap(r=>r.samples.map(x=>x.tg)));
+    const pp=boxStats(RUNS.filter(r=>r.chip===s.chip&&r.model===EX.model&&r.quant===s.quant&&r.ctx===2048).flatMap(r=>r.samples.map(x=>x.pp)));
+    const mm=boxStats(RUNS.filter(r=>r.chip===s.chip&&r.model===EX.model&&r.quant===s.quant&&r.ctx===2048).flatMap(r=>r.samples.map(x=>x.mem)));
+    const n=Object.values(s.statsByCtx).reduce((a,x)=>a+x.n,0);
+    return `<div class="cmpcard" style="--cc:${s.hex}">
+      <div class="hd"><span class="sw" style="width:9px;height:9px;border-radius:2px;background:${s.hex}"></span><b>${esc(chipById(s.chip).name)}</b><span class="tag dim mono">${s.quant}</span><span class="tag dim mono" style="margin-left:auto">n=${n}</span></div>
+      <div class="ro sig" style="font-size:21px">${fmt(at.med,md.d)}<small>${md.unit} · ${esc(t("median"))} @2k</small></div>
+      <div class="mini">
+        <span>tg</span><span><b>${fmt(tg.med,1)}</b> tok/s</span>
+        <span>pp</span><span><b>${fmt0(pp.med)}</b> tok/s</span>
+        <span>${esc(t("peak"))}</span><span><b>${fmt(mm.med,1)}</b> GB</span>
+        <span>${esc(t("model"))||"model"}</span><span class="mono" style="font-size:10px">${esc(EX.model.split("-Instruct")[0])}</span>
+      </div></div>`;}).join("")||`<div class="empty" style="grid-column:1/-1">${esc(t("No data for this filter."))}</div>`;
+}
+/* ------- community ------- */
+const CO={q:"",chips:new Set(CHIPS.map(c=>c.id)),quant:"",ctx:"",minpp:"",mintg:"",sort:"tg",open:new Set()};
+function coRows(){
+  let rows=RUNS.map(r=>{const tg=boxStats(r.samples.map(s=>s.tg)),pp=boxStats(r.samples.map(s=>s.pp)),
+    tf=boxStats(r.samples.map(s=>s.ttft)),mm=boxStats(r.samples.map(s=>s.mem));
+    return {...r,tg:tg.med,pp:pp.med,ttft:tf.med,mem:mm.med,n:tg.n};});
+  rows=rows.filter(r=>CO.chips.has(r.chip)
+    &&(!CO.q||r.model.toLowerCase().includes(CO.q.toLowerCase()))
+    &&(!CO.quant||r.quant===CO.quant)&&(!CO.ctx||String(r.ctx)===CO.ctx)
+    &&(!CO.minpp||r.pp>=+CO.minpp)&&(!CO.mintg||r.tg>=+CO.mintg));
+  const S={tg:(a,b)=>b.tg-a.tg,pp:(a,b)=>b.pp-a.pp,mem:(a,b)=>a.mem-b.mem,date:(a,b)=>b.date<a.date?-1:1};
+  return rows.sort(S[CO.sort]||S.tg);
+}
+function termFor(r){
+  const c=chipById(r.chip);
+  return `<span class="p">$</span> infermesh bench --model ${r.model} --device ${r.chip==="s60"?"gcu:0":r.chip==="m3max"?"mps":"cuda:0"} \\
+    --ctx ${r.ctx} --gen ${GEN_TOKENS} --iters ${r.n} --batch ${r.batch} --quant ${r.quant}
+<span class="d">[bench] loading ${r.model} (${r.quant}) … ok (${fmt(3+rnd()*14,1)} s)</span>
+<span class="d">[bench] warmup ×2 · measuring ×${r.n}</span>
+<span class="b">──── results ─────────────────────────────────────────</span>
+  prefill (pp)      <span class="g">${fmt0(r.pp).padStart(8)}</span> tok/s
+  decode  (tg)      <span class="g">${fmt(r.tg,1).padStart(8)}</span> tok/s
+  TTFT              <span class="g">${fmt0(r.ttft).padStart(8)}</span> ms
+  E2E (${r.ctx}+${GEN_TOKENS})    <span class="g">${fmt(r.ttft/1000+GEN_TOKENS/r.tg,2).padStart(8)}</span> s
+  peak device mem   <span class="g">${fmt(r.mem,1).padStart(8)}</span> GB
+<span class="b">──── system ──────────────────────────────────────────</span>
+  chip: ${c.name} · driver ${r.chip==="s60"?"2.5.136":r.chip==="gx1"?"0.9.2-rc3":"550.54"} · ${SUBMITTERS[r.chip]}
+<span class="g">✓ published to community hub</span> <span class="d">(INFERMESH_HUB_URL)</span>`;
+}
+P.community=()=>{
+  return `
+  <div class="card" style="margin-bottom:14px">
+    <div class="row" style="margin-bottom:10px">
+      ${CHIPS.map(c=>`<button class="fchip tinted ${CO.chips.has(c.id)?"on":"off"}" style="color:${CO.chips.has(c.id)?c.hex:"var(--dim)"}" onclick="tgSet2('${c.id}')"><span class="sw" style="background:${c.hex}"></span>${esc(c.name)}</button>`).join("")}
+    </div>
+    <div class="row">
+      <input placeholder="${esc(t("Search model…"))}" value="${esc(CO.q)}" oninput="CO.q=this.value;rerender()" style="min-width:200px"/>
+      <select onchange="CO.quant=this.value;rerender()"><option value="">${esc(t("All quants"))}</option>${QUANTS.map(q=>`<option ${CO.quant===q.id?"selected":""}>${q.id}</option>`).join("")}</select>
+      <select onchange="CO.ctx=this.value;rerender()"><option value="">${esc(t("All contexts"))}</option>${CTXS.map(c=>`<option ${CO.ctx===String(c)?"selected":""}>${c}</option>`).join("")}</select>
+      <input type="number" placeholder="${esc(t("Min"))} pp" value="${esc(CO.minpp)}" oninput="CO.minpp=this.value;rerender()" style="width:100px"/>
+      <input type="number" placeholder="${esc(t("Min"))} tg" value="${esc(CO.mintg)}" oninput="CO.mintg=this.value;rerender()" style="width:100px"/>
+      <span class="spacer"></span>
+      <label class="fl">${esc(t("Sort"))}
+        <select onchange="CO.sort=this.value;rerender()">
+          <option value="tg" ${CO.sort==="tg"?"selected":""}>${esc(t("tg high → low"))}</option>
+          <option value="pp" ${CO.sort==="pp"?"selected":""}>${esc(t("pp high → low"))}</option>
+          <option value="mem" ${CO.sort==="mem"?"selected":""}>${esc(t("Lowest memory"))}</option>
+          <option value="date" ${CO.sort==="date"?"selected":""}>${esc(t("Newest"))}</option>
+        </select></label>
+    </div>
+  </div>
+  <div class="card">
+    <div class="sub" style="margin-bottom:8px">${esc(t("Published automatically by benchmark runs. Hostname + optional label identifies the submitter."))} · <b class="mono" id="coCount"></b> ${esc(t("runs"))}</div>
+    <table class="tbl"><thead><tr><th></th><th>${esc(t("chip"))}</th><th>${esc(t("Model"))}</th><th>${esc(t("quant"))}</th><th class="num">${esc(t("context"))}</th><th class="num">pp tok/s</th><th class="num">tg tok/s</th><th class="num">TTFT ms</th><th class="num">${esc(t("Peak memory"))}</th><th>${esc(t("Submitter"))}</th><th>${esc(t("Date"))}</th></tr></thead>
+    <tbody id="coBody"></tbody></table>
+  </div>`;
+};
+function tgSet2(id){CO.chips.has(id)?CO.chips.delete(id):CO.chips.add(id);rerender();}
+function coToggle(key){CO.open.has(key)?CO.open.delete(key):CO.open.add(key);mountCommunity();}
+function mountCommunity(){
+  const body=$("#coBody"); if(!body) return;
+  const rows=coRows(); $("#coCount").textContent=rows.length;
+  body.innerHTML=rows.map(r=>{const key=r.chip+"|"+r.model+"|"+r.quant+"|"+r.ctx;const open=CO.open.has(key);const c=chipById(r.chip);
+    return `<tr class="hoverable ${open?"open":""}" onclick="coToggle('${key}')">
+      <td><span class="caret">▸</span></td>
+      <td><span class="tag" style="color:${c.hex};border-color:${c.hex}55">${esc(c.name)}</span></td>
+      <td class="mono">${esc(r.model)}</td><td class="mono">${r.quant}</td>
+      <td class="num">${r.ctx}</td><td class="num">${fmt0(r.pp)}</td><td class="num" style="color:var(--sig);font-weight:650">${fmt(r.tg,1)}</td>
+      <td class="num">${fmt0(r.ttft)}</td><td class="num">${fmt(r.mem,1)} GB</td>
+      <td class="mono sub">${esc(SUBMITTERS[r.chip])}</td><td class="mono sub">${r.date}</td></tr>`+
+      (open?`<tr class="exp-row"><td colspan="11"><div class="term"><button class="btn sm copy" onclick="event.stopPropagation();copyText(this.parentElement.innerText,this)">${esc(t("Copy"))}</button>${termFor(r)}</div></td></tr>`:"");
+  }).join("")||`<tr><td colspan="11"><div class="empty">${esc(t("No data for this filter."))}</div></td></tr>`;
+}
+/* ------- extra i18n keys used below ------- */
+Object.assign(ZH,{
+"model":"模型",
+"Time from request to the first output token; dominated by prefill.":"从发出请求到收到第一个输出 token 的时间，主要由预填充阶段决定。",
+"Average time per generated token during decode (= 1000 / tg).":"解码阶段平均每个输出 token 的耗时（= 1000 / tg）。",
+"Prompt-processing speed; sets TTFT for long contexts.":"提示词处理速度，决定长上下文下的首字延迟。",
+"Output generation speed; the core interactive metric.":"输出生成的速度，交互体验的核心指标。",
+"Wall-clock time for one request: TTFT + generated tokens × TPOT.":"单次请求的完整墙钟耗时：TTFT + 生成 token 数 × TPOT。",
+"(context + generated) tokens ÷ end-to-end time.":"（上下文 + 生成）token 总数 ÷ 端到端耗时。",
+"Highest device memory observed during the run.":"运行期间观察到的最高设备显存占用。",
+"Concurrent requests decoded together; raises throughput and per-request latency.":"同时解码的并发请求数；提升总吞吐，同时增加单请求延迟。",
+"Decode speedup of a quantization relative to fp16 on the same chip.":"同一芯片上某量化格式相对 fp16 的解码加速倍数。",
+"This device runs fp16 only.":"该设备目前仅支持 fp16。",
+"Benchmark complete — published to community hub":"基准测试完成 — 已发布到社区基准库",
+"Summarize what infermesh does in one sentence.":"用一句话介绍 infermesh 的作用。",
+"infermesh is a hardware-agnostic LLM serving platform: one OpenAI/Anthropic-compatible gateway over pluggable backends, so the same control plane runs on NVIDIA, Enflame GCU, Apple silicon, or in-house chips.":"infermesh 是硬件无关的 LLM 推理服务平台：一个兼容 OpenAI/Anthropic 协议的网关，加上可插拔的推理后端 —— 同一套控制面可以跑在 NVIDIA、燧原 GCU、Apple 芯片或自研芯片上。",
+"Canned reply — wire this panel to /v1/chat/completions for live streaming.":"预置回复 — 将此面板接到 /v1/chat/completions 即可实时流式输出。",
+});
+/* ------- run benchmark ------- */
+const BF={model:MODELS[0].id,quant:"fp16",ctxs:new Set([512,2048]),iters:8,batch:1,publish:true,device:"gcu:0",running:false};
+const BH={open:new Set(),extra:[]};
+function medRow(r){const g=k=>boxStats(r.samples.map(METRICS[k].get)).med;
+  return {...r,tg:g("tg"),pp:g("pp"),ttft:g("ttft"),mem:g("mem"),n:r.samples.length};}
+function tgB(c){BF.ctxs.has(c)?BF.ctxs.delete(c):BF.ctxs.add(c);rerender();}
+function startBench(){
+  if(BF.running)return; BF.running=true; rerender();
+  setTimeout(()=>{BF.running=false;
+    const c0=[...BF.ctxs].sort((a,b)=>a-b)[0]||2048;
+    const base=RUNS.find(r=>r.chip==="s60"&&r.model===BF.model&&r.quant==="fp16"&&r.ctx===c0)||RUNS.find(r=>r.chip==="s60");
+    const nr=medRow(base); nr.date="2026-07-02";
+    BH.extra.unshift(nr);
+    toast(t("Benchmark complete — published to community hub"));
+    if(page==="benchmark")rerender();
+  },2800);
+}
+const REF=[
+ ["TTFT","Time to first token","ms","Time from request to the first output token; dominated by prefill."],
+ ["TPOT","Per-token latency","ms","Average time per generated token during decode (= 1000 / tg)."],
+ ["pp","Prefill speed","tok/s","Prompt-processing speed; sets TTFT for long contexts."],
+ ["tg","Decode speed","tok/s","Output generation speed; the core interactive metric."],
+ ["E2E","End-to-end","s","Wall-clock time for one request: TTFT + generated tokens × TPOT."],
+ ["total","Total throughput","tok/s","(context + generated) tokens ÷ end-to-end time."],
+ ["mem","Peak memory","GB","Highest device memory observed during the run."],
+ ["batch","Batch","—","Concurrent requests decoded together; raises throughput and per-request latency."],
+ ["×fp16","speedup vs fp16","×","Decode speedup of a quantization relative to fp16 on the same chip."],
+];
+P.benchmark=()=>{
+  const dq=BF.device==="gcu:0";
+  const devOpt=(id,name,pillCls,pillTxt,sub,enabled)=>{
+    const sel=BF.device===id;
+    return `<div class="card tight" style="cursor:${enabled?"pointer":"not-allowed"};opacity:${enabled?"1":".55"};border-color:${sel?"var(--sig)":"var(--line)"}" ${enabled?`onclick="BF.device='${id}';BF.quant='fp16';rerender()"`:""}>
+      <div class="row" style="justify-content:space-between"><b style="font-size:12.5px">${esc(name)}</b><span class="pill ${pillCls}"><span class="dot"></span>${esc(pillTxt)}</span></div>
+      <div class="sub mono" style="margin-top:4px">${esc(id)} · ${esc(sub)}</div></div>`;};
+  return `
+  <div class="grid g3" style="margin-bottom:14px">
+    <div class="card" style="grid-column:span 2">
+      <h3 style="margin-bottom:12px">${esc(t("Run benchmark"))}</h3>
+      <div class="row" style="margin-bottom:12px">
+        <label class="fl">${esc(t("Model"))}
+          <select onchange="BF.model=this.value">${MODELS.map(m=>`<option ${m.id===BF.model?"selected":""}>${esc(m.id)}</option>`).join("")}</select></label>
+        <label class="fl">${esc(t("Quant"))}
+          <select onchange="BF.quant=this.value">${QUANTS.map(q=>`<option ${q.id===BF.quant?"selected":""} ${dq&&q.id!=="fp16"?"disabled":""}>${q.id}</option>`).join("")}</select></label>
+        <label class="fl">${esc(t("Iterations"))}<input type="number" value="${BF.iters}" min="1" max="50" style="width:84px" oninput="BF.iters=+this.value||1"/></label>
+        <label class="fl">${esc(t("Batch"))}<input type="number" value="${BF.batch}" min="1" max="8" style="width:84px" oninput="BF.batch=+this.value||1"/></label>
+      </div>
+      <label class="fl" style="margin-bottom:14px">${esc(t("Context"))}
+        <div class="row" style="gap:6px">${CTXS.map(c=>`<button class="fchip ${BF.ctxs.has(c)?"on":"off"}" onclick="tgB(${c})">${c>=1024?(c/1024)+"k":c}</button>`).join("")}</div></label>
+      <div class="row" style="justify-content:space-between">
+        <label class="row" style="gap:9px;cursor:pointer;font-size:12.5px">
+          <input type="checkbox" ${BF.publish?"checked":""} onchange="BF.publish=this.checked"/>
+          <span>${esc(t("Publish to community library"))}<span class="sub" style="display:block">${esc(t("auto-publish on completion; opt out per run"))}</span></span>
+        </label>
+        <button class="btn primary" ${BF.running?"disabled":""} onclick="startBench()">${BF.running?esc(t("Running…")):esc(t("Start benchmark"))}</button>
+      </div>
+      ${dq?`<div class="hint" style="margin-top:12px">${esc(t("This device runs fp16 only."))}</div>`:""}
+    </div>
+    <div class="card">
+      <div class="eyebrow" style="margin-bottom:9px">${esc(t("Device"))}</div>
+      <div class="grid" style="gap:8px">
+        ${devOpt("gcu:0","Enflame S60","ok",t("online"),"49.1 GB · efsmi 2.5.136",true)}
+        ${devOpt("cpu","CPU","",t("disabled"),"torch_gcu",false)}
+        ${devOpt("cuda:0","NVIDIA A100 40G","",t("offline"),"lab-a100-08",false)}
+      </div>
+    </div>
+  </div>
+  <details class="ref" style="margin-bottom:14px">
+    <summary>${esc(t("Metrics reference"))}<span class="sub" style="font-weight:400">· ${esc(t("What each benchmark metric means, in both languages."))}</span></summary>
+    <div class="inner"><table class="tbl"><tbody>
+      ${REF.map(([c,l,u,d])=>`<tr><td style="white-space:nowrap"><b class="mono">${esc(c)}</b> <span class="sub">${esc(t(l))}</span></td><td class="mono sub">${esc(u)}</td><td class="sub" style="line-height:1.65">${esc(t(d))}</td></tr>`).join("")}
+    </tbody></table></div>
+  </details>
+  <div class="card">
+    <h3 style="margin-bottom:8px">${esc(t("Run history"))}</h3>
+    <table class="tbl"><thead><tr><th></th><th>${esc(t("Date"))}</th><th>${esc(t("Model"))}</th><th>${esc(t("quant"))}</th><th class="num">${esc(t("context"))}</th><th class="num">${esc(t("Iterations"))}</th><th class="num">tg tok/s</th><th>${esc(t("Status"))}</th></tr></thead>
+    <tbody id="bhBody"></tbody></table>
+  </div>`;
+};
+function bhToggle(k){BH.open.has(k)?BH.open.delete(k):BH.open.add(k);mountBench();}
+function mountBench(){
+  const b=$("#bhBody"); if(!b) return;
+  const base=RUNS.filter(r=>r.chip==="s60").map(medRow).sort((a,b)=>b.date<a.date?-1:1).slice(0,5);
+  const rows=[...BH.extra,...base];
+  b.innerHTML=rows.map((r,i)=>{const k=r.model+"|"+r.ctx+"|"+r.date+"|"+i;const open=BH.open.has(k);
+    return `<tr class="hoverable ${open?"open":""}" onclick="bhToggle('${k}')">
+      <td><span class="caret">▸</span></td><td class="mono sub">${r.date}</td>
+      <td class="mono">${esc(r.model)}</td><td class="mono">${r.quant}</td>
+      <td class="num">${r.ctx}</td><td class="num">${r.n}</td>
+      <td class="num" style="color:var(--sig);font-weight:650">${fmt(r.tg,1)}</td>
+      <td><span class="tag ok">${esc(t("done"))}</span></td></tr>`+
+      (open?`<tr class="exp-row"><td colspan="8"><div class="term"><button class="btn sm copy" onclick="event.stopPropagation();copyText(this.parentElement.innerText,this)">${esc(t("Copy"))}</button>${termFor(r)}</div></td></tr>`:"");
+  }).join("");
+}
+/* ------- downloads ------- */
+const DLS={src:"mirror"};
+P.downloads=()=>`
+  <div class="card" style="margin-bottom:14px">
+    <div class="row" style="margin-bottom:10px">
+      <span class="eyebrow" style="margin:0">${esc(t("Source"))}</span>
+      <div class="seg">
+        <button class="${DLS.src==="hf"?"active":""}" onclick="DLS.src='hf';rerender()">HuggingFace</button>
+        <button class="${DLS.src==="mirror"?"active":""}" onclick="DLS.src='mirror';rerender()">hf-mirror.com</button>
+        <button class="${DLS.src==="ms"?"active":""}" onclick="DLS.src='ms';rerender()">ModelScope</button>
+      </div>
+      <span class="spacer"></span>
+      <input id="dlq" placeholder="${esc(t("Search the hub"))}" style="min-width:240px"/>
+      <button class="btn" onclick="toast(t('Search')+': '+($('#dlq').value||'—'))">${esc(t("Search"))}</button>
+    </div>
+    <div class="hint">${esc(t("GitHub and huggingface.co are blocked on this node — using mirrors."))}</div>
+  </div>
+  <div class="card">
+    <div class="dlrow">
+      <span class="nm">Qwen2.5-14B-Instruct</span><span class="tag sig">${esc(t("downloading"))}</span>
+      <div class="meter"><i style="width:62%"></i></div>
+      <span class="mono sub" style="min-width:170px;text-align:right">62% · 41.2 MB/s · 29.6 GB</span>
+      <button class="btn sm" onclick="toast(t('Pause'))">${esc(t("Pause"))}</button>
+    </div>
+    <div class="dlrow">
+      <span class="nm">DeepSeek-R1-Distill-Qwen-7B</span><span class="tag dim">${esc(t("paused"))}</span>
+      <div class="meter"><i style="width:41%;background:var(--dim)"></i></div>
+      <span class="mono sub" style="min-width:170px;text-align:right">41% · — · 15.2 GB</span>
+      <button class="btn sm" title="${esc(t("Resumes from partial files."))}" onclick="toast(t('Resume'))">${esc(t("Resume"))}</button>
+      <button class="btn sm danger ghost" onclick="toast(t('Delete'),true)">${esc(t("Delete"))}</button>
+    </div>
+    <div class="dlrow">
+      <span class="nm">Llama-3.1-8B-Instruct</span><span class="tag ok">✓ ${esc(t("complete"))}</span>
+      <div class="meter"><i style="width:100%;background:var(--ok)"></i></div>
+      <span class="mono sub" style="min-width:170px;text-align:right">16.1 GB</span>
+    </div>
+  </div>`;
+/* ------- logs ------- */
+const LOG0=[
+["09:12:41","INFO","server: infermesh v0.6.0 listening on 0.0.0.0:8188 (pid 4127)"],
+["09:12:41","INFO","pool: discovered 3 models · pinned: Qwen2.5-7B-Instruct"],
+["09:12:42","INFO","backend.transformers: loading Qwen2.5-7B-Instruct on gcu:0 (fp16)"],
+["09:13:23","INFO","backend.transformers: loaded Qwen2.5-7B-Instruct in 41.2 s · 14.5 GB device mem"],
+["09:13:25","DEBUG","devices: efsmi poll ok · 49 °C · util 4%"],
+["09:14:02","INFO","api: POST /v1/chat/completions 200 · 1.9 s · 214 tok · 11.8 tok/s"],
+["09:14:31","INFO","api: POST /v1/messages 200 · 3.4 s · 402 tok · 12.1 tok/s (anthropic)"],
+["09:14:31","DEBUG","pool: LRU touch Qwen2.5-7B-Instruct"],
+["09:16:08","WARN","scheduler: at capacity (active=8 queued=32) → 503 Retry-After=2"],
+["09:16:08","INFO","stats: rejection recorded: overloaded (session ×3)"],
+["09:18:44","INFO","downloader[hf-mirror.com]: Qwen2.5-14B-Instruct 41% · 40.8 MB/s · ETA 7m02s"],
+["09:19:12","INFO","api: SSE keep-alive ×2 (prefill 8.3 s, ctx=8192)"],
+["09:21:37","ERROR","registry: UnsupportedModelError: 'bge-m3' is an embedding model — rejected before any device op (422)"],
+["09:24:05","INFO","pool: loading Qwen2.5-14B-Instruct on gcu:0 (fp16) — fits (29.9 GB, ceiling 45.0)"],
+["09:25:41","INFO","backend.transformers: loaded Qwen2.5-14B-Instruct in 96.4 s · 29.9 GB device mem"],
+["09:25:44","DEBUG","devices: efsmi poll ok · 56 °C · util 37%"],
+["09:27:19","INFO","bench: run start · Qwen2.5-7B-Instruct fp16 · ctx {512,2048} · iters 8"],
+["09:31:02","INFO","bench: run complete · tg 12.0 tok/s median → published to community hub"],
+["09:33:10","WARN","api: client disconnected mid-stream · lease released · decode thread finishes current token"],
+["09:38:56","INFO","downloader[hf-mirror.com]: Qwen2.5-14B-Instruct 62% · 41.2 MB/s · ETA 4m12s"],
+["09:40:22","INFO","server: settings updated: max_concurrent_requests=8 → applied live"],
+];
+let LOGS=[...LOG0];
+const LG={lv:"",q:"",follow:true};
+P.logs=()=>`
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <select onchange="LG.lv=this.value;mountLogs()">
+        <option value="">${esc(t("All levels"))}</option>
+        ${["INFO","WARN","ERROR","DEBUG"].map(l=>`<option ${LG.lv===l?"selected":""}>${l}</option>`).join("")}
+      </select>
+      <input placeholder="${esc(t("Search logs…"))}" value="${esc(LG.q)}" oninput="LG.q=this.value;mountLogs()" style="min-width:220px"/>
+      <span class="spacer"></span>
+      <button class="fchip ${LG.follow?"on":""}" onclick="LG.follow=!LG.follow;this.classList.toggle('on')">${esc(t("Follow"))}</button>
+      <button class="btn sm ghost" onclick="LOGS.length=0;mountLogs()">${esc(t("Clear"))}</button>
+    </div>
+    <div class="logbox" id="logbox"></div>
+  </div>`;
+function mountLogs(){
+  const b=$("#logbox"); if(!b) return;
+  const rows=LOGS.filter(l=>(!LG.lv||l[1]===LG.lv)&&(!LG.q||l[2].toLowerCase().includes(LG.q.toLowerCase())));
+  b.innerHTML=rows.map(l=>`<div class="logline ${l[1]}"><span class="ts">${l[0]}</span><span class="lv">${l[1]}</span>${esc(l[2])}</div>`).join("")||`<div class="empty">—</div>`;
+  if(LG.follow)b.scrollTop=b.scrollHeight;
+}
+/* ------- chat ------- */
+const CH={model:"Qwen2.5-7B-Instruct",temp:0.7,max:512,msgs:[
+  {role:"user",key:"Summarize what infermesh does in one sentence."},
+  {role:"asst",key:"infermesh is a hardware-agnostic LLM serving platform: one OpenAI/Anthropic-compatible gateway over pluggable backends, so the same control plane runs on NVIDIA, Enflame GCU, Apple silicon, or in-house chips.",meta:"12.0 tok/s · TTFT 0.92 s · gcu:0"},
+]};
+function renderMsgs(){
+  const el=$("#msgs"); if(!el) return;
+  el.innerHTML=CH.msgs.map(m=>`<div class="msg ${m.role}">${esc(m.raw??t(m.key))}${m.meta?`<div class="meta">${esc(m.meta)}</div>`:""}</div>`).join("");
+  el.scrollTop=el.scrollHeight;
+}
+function sendChat(){
+  const inp=$("#chatIn"); const v=(inp.value||"").trim(); if(!v) return;
+  CH.msgs.push({role:"user",raw:v}); inp.value=""; renderMsgs();
+  setTimeout(()=>{CH.msgs.push({role:"asst",key:"Canned reply — wire this panel to /v1/chat/completions for live streaming.",
+    meta:fmt(11.4+rnd()*1.2,1)+" tok/s · TTFT 0.9 s · gcu:0"}); renderMsgs();},650);
+}
+function clearChat(){CH.msgs=[];renderMsgs();}
+P.chat=()=>`
+  <div class="card chatbox">
+    <div class="row" style="margin-bottom:10px">
+      <label class="fl">${esc(t("Model"))}
+        <select onchange="CH.model=this.value">${MODEL_ROWS.filter(m=>m.status!=="unloaded").map(m=>`<option ${CH.model===m.id?"selected":""}>${esc(m.id)}</option>`).join("")}</select></label>
+      <label class="fl">${esc(t("Temperature"))}<input type="number" step="0.1" min="0" max="2" value="${CH.temp}" style="width:84px" oninput="CH.temp=+this.value"/></label>
+      <label class="fl">${esc(t("Max tokens"))}<input type="number" value="${CH.max}" style="width:96px" oninput="CH.max=+this.value"/></label>
+      <span class="spacer"></span>
+      <span class="hint">${esc(t("This is a design preview — replies are canned."))}</span>
+    </div>
+    <div class="msgs" id="msgs"></div>
+    <div class="row" style="margin-top:10px">
+      <input id="chatIn" placeholder="${esc(t("Type a message…"))}" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();sendChat()}"/>
+      <button class="btn primary" onclick="sendChat()">${esc(t("Send"))}</button>
+      <button class="btn ghost" onclick="clearChat()">${esc(t("Clear"))}</button>
+    </div>
+  </div>`;
+/* ------- settings ------- */
+P.settings=()=>`
+  <div class="grid g2" style="margin-bottom:14px">
+    <div class="card"><h3 style="margin-bottom:12px">${esc(t("Server"))}</h3>
+      <div class="grid" style="gap:10px">
+        <label class="fl"><span>${esc(t("Host"))} <span class="tag dim" style="margin-left:6px">${esc(t("requires restart"))}</span></span><input value="0.0.0.0" class="mono"/></label>
+        <label class="fl"><span>${esc(t("Port"))} <span class="tag dim" style="margin-left:6px">${esc(t("requires restart"))}</span></span><input value="8188" class="mono" style="width:120px"/></label>
+        <label class="fl">${esc(t("Model directory"))}<input value="/data/models" class="mono"/></label>
+      </div></div>
+    <div class="card"><h3 style="margin-bottom:12px">${esc(t("Pool"))}</h3>
+      <div class="grid g2" style="gap:10px">
+        <label class="fl">${esc(t("Memory ceiling (MB)"))}<input value="46080" class="mono"/></label>
+        <label class="fl">${esc(t("Idle TTL (s)"))}<input value="900" class="mono"/></label>
+        <label class="fl">${esc(t("Max concurrent requests"))}<input value="8" class="mono"/></label>
+        <label class="fl">${esc(t("Max queued requests"))}<input value="32" class="mono"/></label>
+      </div>
+      <div class="hint" style="margin-top:10px">${esc(t("Overloaded responses return 503 with Retry-After."))}</div></div>
+    <div class="card"><h3 style="margin-bottom:12px">${esc(t("Community hub"))}</h3>
+      <div class="grid" style="gap:10px">
+        <label class="fl">${esc(t("Hub URL"))}<input value="http://hub.internal:8188" class="mono"/></label>
+        <label class="row" style="gap:9px;cursor:pointer;font-size:12.5px"><input type="checkbox" checked/><span>${esc(t("Default auto-publish"))}</span></label>
+        <label class="fl">${esc(t("Submitter label"))}<input value="prod" class="mono" style="width:180px"/></label>
+      </div></div>
+    <div class="card"><h3 style="margin-bottom:12px">${esc(t("Interface"))}</h3>
+      <label class="fl">${esc(t("Default language"))}
+        <select style="width:160px"><option selected>中文</option><option>English</option></select></label>
+    </div>
+  </div>
+  <button class="btn primary" onclick="toast(t('Saved'))">${esc(t("Save changes"))}</button>`;
+/* ============================ boot ============================ */
+function rerender(){
+  renderTop();
+  $("#view").innerHTML=P[page]?P[page]():"";
+  if(page==="explorer")mountExplorer();
+  else if(page==="community")mountCommunity();
+  else if(page==="benchmark")mountBench();
+  else if(page==="analysis")mountAnalysis();
+  else if(page==="compare")mountCompare();
+  else if(page==="logs")mountLogs();
+  else if(page==="chat")renderMsgs();
+}
+function renderPage(){rerender();}
+function setLang(l){lang=l;document.documentElement.setAttribute("lang",l==="zh"?"zh":"en");renderNav();rerender();}
+function toggleTheme(){const r=document.documentElement;
+  r.setAttribute("data-theme",r.getAttribute("data-theme")==="dark"?"light":"dark");}
+/* ============================================================
+   v2 — hardware-efficiency layer: specs, distributions, sweeps
+   ============================================================ */
+/* Datasheet placeholders. In the real build these live in Settings →
+   per-chip spec registry; MBU/MFU derive from them + measured throughput. */
+const SPECS={
+ s60:{bw:640,tf:40,tdp:300,ic:"PCIe 4.0 x16"},
+ a100:{bw:1555,tf:312,tdp:300,ic:"NVLink 3 · 600 GB/s"},
+ "4090":{bw:1008,tf:165,tdp:450,ic:"PCIe 4.0 x16"},
+ m3max:{bw:400,tf:28,tdp:90,ic:"UMA"},
+ gx1:{bw:800,tf:120,tdp:250,ic:"GXLink 1 · 280 GB/s"},
+};
+/* tg (7B fp16 @2k) per driver/SDK version — regression-timeline source */
+const DRVTL={
+ s60:[["efsmi 2.3.98",9.4],["efsmi 2.4.110",11.2],["efsmi 2.5.120",12.3],["efsmi 2.5.136",12.0]],
+ a100:[["535.104",37.9],["550.54",38.3],["560.35",38.5]],
+ "4090":[["545.29",44.1],["550.54",45.2],["560.35",45.0]],
+ m3max:[["Metal 3.2",21.8]],
+ gx1:[["sdk 0.7.2",11.8],["sdk 0.8.0",15.9],["sdk 0.9.1",17.5]],
+};
+const PWR={s60:210,a100:265,"4090":340,m3max:72,gx1:190};       // avg W, decode
+const SOAK={s60:-0.03,a100:-0.02,"4090":-0.09,m3max:-0.01,gx1:-0.01}; // 5-min soak vs burst
+const MEMBRK={                                                   // 7B @2k, best quant, GB
+ s60:{q:"fp16",w:13.2,kv:0.8,act:0.3,frag:0.2},
+ a100:{q:"fp16",w:13.2,kv:0.8,act:0.4,frag:0.3},
+ "4090":{q:"4bit",w:4.6,kv:0.8,act:0.3,frag:0.3},
+ m3max:{q:"4bit",w:4.6,kv:0.8,act:0.2,frag:0.2},
+ gx1:{q:"int8",w:7.3,kv:0.8,act:0.3,frag:1.1},
+};
+const CORR=[  // greedy-match vs fp16 reference, 200 fixed prompts; mean logit KL
+ ["s60","fp16",0.998,0.0004,"pass"],
+ ["a100","fp16",0.999,0.0002,"pass"],
+ ["a100","int8",0.994,0.0021,"pass"],
+ ["4090","fp16",0.999,0.0002,"pass"],
+ ["4090","int8",0.995,0.0019,"pass"],
+ ["4090","4bit",0.968,0.0120,"warn"],
+ ["m3max","fp16",0.998,0.0005,"pass"],
+ ["m3max","4bit",0.971,0.0104,"warn"],
+ ["gx1","fp16",0.997,0.0007,"pass"],
+ ["gx1","int8",0.992,0.0031,"pass"],
+];
+const SCALE={
+ a100:{cards:[1,2,4,8],eff:[1,.96,.90,.82]},
+ gx1:{cards:[1,2,4,8],eff:[1,.92,.81,.64]},
+ "4090":{cards:[1,2],eff:[1,.88]},
+};
+const BPP={fp16:2,int8:1,"4bit":0.5};
+const chipOf=id=>CHIPS.find(c=>c.id===id);
+const qspd=q=>QUANTS.find(x=>x.id===q).spd;
+/* MBU: weight bytes streamed per token ÷ peak BW.  MFU: 2·P·pp ÷ peak FLOPs. 7B reference. */
+function mbu(id,q){const c=chipOf(id);return 7*BPP[q]*c.tg*qspd(q)/SPECS[id].bw;}
+function mfu(id){const c=chipOf(id);return 2*7*c.pp/1000/SPECS[id].tf;}
+function tokJ(id){const c=chipOf(id),q=MEMBRK[id].q;return c.tg*qspd(q)/PWR[id];}
+/* --- per-request latency distributions (seeded) --- */
+function genDist(id){
+ const c=chipOf(id),q=MEMBRK[id].q,spd=qspd(q);
+ const itlB=1000/(c.tg*spd), ttB=(2048/c.pp+c.ov)*1000;
+ const spike={s60:.04,a100:.008,"4090":.01,m3max:.02,gx1:.025}[id];
+ const itl=[],ttft=[];
+ for(let i=0;i<3000;i++){let v=itlB*(0.93+0.14*rnd());if(rnd()<spike)v*=2+6*rnd();itl.push(v);}
+ for(let i=0;i<300;i++){let v=ttB*(0.94+0.12*rnd());if(rnd()<spike*0.8)v*=1.4+1.6*rnd();ttft.push(v);}
+ const e2e=ttft.map(t=>(t+256*itl[Math.floor(rnd()*itl.length)])/1000);
+ return {q,itl,ttft,e2e};
+}
+const DIST={}; CHIPS.forEach(c=>DIST[c.id]=genDist(c.id));
+function pct(a,p){const s=[...a].sort((x,y)=>x-y),i=(s.length-1)*p,lo=Math.floor(i),hi=Math.ceil(i);return s[lo]+(s[hi]-s[lo])*(i-lo);}
+function cvOf(a){const m=a.reduce((s,x)=>s+x,0)/a.length,v=a.reduce((s,x)=>s+(x-m)*(x-m),0)/a.length;return Math.sqrt(v)/m;}
+/* --- concurrency sweep → throughput/p99 frontier --- */
+const SWEEP=[1,2,4,8,16,32,64];
+const SAT={s60:6,a100:28,"4090":22,m3max:8,gx1:12};
+function frontier(id){
+ const c=chipOf(id),q=MEMBRK[id].q,t1=c.tg*qspd(q),tt0=2048/c.pp+c.ov,s=SAT[id];
+ return SWEEP.map(k=>({k,thr:t1*k/(1+Math.pow(k/s,1.35)),
+                       p99:tt0*(1+0.18*k/s+0.9*Math.pow(k/s,2.2))*1.25}));
+}
+function goodput(id,slo){let g=0,kk=0;for(const p of frontier(id))if(p.p99<=slo&&p.thr>g){g=p.thr;kk=p.k;}return {g,k:kk};}
+/* --- generic tooltip binding for v2 charts --- */
+function bindTTs(scope){
+ (scope||document).querySelectorAll("[data-tt]").forEach(el=>{
+   el.addEventListener("mousemove",e=>showTT(decodeURIComponent(el.dataset.tt),e));
+   el.addEventListener("mouseleave",hideTT);
+ });
+}
+/* --- log-scale helpers + v2 SVG builders --- */
+const lg=Math.log10;
+function lgX(v,mn,mx,p0,p1){return p0+(lg(v)-lg(mn))/(lg(mx)-lg(mn))*(p1-p0);}
+function rooflineSVG(id){
+ const W=920,H=430,L=70,R=26,T=26,B=52,mnx=.5,mxx=8192,mny=.5,mxy=512;
+ const X=v=>lgX(v,mnx,mxx,L,W-R),Y=v=>H-B-(lg(v)-lg(mny))/(lg(mxy)-lg(mny))*(H-T-B);
+ const roof=(bw,tf)=>{const ridge=tf*1000/bw;let d="M";
+   d+=X(mnx)+" "+Y(bw*mnx/1000)+" L "+X(ridge)+" "+Y(tf)+" L "+X(mxx)+" "+Y(tf);return d;};
+ let g="";
+ for(const e of [1,10,100]){for(let m=1;m<10;m++){const v=e*m;if(v<mny||v>mxy)continue;
+   g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="${m===1?1:.4}" opacity="${m===1?.8:.35}"/>`;
+   if(m===1)g+=`<text x="${L-8}" y="${Y(v)+4}" text-anchor="end" class="axis">${v}</text>`;}}
+ for(const e of [1,10,100,1000]){for(let m=1;m<10;m++){const v=e*m;if(v<mnx||v>mxx)continue;
+   g+=`<line y1="${T}" y2="${H-B}" x1="${X(v)}" x2="${X(v)}" stroke="var(--line)" stroke-width="${m===1?1:.4}" opacity="${m===1?.8:.35}"/>`;
+   if(m===1)g+=`<text x="${X(v)}" y="${H-B+18}" text-anchor="middle" class="axis">${v>=1000?(v/1000)+"k":v}</text>`;}}
+ const ref=id==="a100"?"s60":"a100";
+ g+=`<path d="${roof(SPECS[ref].bw,SPECS[ref].tf)}" fill="none" stroke="${chipOf(ref).hex}" stroke-width="1.4" stroke-dasharray="5 5" opacity=".45"/>`;
+ g+=`<path d="${roof(SPECS[id].bw,SPECS[id].tf)}" fill="none" stroke="${chipOf(id).hex}" stroke-width="2.4"/>`;
+ const c=chipOf(id);let pts="";
+ for(const q of c.quants){
+  const ix=2/BPP[q],perf=2*7*c.tg*qspd(q)/1000,m=mbu(id,q);
+  pts+=`<circle cx="${X(ix)}" cy="${Y(perf)}" r="7" fill="${c.hex}" stroke="var(--bg1)" stroke-width="2" data-tt="${encodeURIComponent(`<b>decode · ${q}</b><br>${(2*7*c.tg*qspd(q)/1000).toFixed(2)} TFLOP/s @ ${ix} FLOP/B<br>MBU ${(m*100).toFixed(1)}%`)}"/>`;
+  pts+=`<text x="${X(ix)}" y="${Y(perf)-12}" text-anchor="middle" class="axis" fill="${c.hex}">${q}</text>`;
+ }
+ const ixp=2048*2/BPP.fp16,perfp=2*7*c.pp/1000;
+ pts+=`<rect x="${X(ixp)-6.5}" y="${Y(perfp)-6.5}" width="13" height="13" rx="2.5" fill="${c.hex}" stroke="var(--bg1)" stroke-width="2" data-tt="${encodeURIComponent(`<b>prefill · fp16</b><br>${perfp.toFixed(1)} TFLOP/s @ ${fmt0(ixp)} FLOP/B<br>MFU ${(mfu(id)*100).toFixed(1)}%`)}"/>`;
+ pts+=`<text x="${X(ixp)}" y="${Y(perfp)-13}" text-anchor="middle" class="axis" fill="${c.hex}">prefill</text>`;
+ return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+  <text x="${L-46}" y="${T-8}" class="axis">TFLOP/s</text>
+  <text x="${W-R}" y="${H-8}" text-anchor="end" class="axis">FLOP/byte (log)</text>${g}${pts}</svg>`;
+}
+function frontierSVG(ids,slo){
+ const W=920,H=400,L=64,R=24,T=24,B=50;
+ let mxThr=0;ids.forEach(id=>frontier(id).forEach(p=>mxThr=Math.max(mxThr,p.thr)));
+ const mny=.08,mxy=60;
+ const X=v=>L+v/(mxThr*1.08)*(W-L-R),Y=v=>H-B-(lg(v)-lg(mny))/(lg(mxy)-lg(mny))*(H-T-B);
+ let g="";
+ for(const v of [0.1,0.5,1,2,5,10,30]){g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width=".6" opacity=".5"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end" class="axis">${v}</text>`;}
+ const xt=niceTicks(0,mxThr*1.08,6).ticks;
+ for(const v of xt){if(v===0)continue;g+=`<line y1="${T}" y2="${H-B}" x1="${X(v)}" x2="${X(v)}" stroke="var(--line)" stroke-width=".6" opacity=".5"/><text x="${X(v)}" y="${H-B+18}" text-anchor="middle" class="axis">${fmt0(v)}</text>`;}
+ g+=`<line x1="${L}" x2="${W-R}" y1="${Y(slo)}" y2="${Y(slo)}" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="7 5"/><text x="${W-R}" y="${Y(slo)-6}" text-anchor="end" class="axis" fill="var(--warn)">SLO p99 ≤ ${slo}s</text>`;
+ for(const id of ids){const c=chipOf(id),F=frontier(id);
+  let d="M"+F.map(p=>X(p.thr)+" "+Y(p.p99)).join(" L ");
+  g+=`<path d="${d}" fill="none" stroke="${c.hex}" stroke-width="2.2" opacity=".9"/>`;
+  const gp=goodput(id,slo);
+  for(const p of F){const knee=p.k===gp.k&&gp.g>0;
+   g+=`<circle cx="${X(p.thr)}" cy="${Y(p.p99)}" r="${knee?7:4.5}" fill="${knee?"var(--bg1)":c.hex}" stroke="${c.hex}" stroke-width="${knee?3:0}" data-tt="${encodeURIComponent(`<b>${esc(c.name)}</b> · c=${p.k}<br>${p.thr.toFixed(1)} tok/s · p99 TTFT ${p.p99.toFixed(2)}s${knee?"<br><b>← goodput point</b>":""}`)}"/>`;}
+ }
+ return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+  <text x="${L-40}" y="${T-6}" class="axis">p99 TTFT s (log)</text>
+  <text x="${W-R}" y="${H-6}" text-anchor="end" class="axis">aggregate tok/s → concurrency 1…64</text>${g}</svg>`;
+}
+function scalingSVG(){
+ const W=920,H=380,L=64,R=24,T=24,B=48,mx=8;
+ const X=v=>L+(v-1)/(mx-1)*(W-L-R),Y=v=>H-B-(v/8)*(H-T-B);
+ let g=`<path d="M ${X(1)} ${Y(1)} L ${X(8)} ${Y(8)}" stroke="var(--tx3)" stroke-width="1.4" stroke-dasharray="6 5" fill="none"/><text x="${X(8)-6}" y="${Y(8)+16}" text-anchor="end" class="axis">ideal linear</text>`;
+ for(const v of [1,2,4,6,8]){g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width=".6" opacity=".5"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end" class="axis">${v}×</text>`;}
+ for(const v of [1,2,4,8]){g+=`<text x="${X(v)}" y="${H-B+18}" text-anchor="middle" class="axis">${v}</text>`;}
+ for(const id in SCALE){const c=chipOf(id),s=SCALE[id];
+  const ptv=s.cards.map((k,i)=>({k,sp:k*s.eff[i],eff:s.eff[i]}));
+  g+=`<path d="M ${ptv.map(p=>X(p.k)+" "+Y(p.sp)).join(" L ")}" fill="none" stroke="${c.hex}" stroke-width="2.2"/>`;
+  for(const p of ptv){g+=`<circle cx="${X(p.k)}" cy="${Y(p.sp)}" r="5" fill="${c.hex}" data-tt="${encodeURIComponent(`<b>${esc(c.name)}</b> · ${p.k}× GPU<br>speedup ${p.sp.toFixed(2)}× · efficiency ${(p.eff*100).toFixed(0)}%`)}"/>`;
+   if(p.k>1)g+=`<text x="${X(p.k)}" y="${Y(p.sp)-11}" text-anchor="middle" class="axis" fill="${c.hex}">${(p.eff*100).toFixed(0)}%</text>`;}
+ }
+ return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+  <text x="${L-40}" y="${T-6}" class="axis">speedup</text>
+  <text x="${W-R}" y="${H-6}" text-anchor="end" class="axis">GPUs (tensor parallel)</text>${g}</svg>`;
+}
+function timelineSVG(id,mark){
+ const W=920,H=300,L=64,R=24,T=26,B=46,tl=DRVTL[id],c=chipOf(id);
+ const vals=tl.map(x=>x[1]),mn=Math.min(...vals)*0.9,mx=Math.max(...vals)*1.08;
+ const X=i=>L+(tl.length===1?((W-L-R)/2):i/(tl.length-1)*(W-L-R)),Y=v=>H-B-(v-mn)/(mx-mn)*(H-T-B);
+ let g="";const yt=niceTicks(mn,mx,5).ticks;
+ for(const v of yt){g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width=".6" opacity=".5"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end" class="axis">${v}</text>`;}
+ g+=`<path d="M ${tl.map((x,i)=>X(i)+" "+Y(x[1])).join(" L ")}" fill="none" stroke="${c.hex}" stroke-width="2.4"/>`;
+ tl.forEach((x,i)=>{
+  const reg=i>0&&x[1]<tl[i-1][1]*0.99;
+  g+=`<circle cx="${X(i)}" cy="${Y(x[1])}" r="${reg?7:5}" fill="${reg?"var(--err)":c.hex}" data-tt="${encodeURIComponent(`<b>${esc(x[0])}</b><br>tg ${x[1].toFixed(1)} tok/s${i>0?`<br>Δ ${(100*(x[1]/tl[i-1][1]-1)).toFixed(1)}% vs ${esc(tl[i-1][0])}`:""}${reg?"<br><b>regression</b>":""}`)}"/>`;
+  g+=`<text x="${X(i)}" y="${H-B+18}" text-anchor="middle" class="axis">${esc(x[0])}</text>`;
+  if(reg)g+=`<text x="${X(i)}" y="${Y(x[1])-13}" text-anchor="middle" class="axis" fill="var(--err)">▼ ${(100*(x[1]/tl[i-1][1]-1)).toFixed(1)}%</text>`;
+ });
+ return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+  <text x="${L-40}" y="${T-8}" class="axis">tg tok/s · 7B fp16 @2k</text>${g}</svg>`;
+}
+function histSVG(arr,hex){
+ const W=440,H=120,B=18,bins=26,mn=Math.min(...arr),mx=pct(arr,.995);
+ const h=new Array(bins).fill(0);arr.forEach(v=>{const b=Math.min(bins-1,Math.floor((v-mn)/(mx-mn)*bins));if(b>=0)h[b]++;});
+ const pk=Math.max(...h);let g="";
+ h.forEach((n,i)=>{const bh=n/pk*(H-B-8);g+=`<rect x="${i*(W/bins)+1}" y="${H-B-bh}" width="${W/bins-2}" height="${bh}" rx="1.5" fill="${hex}" opacity=".8"/>`;});
+ g+=`<text x="2" y="${H-4}" class="axis">${mn.toFixed(0)}ms</text><text x="${W-2}" y="${H-4}" text-anchor="end" class="axis">${mx.toFixed(0)}ms · p99.5</text>`;
+ return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">${g}</svg>`;
+}
+/* ------- hardware analysis (v2) ------- */
+const AN={tab:"eff",chip:"gx1",cap:new Set(["s60","a100","gx1"]),slo:2,dist:"gx1"};
+function anR(){$("#view").innerHTML=P.analysis();bindTTs($("#view"));}
+function chipPick(sel,multi,fn){
+ return CHIPS.map(c=>{const on=multi?AN[sel].has(c.id):AN[sel]===c.id;
+  return `<button class="fchip ${on?"on":""}" onclick="${fn}('${c.id}')" ${on?`style="border-color:${c.hex}66"`:""}>
+   <span class="sw" style="background:${c.hex}${on?"":"55"}"></span>${esc(c.name)}${c.sample?` <span class="tag" style="color:var(--mut);margin-left:4px">${esc(t("in-house sample"))}</span>`:""}</button>`;}).join("");
+}
+function anChip(id){AN.chip=id;anR();}
+function anDistC(id){AN.dist=id;anR();}
+function anCap(id){AN.cap.has(id)?(AN.cap.size>1&&AN.cap.delete(id)):AN.cap.add(id);anR();}
+function anSlo(v){AN.slo=v;anR();}
+function anTab(tb){AN.tab=tb;anR();}
+function memBar(id){
+ const b=MEMBRK[id],c=chipOf(id),tot=b.w+b.kv+b.act+b.frag,mx=15.2;
+ const seg=(v,col,lb)=>`<div data-tt="${encodeURIComponent(`<b>${esc(t(lb))}</b> ${v.toFixed(1)} GB · ${(v/tot*100).toFixed(0)}%`)}" style="width:${v/mx*100}%;background:${col};min-width:3px"></div>`;
+ return `<div style="display:flex;align-items:center;gap:12px;margin:7px 0">
+  <div style="width:170px;flex:none" class="mono sub">${esc(c.name)} · ${b.q}</div>
+  <div style="flex:1;display:flex;height:22px;border-radius:6px;overflow:hidden;border:1px solid var(--line);background:var(--inset)">
+   ${seg(b.w,c.hex+"cc","weights")}${seg(b.kv,"var(--ok)","KV cache")}${seg(b.act,"var(--info)","activations")}${seg(b.frag,"var(--err)","fragmentation")}</div>
+  <div class="mono num" style="width:76px;flex:none;text-align:right">${tot.toFixed(1)} GB</div></div>`;
+}
+function anEff(){
+ const id=AN.chip,c=chipOf(id),q=MEMBRK[id].q,S=SPECS[id];
+ const kpi=(lbl,val,unit)=>`<div class="card tight kpi"><div class="eyebrow">${esc(t(lbl))}</div><div class="ro">${val}<small>${unit}</small></div></div>`;
+ return `
+ <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">${chipPick("chip",false,"anChip")}</div>
+ <div class="grid g4" style="margin-bottom:14px">
+  ${kpi("decode MBU (best quant)",fmt(mbu(id,q)*100,1),"% · "+q)}
+  ${kpi("prefill MFU",fmt(mfu(id)*100,1),"%")}
+  ${kpi("tokens per joule",tokJ(id).toFixed(3),"tok/J")}
+  ${kpi("avg power / TDP",PWR[id]+" / "+S.tdp,"W")}
+ </div>
+ <div class="card" style="margin-bottom:14px">
+  <div class="eyebrow">${esc(t("Roofline — where each workload sits"))} · ${esc(c.name)} · ${S.bw} GB/s · ${S.tf} TFLOPS fp16</div>
+  <div class="plotwrap">${rooflineSVG(id)}</div>
+  <div class="hint">${esc(t("Solid roof = selected chip. Dashed = reference. Circles = decode per quant, square = prefill. Hover for MBU/MFU."))}</div>
+ </div>
+ <div class="grid g2" style="margin-bottom:14px">
+  <div class="card">
+   <div class="eyebrow">${esc(t("Efficiency across chips"))}</div>
+   <table class="tbl"><thead><tr><th>${esc(t("chip"))}</th><th>${esc(t("quant"))}</th><th class="num">${esc(t("MBU decode"))}</th><th class="num">${esc(t("MFU prefill"))}</th><th class="num">${esc(t("tok/J"))}</th><th class="num">${esc(t("soak Δ"))}</th></tr></thead><tbody>
+   ${CHIPS.map(x=>{const xq=MEMBRK[x.id].q;const soak=SOAK[x.id];
+     return `<tr><td><span class="tag" style="color:${x.hex}">${esc(x.name)}</span></td><td class="mono">${xq}</td>
+     <td class="num">${fmt(mbu(x.id,xq)*100,1)}%</td><td class="num">${fmt(mfu(x.id)*100,1)}%</td>
+     <td class="num">${tokJ(x.id).toFixed(3)}</td>
+     <td class="num" style="color:${soak<=-0.05?"var(--err)":"var(--mut)"}">${(soak*100).toFixed(0)}%${soak<=-0.05?" · "+esc(t("throttling")):""}</td></tr>`;}).join("")}
+   </tbody></table>
+  </div>
+  <div class="card">
+   <div class="eyebrow">${esc(t("Memory breakdown — 7B @2k, best quant"))}</div>
+   ${CHIPS.map(x=>memBar(x.id)).join("")}
+   <div class="legend" style="margin-top:8px">
+    <span><span class="sw" style="background:var(--sig)"></span>${esc(t("weights"))}</span>
+    <span><span class="sw" style="background:var(--ok)"></span>${esc(t("KV cache"))}</span>
+    <span><span class="sw" style="background:var(--info)"></span>${esc(t("activations"))}</span>
+    <span><span class="sw" style="background:var(--err)"></span>${esc(t("fragmentation"))}</span></div>
+  </div>
+ </div>
+ <div class="card ins" style="margin-bottom:14px">
+  <div class="eyebrow" style="color:var(--sig)">Insight</div>
+  <p style="margin:6px 0 2px;font-size:12.5px;line-height:1.7">${esc(t("GX-1 allocator fragmentation is 1.1 GB — 3–5× peers. Worth a look before it compounds at 70B scale."))}</p>
+ </div>
+ <div class="hint">${esc(t("Spec-sheet placeholders — edit per-chip peak BW / TFLOPS / TDP in Settings; MBU & MFU derive from them plus measured throughput. No hardware counters required for v1."))}</div>`;
+}
+function anCapT(){
+ const ids=[...AN.cap];
+ return `
+ <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px">
+  ${chipPick("cap",true,"anCap")}
+  <span style="flex:1"></span>
+  <div class="seg">${[1,2,5,10].map(v=>`<button class="${AN.slo===v?"active":""}" onclick="anSlo(${v})">p99 ≤ ${v}s</button>`).join("")}</div>
+ </div>
+ <div class="card" style="margin-bottom:14px">
+  <div class="eyebrow">${esc(t("Throughput–latency frontier"))} · 7B · ctx 2k · ${esc(t("concurrency"))} 1→64</div>
+  <div class="plotwrap">${frontierSVG(ids,AN.slo)}</div>
+  <div class="hint">${esc(t("Ring = goodput point: highest throughput still meeting the SLO. Hover points for concurrency."))}</div>
+ </div>
+ <div class="card">
+  <div class="eyebrow">${esc(t("Goodput @ SLO"))} p99 TTFT ≤ ${AN.slo}s</div>
+  <table class="tbl"><thead><tr><th>${esc(t("chip"))}</th><th class="num">goodput tok/s</th><th class="num">${esc(t("max conc"))}</th><th class="num">${esc(t("p99 at that point"))}</th></tr></thead><tbody>
+  ${ids.map(id=>{const c=chipOf(id),gp=goodput(id,AN.slo);
+   if(!gp.g)return `<tr><td><span class="tag" style="color:${c.hex}">${esc(c.name)}</span></td><td class="num sub" colspan="3">${esc(t("does not meet SLO at any concurrency (prefill-bound)"))}</td></tr>`;
+   const pt=frontier(id).find(p=>p.k===gp.k);
+   return `<tr><td><span class="tag" style="color:${c.hex}">${esc(c.name)}</span></td><td class="num">${fmt(gp.g,1)}</td><td class="num">${gp.k}</td><td class="num">${pt.p99.toFixed(2)} s</td></tr>`;}).join("")}
+  </tbody></table>
+ </div>`;
+}
+function anScaleT(){
+ return `
+ <div class="card" style="margin-bottom:14px">
+  <div class="eyebrow">${esc(t("Multi-GPU scaling (tensor parallel)"))}</div>
+  <div class="plotwrap">${scalingSVG()}</div>
+  <div class="hint">${esc(t("Ideal = linear. Labels show parallel efficiency. Data: 7B fp16, ctx 2k."))}</div>
+ </div>
+ <div class="grid g2" style="margin-bottom:14px">
+  <div class="card">
+   <div class="eyebrow">${esc(t("efficiency"))}</div>
+   <table class="tbl"><thead><tr><th>${esc(t("chip"))}</th><th>${esc(t("interconnect"))}</th>${[1,2,4,8].map(k=>`<th class="num">${k}×</th>`).join("")}</tr></thead><tbody>
+   ${Object.keys(SCALE).map(id=>{const c=chipOf(id),s=SCALE[id];
+    return `<tr><td><span class="tag" style="color:${c.hex}">${esc(c.name)}</span></td><td class="mono sub">${esc(SPECS[id].ic)}</td>
+    ${[1,2,4,8].map(k=>{const i=s.cards.indexOf(k);return `<td class="num">${i<0?"—":(s.eff[i]*100).toFixed(0)+"%"}</td>`;}).join("")}</tr>`;}).join("")}
+   </tbody></table>
+  </div>
+  <div class="card ins">
+   <div class="eyebrow" style="color:var(--sig)">Insight</div>
+   <p style="margin:6px 0 2px;font-size:12.5px;line-height:1.7">${esc(t("GX-1 efficiency collapses 81% → 64% from 4 to 8 cards while A100/NVLink holds 82%. Points at GXLink all-reduce bandwidth — the single highest-leverage hardware question this system can answer."))}</p>
+  </div>
+ </div>
+ <div class="hint">${esc(t("S60 runs single-card in the current deployment; add nodes to populate its row."))}</div>`;
+}
+function anDistT(){
+ const id=AN.dist,c=chipOf(id),D=DIST[id];
+ const row=(lb,a,unit,d)=>`<tr><td>${esc(t(lb))}</td>
+  <td class="num">${pct(a,.5).toFixed(d)}</td><td class="num">${pct(a,.9).toFixed(d)}</td>
+  <td class="num">${pct(a,.99).toFixed(d)}</td><td class="num">${pct(a,.999).toFixed(d)}</td>
+  <td class="num">${(cvOf(a)*100).toFixed(1)}%</td><td class="mono sub">${unit}</td></tr>`;
+ const spikes=D.itl.filter(v=>v>2*pct(D.itl,.5)).length;
+ return `
+ <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">${chipPick("dist",false,"anDistC")}</div>
+ <div class="grid g2" style="margin-bottom:14px">
+  <div class="card">
+   <div class="eyebrow">${esc(t("Latency distributions"))} · ${esc(c.name)} · ${D.q} · 7B @2k</div>
+   <table class="tbl"><thead><tr><th>${esc(t("metric"))}</th><th class="num">p50</th><th class="num">p90</th><th class="num">p99</th><th class="num">p99.9</th><th class="num">CV</th><th></th></tr></thead><tbody>
+    ${row("TTFT",D.ttft,"ms",0)}
+    ${row("ITL",D.itl,"ms",1)}
+    ${row("E2E",D.e2e,"s",2)}
+   </tbody></table>
+  </div>
+  <div class="card">
+   <div class="eyebrow">${esc(t("ITL histogram"))} · n=3000</div>
+   <div class="plotwrap" style="padding:10px 12px">${histSVG(D.itl,c.hex)}</div>
+   <div class="grid g2" style="margin-top:10px">
+    <div class="card tight kpi"><div class="eyebrow">${esc(t("tail ratio p99/p50"))}</div><div class="ro">${(pct(D.itl,.99)/pct(D.itl,.5)).toFixed(2)}<small>×</small></div></div>
+    <div class="card tight kpi"><div class="eyebrow">${esc(t("spikes >2× median"))}</div><div class="ro">${(spikes/30).toFixed(1)}<small>%</small></div></div>
+   </div>
+  </div>
+ </div>
+ <div class="hint">${esc(t("Medians lie. Tail ratio and CV are the first fingerprints of scheduler stalls, allocator pauses and kernel-launch gaps."))}</div>`;
+}
+P.analysis=()=>{
+ const tabs=[["eff","Efficiency"],["cap","Capacity"],["scale","Scaling"],["dist","Distributions"]];
+ return `
+ <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+  <div class="seg">${tabs.map(([k,lb])=>`<button class="${AN.tab===k?"active":""}" onclick="anTab('${k}')">${esc(t(lb))}</button>`).join("")}</div>
+ </div>
+ ${AN.tab==="eff"?anEff():AN.tab==="cap"?anCapT():AN.tab==="scale"?anScaleT():anDistT()}`;
+};
+function mountAnalysis(){bindTTs($("#view"));}
+/* ------- compare A/B (v2) ------- */
+const CP={a:{chip:"s60",di:2},b:{chip:"s60",di:3}};
+function cpR(){$("#view").innerHTML=P.compare();bindTTs($("#view"));}
+function cpSet(side,field,val){
+ if(field==="chip"){CP[side].chip=val;CP[side].di=DRVTL[val].length-1;}
+ else CP[side].di=+val;
+ cpR();
+}
+function snap(side){
+ const s=CP[side],c=chipOf(s.chip),[dv,dtg]=DRVTL[s.chip][s.di],mult=dtg/c.tg;
+ const q=MEMBRK[s.chip].q,spd=qspd(q),D=DIST[s.chip],b=MEMBRK[s.chip];
+ const pm=Math.pow(mult,0.7),cr=CORR.find(r=>r[0]===s.chip&&r[1]===q);
+ return {c,dv,q,vals:{
+  tg:dtg*spd, pp:c.pp*pm,
+  t50:pct(D.ttft,.5)/pm, t99:pct(D.ttft,.99)/pm, i99:pct(D.itl,.99)/mult,
+  mem:b.w+b.kv+b.act+b.frag, pw:PWR[s.chip], tj:dtg*spd/PWR[s.chip],
+  gm:cr?cr[2]*100:100}};
+}
+const CPROWS=[
+ ["tg","tg (decode)","tok/s",1,true],["pp","pp (prefill)","tok/s",0,true],
+ ["t50","TTFT p50","ms",0,false],["t99","TTFT p99","ms",0,false],["i99","ITL p99","ms",1,false],
+ ["mem","peak mem","GB",1,false],["pw","power","W",0,false],["tj","tok/J","",3,true],["gm","greedy match","%",1,true]];
+function cpSel(side){
+ const s=CP[side];
+ return `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+  <select class="mono" onchange="cpSet('${side}','chip',this.value)">${CHIPS.map(c=>`<option value="${c.id}" ${c.id===s.chip?"selected":""}>${esc(c.name)}</option>`).join("")}</select>
+  <select class="mono" onchange="cpSet('${side}','di',this.value)">${DRVTL[s.chip].map((d,i)=>`<option value="${i}" ${i===s.di?"selected":""}>${esc(d[0])}</option>`).join("")}</select></div>`;
+}
+P.compare=()=>{
+ const A=snap("a"),B=snap("b");
+ let reg=0,imp=0;
+ const rows=CPROWS.map(([k,lb,un,d,hi])=>{
+  const a=A.vals[k],b=B.vals[k],dl=(b-a)/a*100;
+  const bad=(hi?dl<0:dl>0)&&Math.abs(dl)>2, good=(hi?dl>0:dl<0)&&Math.abs(dl)>2;
+  if(bad)reg++; if(good)imp++;
+  const col=bad?"var(--err)":good?"var(--ok)":"var(--mut)";
+  return `<tr><td>${esc(t(lb))}</td><td class="mono sub">${un}</td>
+   <td class="num">${a.toFixed(d)}</td><td class="num">${b.toFixed(d)}</td>
+   <td class="num" style="color:${col};font-weight:650">${dl>=0?"+":""}${dl.toFixed(1)}%</td></tr>`;}).join("");
+ const verdict=reg?`<span class="tag" style="color:var(--err)">${reg} ${esc(t("regressions"))}</span>`:"";
+ const verd2=imp?`<span class="tag" style="color:var(--ok)">${imp} ${esc(t("improvements"))}</span>`:"";
+ const verd3=(!reg&&!imp)?`<span class="tag" style="color:var(--mut)">${esc(t("within noise"))}</span>`:"";
+ return `
+ <div class="grid g2" style="margin-bottom:14px">
+  <div class="card tight"><div class="eyebrow">${esc(t("Run A"))}</div>${cpSel("a")}</div>
+  <div class="card tight"><div class="eyebrow">${esc(t("Run B"))}</div>${cpSel("b")}</div>
+ </div>
+ <div class="card" style="margin-bottom:14px">
+  <div class="eyebrow">${esc(t("metric"))} · A → B ${verdict}${verd2}${verd3}</div>
+  <table class="tbl"><thead><tr><th>${esc(t("metric"))}</th><th></th>
+   <th class="num">A · ${esc(A.c.name)} · ${esc(A.dv)}</th><th class="num">B · ${esc(B.c.name)} · ${esc(B.dv)}</th><th class="num">Δ%</th></tr></thead>
+   <tbody>${rows}</tbody></table>
+  <div class="hint">${esc(t("|Δ| > 2% is colored; smaller moves are treated as run-to-run noise. Thresholds become per-metric configs in the real build."))}</div>
+ </div>
+ <div class="card" style="margin-bottom:14px">
+  <div class="eyebrow">${esc(t("Driver / SDK timeline"))} · ${esc(A.c.name)}</div>
+  <div class="plotwrap">${timelineSVG(CP.a.chip)}</div>
+  <div class="hint">${esc(t("Red = regression vs previous version. This is why driver fingerprints belong in the benchmark schema."))}</div>
+ </div>
+ <div class="card">
+  <div class="eyebrow">${esc(t("Numerical correctness vs fp16 reference"))}</div>
+  <table class="tbl"><thead><tr><th>${esc(t("chip"))}</th><th>${esc(t("quant"))}</th><th class="num">${esc(t("greedy match"))}</th><th class="num">${esc(t("mean logit KL"))}</th><th>${esc(t("status"))}</th></tr></thead><tbody>
+  ${CORR.map(([id,q,gm,kl,st])=>{const c=chipOf(id);
+   return `<tr><td><span class="tag" style="color:${c.hex}">${esc(c.name)}</span></td><td class="mono">${q}</td>
+   <td class="num">${(gm*100).toFixed(1)}%</td><td class="num">${kl.toFixed(4)}</td>
+   <td><span class="tag" style="color:${st==="pass"?"var(--ok)":"var(--warn)"}">${esc(t(st==="pass"?"PASS":"WARN"))}</span></td></tr>`;}).join("")}
+  </tbody></table>
+  <div class="hint">${esc(t("200 fixed prompts, greedy decode, first-divergence tracked. The first gate of any bring-up."))}</div>
+ </div>`;
+};
+function mountCompare(){bindTTs($("#view"));}
+/* ------- v2 i18n ------- */
+Object.assign(ZH,{
+"Hardware Analysis":"硬件分析","Compare A/B":"A/B 对比",
+"Efficiency":"效率","Capacity":"容量","Scaling":"扩展","Distributions":"分布",
+"decode MBU (best quant)":"decode 带宽利用率 MBU","prefill MFU":"prefill 算力利用率 MFU",
+"tokens per joule":"每焦耳 token 数","avg power / TDP":"平均功耗 / TDP",
+"Roofline — where each workload sits":"Roofline — 每个负载卡在哪里",
+"Solid roof = selected chip. Dashed = reference. Circles = decode per quant, square = prefill. Hover for MBU/MFU.":"实线屋顶 = 当前芯片，虚线 = 参照。圆点 = 各量化档 decode，方块 = prefill。悬停查看 MBU/MFU。",
+"Efficiency across chips":"各芯片效率对比","chip":"芯片","quant":"量化",
+"MBU decode":"MBU · decode","MFU prefill":"MFU · prefill","tok/J":"tok/J","soak Δ":"持续负载 Δ","throttling":"降频",
+"Memory breakdown — 7B @2k, best quant":"显存分解 — 7B @2k · 最佳量化",
+"weights":"权重","KV cache":"KV 缓存","activations":"激活","fragmentation":"碎片/分配器",
+"GX-1 allocator fragmentation is 1.1 GB — 3–5× peers. Worth a look before it compounds at 70B scale.":"GX-1 的分配器碎片达 1.1 GB，是同类芯片的 3–5 倍。建议在放大到 70B 规模之前排查显存分配器。",
+"Spec-sheet placeholders — edit per-chip peak BW / TFLOPS / TDP in Settings; MBU & MFU derive from them plus measured throughput. No hardware counters required for v1.":"规格为数据手册占位值 — 各芯片峰值带宽 / TFLOPS / TDP 可在设置中登记；MBU 与 MFU 由它们加实测吞吐推导，第一版无需任何硬件计数器。",
+"Throughput–latency frontier":"吞吐–延迟前沿","concurrency":"并发",
+"Ring = goodput point: highest throughput still meeting the SLO. Hover points for concurrency.":"圆环 = goodput 点：满足 SLO 的最高吞吐。悬停各点查看并发数。",
+"Goodput @ SLO":"SLO 下的 goodput","max conc":"最大并发","p99 at that point":"该点 p99",
+"does not meet SLO at any concurrency (prefill-bound)":"任何并发下均无法满足该 SLO（受限于 prefill）",
+"Multi-GPU scaling (tensor parallel)":"多卡扩展（张量并行）",
+"Ideal = linear. Labels show parallel efficiency. Data: 7B fp16, ctx 2k.":"虚线为理想线性，标签为并行效率。数据：7B fp16 · ctx 2k。",
+"interconnect":"互联","efficiency":"并行效率",
+"GX-1 efficiency collapses 81% → 64% from 4 to 8 cards while A100/NVLink holds 82%. Points at GXLink all-reduce bandwidth — the single highest-leverage hardware question this system can answer.":"GX-1 从 4 卡到 8 卡时并行效率由 81% 跌至 64%，同规模 A100/NVLink 仍保持 82%。矛头指向 GXLink 的 all-reduce 带宽 —— 这是本系统能替硬件团队回答的最高杠杆问题。",
+"S60 runs single-card in the current deployment; add nodes to populate its row.":"S60 在当前部署中为单卡；接入更多节点后此表会自动补齐。",
+"Latency distributions":"延迟分布","metric":"指标","TTFT":"TTFT","ITL":"ITL","E2E":"E2E",
+"ITL histogram":"ITL 直方图","tail ratio p99/p50":"尾部比 p99/p50","spikes >2× median":"尖峰占比（>2× 中位）",
+"Medians lie. Tail ratio and CV are the first fingerprints of scheduler stalls, allocator pauses and kernel-launch gaps.":"中位数会骗人。尾部比与 CV 是调度停顿、分配器暂停和 kernel 启动间隙最早的指纹。",
+"Run A":"运行 A","Run B":"运行 B",
+"tg (decode)":"tg（decode）","pp (prefill)":"pp（prefill）","TTFT p50":"TTFT p50","TTFT p99":"TTFT p99","ITL p99":"ITL p99",
+"peak mem":"峰值显存","power":"功耗","greedy match":"贪心一致率",
+"regressions":"项回归","improvements":"项改善","within noise":"噪声范围内",
+"|Δ| > 2% is colored; smaller moves are treated as run-to-run noise. Thresholds become per-metric configs in the real build.":"|Δ| > 2% 才着色，更小的波动视为运行间噪声。真实版本中阈值按指标可配置。",
+"Driver / SDK timeline":"驱动 / SDK 时间线",
+"Red = regression vs previous version. This is why driver fingerprints belong in the benchmark schema.":"红点 = 相对上一版本的回归。这正是基准 schema 需要驱动指纹字段的原因。",
+"Numerical correctness vs fp16 reference":"数值正确性（对照 fp16 参考实现）",
+"mean logit KL":"平均 logit KL","status":"状态","PASS":"通过","WARN":"警告",
+"200 fixed prompts, greedy decode, first-divergence tracked. The first gate of any bring-up.":"200 条固定 prompt 贪心解码，记录首个分歧位置 —— 任何芯片 bring-up 的第一道关。",
+});
+(function init(){
+  const id=location.hash.replace(/^#\//,"");
+  if(id&&NAV.some(g=>g.items.some(it=>it.id===id)))page=id;
+  renderNav(); rerender();
+})();
+</script>
+</body>
+</html>

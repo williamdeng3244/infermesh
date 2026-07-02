@@ -219,7 +219,7 @@ tr.cm-det>td{background:rgba(127,127,127,.04);padding:0}
     </nav>
     <div class="sb-foot">
       <span id="sb-health" class="pill"><span class="dot"></span> connecting</span>
-      <span id="sb-ver">v0.5.0 · mock / vllm / openai / transformers</span>
+      <span id="sb-ver">v0.6.0 · mock / vllm / openai / transformers</span>
     </div>
   </aside>
 
