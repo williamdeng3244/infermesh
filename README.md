@@ -161,8 +161,9 @@ read timeout. Tune with `--sse-keepalive SECONDS` (default 15; `0` disables).
 ## Admin dashboard
 
 Open **http://127.0.0.1:8000/** (or `/admin`) in a browser while the server runs —
-a self-contained dark panel (no build step, no JS deps, no CDN) with a sidebar and
-eight sections:
+a self-contained panel in the "instrument bench" theme (no build step, no JS deps,
+no CDN — graphite-blue ground, signal-amber accent, per-chip categorical colors)
+with a sidebar and twelve sections:
 
 - **Models** — memory gauge + live table with **Load / Unload / Pin / Unpin**, a **device picker** so a model loads on a chosen GPU/CPU, and **per-model overrides** (temperature · top_p · top_k · max_tokens · max_context_window) that win over the global defaults
 - **Chat** — pick a model and stream a completion in a chat playground, with a **prefilling…** indicator until the first token and a **first-token (TTFT)** time on each reply
@@ -171,11 +172,53 @@ eight sections:
 - **Devices** — detected accelerators (NVIDIA / AMD / CPU) with VRAM used/free/total
 - **Download** — search HuggingFace, browse downloads/likes/task, one-click download into the model dir with a progress bar (`pip install '.[downloader]'`); set a **mirror endpoint** in Settings (e.g. `hf-mirror.com`) for faster/regional access, or pull by ID from **ModelScope** (`pip install '.[modelscope]'`) as a second source
 - **Benchmark** — prefill/decode tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory; `same`/`different` prompt modes, a single-request profile, copy-to-clipboard, and a **persisted history of past runs** (each row **expands** to the full per-run breakdown — context, PP/TG tok/s, TTFT, TPOT, E2E percentiles, peak GPU memory, token counts)
+- **Performance Explorer** — grouped box-plots over the community library (metric × context, chip legend chips, hover read-outs, CSV export)
+- **Hardware Analysis** — Efficiency (MBU / MFU / tok-per-J + Roofline against the chip-spec registry, soak drift), Capacity (throughput–latency frontier + goodput vs an SLO band), Scaling (multi-device speedup / parallel efficiency), Distributions (per-level TTFT/ITL percentiles, tail ratio, ITL CV)
+- **Compare A/B** — pick any two recorded runs: per-metric Δ% colored by better/worse/within-noise verdicts, the chip's driver/SDK timeline with regressions flagged, and numeric-correctness verdicts when runs carry them
+- **Community** — the shared benchmark library: filter cards, result rows expanding to a simulated terminal transcript, submit/export
 - **Settings** — view all settings and live-edit idle-timeout / API key / **tiered-KV cache** (hot-entry capacity + cold SSD dir, applied to new model loads) / a **HuggingFace mirror endpoint** / **generation defaults** (default temperature · top_p · top_k · max_tokens, applied only when a request omits them — a request's own value always wins) / **startup settings** (host · port · model-dir · backend · max-memory), each badged "restart to apply" with a one-click **Restart server** button / **concurrency** (max concurrent + queue bound, applied live to the admission gate)
 
 If an API key is enabled, paste it into the header field (or set it from the
 Settings tab) and the page sends it with every request. A sun/moon button in the
 header toggles **light / dark** mode (persisted in the browser; defaults dark).
+
+## Hardware efficiency & fleet metrics (Milestone 2)
+
+The benchmark system can answer *which subsystem a chip is losing in, which
+driver introduced a regression, how well it scales, and whether the numbers
+are numerically correct* — the bring-up questions for an in-house accelerator:
+
+- **Background bench jobs** — `POST /api/bench/jobs` (progress, cooperative
+  cancel); each run holds one admission slot, so benchmarks share the
+  concurrency budget with live inference instead of stampeding it.
+- **Chip-spec registry** — `infermesh/config/chip_specs.json` presets
+  (s60 / a100 / rtx4090 / m3max, each annotated `datasheet` or `estimated`),
+  overridable per chip in `~/.infermesh/chip_specs.json`; `GET/PUT /api/specs`.
+  These peak-BW / TFLOPS / TDP figures are the MBU / MFU / tok-per-J
+  denominators — no hardware counters required.
+- **Optional power telemetry** — a backend may implement `get_power_w()`;
+  bench jobs then sample at ~1 Hz and record `power_avg_w` / `energy_j`.
+  Implement it in an in-house backend and energy metrics light up with zero
+  control-plane changes.
+- **Multi-device runs** — `devices: ["gcu:0","gcu:1"]` for per-card
+  data-parallel child runs (each recorded separately), or
+  `parallelism: {"tp": n}` for one tensor-parallel group run (the vLLM
+  backend maps it to `--tensor-parallel-size`); interconnect detected
+  best-effort (`nvidia-smi topo -m` or the registry).
+- **Concurrency sweeps** — `mode: "concurrency_sweep"` holds each level's
+  in-flight count constant for a window, records TTFT + full ITL sequences,
+  and stores per-level percentiles/CV; the read side derives the
+  throughput–latency frontier and **goodput** against the live
+  `slo_p99_ttft_s` setting (retune the SLO and history reprices itself).
+- **Numeric correctness** — a fixed 20-prompt set greedy-decoded against an
+  offline fp16 reference (`scripts/gen_reference.py`; generate references on
+  a CUDA/CPU machine, **never on a GCU node** — torch_gcu hijacks torch).
+  Token-level match rate, first divergence, optional top-20 logit KL;
+  pass ≥ 0.99 / warn ≥ 0.95 / fail. Add `"correctness": true` to a bench job.
+- **Read-side analysis** — `/api/analysis/efficiency|frontier|scaling|timeline`
+  and `/api/compare?a=&b=` (Δ% with better/worse/same verdicts at
+  `compare_threshold_pct`), all derived on read with a 5 s cache, and all
+  rendered by the dashboard's **Hardware Analysis** and **Compare A/B** pages.
 
 ## Run the tests
 
