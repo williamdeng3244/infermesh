@@ -18,6 +18,7 @@ fresh connection per call keeps it thread-safe under FastAPI's threadpool.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import sqlite3
 import time
@@ -28,11 +29,30 @@ from typing import Optional
 
 from infermesh.core.settings import HOME_DIR
 
+#: Current on-disk schema. v2 (Milestone 2) adds driver fingerprints,
+#: multi-device, energy, latency-distribution, and correctness columns —
+#: all nullable, so v1 rows stay fully readable after migration.
+SCHEMA_VERSION = 2
+
 # Columns the box-plot / table read; also the whitelist of selectable metrics.
 METRICS = (
     "pp_tps", "tg_tps", "ttft_ms", "tpot_ms",
     "peak_mem_gb", "e2e_latency_s", "total_throughput",
 )
+
+# v2 additions and their SQLite types. Columns marked (JSON) hold a
+# JSON-encoded object in TEXT; they are decoded on read.
+_V2_TYPES = {
+    "driver_version": "TEXT", "firmware_version": "TEXT", "sdk_version": "TEXT",
+    "device_count": "INTEGER",
+    "parallelism": "TEXT",       # (JSON) {"tp": 2, "pp": 1}
+    "interconnect": "TEXT",
+    "power_avg_w": "REAL", "energy_j": "REAL",
+    "percentiles": "TEXT",       # (JSON) {"ttft": {"p50":..,"p99":..}, "itl": {..}}
+    "cv_itl": "REAL", "n_requests": "INTEGER",
+    "correctness": "TEXT",       # (JSON) {"greedy_match":.., "mean_kl":.., "ref":..}
+}
+_JSON_COLUMNS = ("parallelism", "percentiles", "correctness")
 
 # Full column set, in insert order. id/created_at/dedup_key are bookkeeping.
 _COLUMNS = (
@@ -42,6 +62,7 @@ _COLUMNS = (
     "model", "quant", "context_length", "batch_size",
     "pp_tps", "tg_tps", "ttft_ms", "tpot_ms",
     "peak_mem_gb", "e2e_latency_s", "total_throughput",
+    *(_V2_TYPES.keys()),
     "dedup_key",
 )
 
@@ -70,6 +91,18 @@ CREATE TABLE IF NOT EXISTS runs (
     peak_mem_gb       REAL,
     e2e_latency_s     REAL,
     total_throughput  REAL,
+    driver_version    TEXT,
+    firmware_version  TEXT,
+    sdk_version       TEXT,
+    device_count      INTEGER,
+    parallelism       TEXT,
+    interconnect      TEXT,
+    power_avg_w       REAL,
+    energy_j          REAL,
+    percentiles       TEXT,
+    cv_itl            REAL,
+    n_requests        INTEGER,
+    correctness       TEXT,
     dedup_key         TEXT UNIQUE
 );
 CREATE INDEX IF NOT EXISTS idx_runs_chip    ON runs(chip);
@@ -77,6 +110,27 @@ CREATE INDEX IF NOT EXISTS idx_runs_model   ON runs(model);
 CREATE INDEX IF NOT EXISTS idx_runs_quant   ON runs(quant);
 CREATE INDEX IF NOT EXISTS idx_runs_context ON runs(context_length);
 """
+
+
+def _ensure_schema(conn: sqlite3.Connection) -> None:
+    """Migrate an existing DB to :data:`SCHEMA_VERSION` (idempotent).
+
+    v1→v2 is purely additive: ``ALTER TABLE .. ADD COLUMN`` for each missing
+    nullable column, then stamp both the ``schema_version`` table and
+    ``PRAGMA user_version``. Old rows read back unchanged with NULLs in the
+    new columns."""
+    have = {r[1] for r in conn.execute("PRAGMA table_info(runs)").fetchall()}
+    for name, typ in _V2_TYPES.items():
+        if name not in have:
+            conn.execute("ALTER TABLE runs ADD COLUMN %s %s" % (name, typ))
+    conn.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)")
+    row = conn.execute("SELECT version FROM schema_version").fetchone()
+    if row is None:
+        conn.execute("INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,))
+    elif int(row[0]) != SCHEMA_VERSION:
+        conn.execute("UPDATE schema_version SET version=?", (SCHEMA_VERSION,))
+    conn.execute("PRAGMA user_version=%d" % SCHEMA_VERSION)
+    conn.commit()
 
 
 def _db_path() -> Path:
@@ -91,6 +145,7 @@ def _connect() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")       # concurrent readers while one writes
     conn.executescript(_DDL)
+    _ensure_schema(conn)                          # v1 DBs gain the v2 columns in place
     return conn
 
 
@@ -119,12 +174,18 @@ def normalize(rec: dict) -> dict:
     out = {c: rec.get(c) for c in _COLUMNS}
     out["id"] = rec.get("id") or uuid.uuid4().hex[:12]
     out["created_at"] = _num(rec.get("created_at")) or time.time()
-    for c in ("accel_mem_gb", *METRICS):
+    for c in ("accel_mem_gb", "power_avg_w", "energy_j", "cv_itl", *METRICS):
         out[c] = _num(rec.get(c))
-    for c in ("cores", "context_length", "batch_size"):
+    for c in ("cores", "context_length", "batch_size", "device_count", "n_requests"):
         try:
             out[c] = None if rec.get(c) is None else int(rec.get(c))
         except (TypeError, ValueError):
+            out[c] = None
+    for c in _JSON_COLUMNS:  # dict/list in, JSON text on disk; strings pass through
+        v = rec.get(c)
+        if isinstance(v, (dict, list)):
+            out[c] = json.dumps(v)
+        elif not (v is None or isinstance(v, str)):
             out[c] = None
     out["submitter"] = (rec.get("submitter") or "anonymous")
     out["model"] = rec.get("model") or "—"
@@ -132,6 +193,18 @@ def normalize(rec: dict) -> dict:
     out["quant"] = rec.get("quant") or "—"
     out["dedup_key"] = _dedup_key(out)
     return out
+
+
+def _decode_row(d: dict) -> dict:
+    """JSON-decode the (JSON) TEXT columns on the way out."""
+    for c in _JSON_COLUMNS:
+        v = d.get(c)
+        if isinstance(v, str) and v:
+            try:
+                d[c] = json.loads(v)
+            except ValueError:
+                pass
+    return d
 
 
 def submit(rec: dict) -> dict:
@@ -198,7 +271,7 @@ def query_runs(*, chip: str = "", vendor: str = "", model: str = "", quant: str 
     sql += " LIMIT ?"; args.append(max(1, min(int(limit), 5000)))
     conn = _connect()
     try:
-        return [dict(r) for r in conn.execute(sql, args).fetchall()]
+        return [_decode_row(dict(r)) for r in conn.execute(sql, args).fetchall()]
     finally:
         conn.close()
 
@@ -227,7 +300,7 @@ def get(run_id: str) -> Optional[dict]:
     conn = _connect()
     try:
         row = conn.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
-        return dict(row) if row else None
+        return _decode_row(dict(row)) if row else None
     finally:
         conn.close()
 
