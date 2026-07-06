@@ -123,7 +123,7 @@ class BenchJobManager:
                 raise JobCancelled()
             if gate is not None:
                 job.progress["phase"] = "waiting"
-                await self._acquire_or_cancel(gate, job)
+                await self.acquire_or_cancel(gate, job)
                 held = True
             if job.cancel_event.is_set():
                 raise JobCancelled()
@@ -150,9 +150,10 @@ class BenchJobManager:
                 await gate.release()
 
     @staticmethod
-    async def _acquire_or_cancel(gate, job: BenchJob) -> None:
+    async def acquire_or_cancel(gate, job: BenchJob) -> None:
         """gate.acquire() racing job.cancel_event; raises JobCancelled if the
-        cancel wins (releasing the slot if acquire landed concurrently)."""
+        cancel wins (releasing the slot if acquire landed concurrently).
+        Public: multi-device runners take one slot *per card sub-run*."""
         acquire = asyncio.ensure_future(gate.acquire())
         cancel = asyncio.ensure_future(job.cancel_event.wait())
         try:

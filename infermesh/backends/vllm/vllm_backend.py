@@ -69,6 +69,15 @@ def _metric(text: str, name: str) -> float:
     return 0.0
 
 
+def _tp_size(spec: ModelSpec) -> int:
+    """Tensor-parallel degree from the neutral control-plane hint
+    (``spec.extra["parallelism"] = {"tp": n}``); 1 when absent or malformed."""
+    try:
+        return max(1, int((spec.extra.get("parallelism") or {}).get("tp") or 1))
+    except (TypeError, ValueError):
+        return 1
+
+
 class VLLMBackend(InferenceBackend):
     """One vLLM sidecar process serving one model, fronted by HTTP."""
 
@@ -138,6 +147,13 @@ class VLLMBackend(InferenceBackend):
             cmd += ["--max-model-len", str(spec.max_context)]
         if spec.quantization:
             cmd += ["--quantization", spec.quantization]
+        # Tensor parallelism: the control plane records the intent neutrally in
+        # spec.extra["parallelism"] = {"tp": n}; mapping it onto vLLM's flag
+        # happens HERE, inside the vllm backend, by the purity rule. An
+        # explicit vllm_args entry wins over the neutral hint.
+        tp = _tp_size(spec)
+        if tp >= 2 and "tensor-parallel-size" not in (spec.extra.get("vllm_args") or {}):
+            cmd += ["--tensor-parallel-size", str(tp)]
         for key, value in (spec.extra.get("vllm_args") or {}).items():
             if value is True:
                 cmd.append(f"--{key}")

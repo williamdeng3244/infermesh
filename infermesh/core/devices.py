@@ -22,6 +22,32 @@ def _run(cmd: list[str]) -> Optional[str]:
     return result.stdout if result.returncode == 0 else None
 
 
+def detect_interconnect(vendor: Optional[str], chip: Optional[str] = None) -> Optional[str]:
+    """Best-effort interconnect label for multi-device benchmark records.
+
+    NVIDIA: parse ``nvidia-smi topo -m`` — any NV# link in the GPU matrix means
+    "nvlink", a matrix without one means "pcie". Other vendors: fall back to the
+    chip-spec registry's ``interconnect`` field. None when nothing knows.
+    Blocking (subprocess) — call via ``asyncio.to_thread`` from async code."""
+    import re
+    if (vendor or "").lower() == "nvidia":
+        out = _run(["nvidia-smi", "topo", "-m"])
+        if out:
+            rows = [ln for ln in out.splitlines() if ln.strip().startswith("GPU")]
+            if any(re.search(r"\bNV\d+\b", ln) for ln in rows):
+                return "nvlink"
+            if rows:
+                return "pcie"
+    try:
+        from infermesh.core import specs as _specs
+        hit = _specs.resolve(chip or "")
+        if hit:
+            return hit[1].get("interconnect")
+    except Exception:  # noqa: BLE001 - registry lookup is best-effort
+        return None
+    return None
+
+
 def _nvidia() -> list[dict]:
     out = _run([
         "nvidia-smi",

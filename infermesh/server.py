@@ -63,7 +63,7 @@ from infermesh.core.settings import Settings
 from infermesh.core.scheduler import AdmissionController, Overloaded
 from infermesh.core.bench_jobs import BenchJobManager
 from infermesh.core.model_settings import ModelSettingsStore, SAMPLING_FIELDS
-from infermesh.core.devices import enumerate_devices
+from infermesh.core.devices import detect_interconnect, enumerate_devices
 from infermesh.core.stats import StatsAccumulator
 from infermesh.core.history import (
     append_benchmark,
@@ -160,6 +160,11 @@ class BenchmarkRequest(BaseModel):
     mode: str = "same"  # "same" (shared prompt, prefix-cacheable) | "different"
     device: Optional[str] = None  # run on a specific accelerator (e.g. "gcu:0", "cpu"); None = current
     share: Optional[bool] = True  # publish this run to the shared community library (per-run opt-out)
+    # multi-device (jobs only): devices=["gcu:0","gcu:1"] without tp => one
+    # sub-run per card (data parallel); with parallelism={"tp": n} => one run
+    # over the whole group (backend maps tp, e.g. vLLM tensor_parallel_size)
+    devices: Optional[list] = None
+    parallelism: Optional[dict] = None
 
 
 class SpecsPutRequest(BaseModel):
@@ -937,9 +942,11 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         return res
 
     async def _record_benchmark(result: dict, *, concurrency: int, params: dict,
-                                share: Optional[bool], model_id: str) -> str:
+                                share: Optional[bool], model_id: str,
+                                extras: Optional[dict] = None) -> str:
         """Persist one finished benchmark to history (+ community library when
-        enabled). Returns the run id shared by both stores."""
+        enabled). ``extras`` adds schema-v2 fields (device_count, parallelism,
+        interconnect, …) onto the community row. Returns the shared run id."""
         run_id = uuid.uuid4().hex[:12]
         sysinfo = _sysinfo()
         append_benchmark({
@@ -956,6 +963,8 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                 bk = getattr(getattr(pool.get_entry(model_id), "spec", None), "backend", None) or settings.backend
                 rec = _community_record(result, {"concurrency": concurrency}, sysinfo,
                                         submitter, quant, bk, run_id=run_id)
+                if extras:
+                    rec.update({k: v for k, v in extras.items() if v is not None})
                 if settings.hub_url:
                     await _publish_to_hub(settings.hub_url, rec)
                 else:
@@ -1008,40 +1017,123 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         return result
 
     # ------------- background benchmark jobs (admission-gated) ------------- #
-    async def _run_bench_job(job) -> tuple:
-        """Job-runner body: load, benchmark (cancellable, with progress), record."""
+    async def _bench_once(job, *, device: Optional[str], progress_base: int,
+                          force_reload: bool) -> dict:
+        """One pinned-and-loaded benchmark pass with progress/cancel wiring."""
         from infermesh.core.benchmark import run_benchmark
         spec = job.spec
         model_id = spec["model_id"]
-        if spec.get("device"):  # pin the model to the chosen accelerator
-            pool.set_device(model_id, spec["device"])
+        if device:
+            pool.set_device(model_id, device)
+        if device or force_reload:
             await pool.unload_if_idle_unpinned(model_id, force=True)
         job.progress["phase"] = "load"
         async with pool.acquire(model_id):  # load up front: unsupported models fail fast
             pass
-        if job.cancel_event.is_set():
-            return None, []
-
         job.progress["phase"] = "running"
 
         def _prog(done_n: int, total: int) -> None:
-            job.progress["current"] = done_n
-            job.progress["total"] = total
+            job.progress["current"] = progress_base + done_n
 
         bench = run_benchmark(pool, model_id,
                               requests=spec["requests"], concurrency=spec["concurrency"],
                               max_tokens=spec["max_tokens"], prompt=spec["prompt"],
                               mode=spec["mode"], should_stop=job.cancel_event.is_set,
                               on_progress=_prog)
-        # device-pinned runs get the same load-hang bound as the sync endpoint
-        result = await (asyncio.wait_for(bench, timeout=240) if spec.get("device") else bench)
+        # pinned/reloaded runs get the same load-hang bound as the sync endpoint
+        if device or force_reload:
+            return await asyncio.wait_for(bench, timeout=240)
+        return await bench
+
+    async def _run_bench_job(job) -> tuple:
+        """Dispatch: data parallel (devices list, no tp) vs single/tensor-parallel."""
+        spec = job.spec
+        devices = [str(d) for d in (spec.get("devices") or [])][:8]
+        try:
+            tp = int((spec.get("parallelism") or {}).get("tp") or 0)
+        except (TypeError, ValueError):
+            tp = 0
+        if len(devices) >= 2 and tp < 2:
+            return await _run_dp_bench_job(job, devices)
+        return await _run_single_bench_job(job, devices=devices, tp=tp)
+
+    async def _run_single_bench_job(job, *, devices: list, tp: int) -> tuple:
+        """Single device or tensor-parallel group: exactly one run, one record.
+        (The manager already holds this job's admission slot.)"""
+        spec = job.spec
+        model_id = spec["model_id"]
+        device = spec.get("device") or (devices[0] if devices and tp < 2 else None)
+        force_reload = False
+        if tp >= 2:
+            # record the intent neutrally; the backend maps it at load time
+            # (vLLM: tensor_parallel_size) — mapping code lives in backends/vllm
+            entry = pool.get_entry(model_id)
+            if entry is not None:
+                extra = dict(entry.spec.extra or {})
+                extra["parallelism"] = {"tp": tp}
+                if devices:
+                    extra["devices"] = list(devices)
+                entry.spec.extra = extra
+            force_reload = True
+        result = await _bench_once(job, device=device, progress_base=0,
+                                   force_reload=force_reload)
         if job.cancel_event.is_set():
             return result, []  # cancelled: keep partial numbers, record nothing
+        device_count = max(tp, len(devices)) if tp >= 2 else 1
+        parallelism = {"tp": tp} if tp >= 2 else None
+        interconnect = None
+        if device_count > 1:  # nvidia-smi topo (to_thread) or the specs registry
+            interconnect = await asyncio.to_thread(
+                detect_interconnect, result.get("vendor"), result.get("device_name"))
+        extras = {"device_count": device_count, "parallelism": parallelism,
+                  "interconnect": interconnect}
+        result = dict(result, **extras)
         run_id = await _record_benchmark(
             result, concurrency=spec["concurrency"],
-            params={k: spec[k] for k in ("requests", "concurrency", "max_tokens", "mode", "device")},
-            share=spec.get("share"), model_id=model_id)
+            params={**{k: spec[k] for k in ("requests", "concurrency", "max_tokens", "mode", "device")},
+                    **({"devices": devices} if devices else {})},
+            share=spec.get("share"), model_id=model_id, extras=extras)
         return result, [run_id]
+
+    async def _run_dp_bench_job(job, devices: list) -> tuple:
+        """Data parallel: one child run per card, each recorded separately and
+        each holding its own admission slot while it runs. Sub-runs execute
+        sequentially — the pool keeps one backend instance per model, so a
+        card's numbers are never polluted by a concurrent sibling. (The
+        manager was given gate=None for this job.)"""
+        spec = job.spec
+        model_id = spec["model_id"]
+        per_dev = spec["requests"]
+        job.progress.update({"current": 0, "total": per_dev * len(devices)})
+        children: list[dict] = []
+        run_ids: list[str] = []
+        for idx, dev in enumerate(devices):
+            if job.cancel_event.is_set():
+                break
+            job.progress["phase"] = f"waiting ({dev})"
+            await bench_jobs.acquire_or_cancel(gate, job)  # one slot per card sub-run
+            try:
+                result = await _bench_once(job, device=dev, progress_base=idx * per_dev,
+                                           force_reload=True)
+            finally:
+                await gate.release()
+            if job.cancel_event.is_set():
+                break
+            extras = {"device_count": 1, "parallelism": {"dp": len(devices)},
+                      "interconnect": None}
+            result = dict(result, **extras)
+            run_id = await _record_benchmark(
+                result, concurrency=spec["concurrency"],
+                params={**{k: spec[k] for k in ("requests", "concurrency", "max_tokens", "mode")},
+                        "device": dev, **extras},
+                share=spec.get("share"), model_id=model_id, extras=extras)
+            children.append({"device": dev, "run_id": run_id, "result": result})
+            run_ids.append(run_id)
+        combined = round(sum((c["result"].get("output_tokens_per_sec") or 0.0)
+                             for c in children), 1)
+        summary = {"mode": "data_parallel", "devices": devices, "children": children,
+                   "combined_output_tokens_per_sec": combined}
+        return summary, run_ids
 
     @app.post("/api/bench/jobs", status_code=202)
     async def api_bench_job_create(req: BenchmarkRequest, _: None = Depends(require_auth)):
@@ -1054,6 +1146,11 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                 openai_adapter.create_error_response(f"model '{req.model}' not found", "model_not_found", 404),
                 status_code=404,
             )
+        devices = [str(d) for d in (req.devices or [])][:8]
+        try:
+            tp = int((req.parallelism or {}).get("tp") or 0)
+        except (TypeError, ValueError):
+            tp = 0
         job = bench_jobs.create({
             "model": req.model, "model_id": model_id,
             "requests": max(1, min(req.requests, 200)),
@@ -1061,8 +1158,14 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             "max_tokens": max(1, min(req.max_tokens, 1024)),
             "prompt": req.prompt, "mode": req.mode,
             "device": req.device, "share": req.share,
+            "devices": devices or None,
+            "parallelism": ({"tp": tp} if tp >= 2 else None),
         })
-        job.task = asyncio.create_task(bench_jobs.run(job, _run_bench_job, gate=gate))
+        # Data-parallel jobs take one slot per card sub-run inside the runner,
+        # so the manager must not also hold a job-wide slot for them.
+        data_parallel = len(devices) >= 2 and tp < 2
+        job.task = asyncio.create_task(
+            bench_jobs.run(job, _run_bench_job, gate=None if data_parallel else gate))
         return {"job_id": job.job_id, "state": job.state}
 
     @app.get("/api/bench/jobs")
