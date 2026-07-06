@@ -5,31 +5,10 @@ cooperative cancellation, and admission-gate budget sharing."""
 import asyncio
 import time
 
-import pytest
-from fastapi.testclient import TestClient
-
 from infermesh.core.bench_jobs import BenchJobManager
 from infermesh.core.scheduler import AdmissionController
-from infermesh.core.settings import Settings
-from infermesh.server import create_app
 
-
-@pytest.fixture
-def jobs_client(mock_pool, tmp_path, monkeypatch):
-    # Point the history store at a temp dir: entering the client context below
-    # runs the app lifespan, which would otherwise load the developer's real
-    # ~/.infermesh metrics into the module-global _METRICS deque (and our runs
-    # would append to their real benchmarks.jsonl).
-    from infermesh.core import history as h
-    hist = tmp_path / "history"
-    monkeypatch.setattr(h, "HISTORY_DIR", hist)
-    monkeypatch.setattr(h, "METRICS_FILE", hist / "metrics.jsonl")
-    monkeypatch.setattr(h, "BENCH_FILE", hist / "benchmarks.jsonl")
-    # Enter the context manager: that keeps one event loop alive across
-    # requests, so the create_task'd job actually progresses between polls
-    # (a bare TestClient spins a fresh loop per request and strands the task).
-    with TestClient(create_app(mock_pool, Settings())) as c:
-        yield c
+# jobs_client comes from conftest.py (context-entered client + history isolation)
 
 
 def _wait_terminal(client, job_id: str, timeout: float = 30.0) -> dict:

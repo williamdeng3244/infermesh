@@ -41,3 +41,22 @@ def mock_pool():
 def client(mock_pool):
     """FastAPI TestClient over the mock-backed gateway (auth off)."""
     return TestClient(create_app(mock_pool, Settings()))
+
+
+@pytest.fixture
+def jobs_client(mock_pool, tmp_path, monkeypatch):
+    """Context-entered TestClient for background-job tests.
+
+    Entering the context keeps one event loop alive across requests, so
+    create_task'd bench jobs progress between polls (a bare TestClient spins a
+    fresh loop per request and strands the task). History is pointed at a temp
+    dir first: the lifespan would otherwise load the developer's real
+    ~/.infermesh metrics into the module-global _METRICS deque, and job runs
+    would append to their real benchmarks.jsonl."""
+    from infermesh.core import history as h
+    hist = tmp_path / "history"
+    monkeypatch.setattr(h, "HISTORY_DIR", hist)
+    monkeypatch.setattr(h, "METRICS_FILE", hist / "metrics.jsonl")
+    monkeypatch.setattr(h, "BENCH_FILE", hist / "benchmarks.jsonl")
+    with TestClient(create_app(mock_pool, Settings())) as c:
+        yield c

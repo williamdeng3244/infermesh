@@ -121,6 +121,7 @@ class SettingsPatch(BaseModel):
     api_key: Optional[str] = None  # "" clears (auth off); null = leave unchanged
     max_concurrent_requests: Optional[int] = None  # admission cap (live)
     max_queued_requests: Optional[int] = None      # admission queue bound (0 => unbounded)
+    slo_p99_ttft_s: Optional[float] = None         # capacity SLO for read-side goodput (live)
     kv_hot_capacity: Optional[int] = None
     kv_cold_dir: Optional[str] = None
     hf_endpoint: Optional[str] = None
@@ -165,6 +166,10 @@ class BenchmarkRequest(BaseModel):
     # over the whole group (backend maps tp, e.g. vLLM tensor_parallel_size)
     devices: Optional[list] = None
     parallelism: Optional[dict] = None
+    # concurrency sweep (jobs only, mode="concurrency_sweep"): in-flight levels
+    # and the per-level measurement window
+    levels: Optional[list] = None
+    window_s: Optional[float] = None
 
 
 class SpecsPutRequest(BaseModel):
@@ -1046,8 +1051,10 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         return await bench
 
     async def _run_bench_job(job) -> tuple:
-        """Dispatch: data parallel (devices list, no tp) vs single/tensor-parallel."""
+        """Dispatch: sweep vs data parallel (devices, no tp) vs single/tp."""
         spec = job.spec
+        if (spec.get("mode") or "") == "concurrency_sweep":
+            return await _run_sweep_bench_job(job)
         devices = [str(d) for d in (spec.get("devices") or [])][:8]
         try:
             tp = int((spec.get("parallelism") or {}).get("tp") or 0)
@@ -1056,6 +1063,61 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         if len(devices) >= 2 and tp < 2:
             return await _run_dp_bench_job(job, devices)
         return await _run_single_bench_job(job, devices=devices, tp=tp)
+
+    async def _run_sweep_bench_job(job) -> tuple:
+        """Concurrency sweep: sequential levels; every level records as a
+        child run (batch_size = level), the parent frontier lands in history
+        and in the job result. Goodput is NOT stored — /api/analysis computes
+        it against the current slo_p99_ttft_s setting."""
+        from infermesh.core.sweep import DEFAULT_LEVELS, run_concurrency_sweep
+        spec = job.spec
+        model_id = spec["model_id"]
+        device = spec.get("device") or ((spec.get("devices") or [None])[0])
+        if device:
+            pool.set_device(model_id, device)
+            await pool.unload_if_idle_unpinned(model_id, force=True)
+        job.progress["phase"] = "load"
+        async with pool.acquire(model_id):
+            pass
+        if job.cancel_event.is_set():
+            return None, []
+        levels = spec.get("levels") or list(DEFAULT_LEVELS)
+        window = float(spec.get("window_s") or 30.0)
+        job.progress.update({"current": 0, "total": len(levels), "phase": "running"})
+
+        def _lvl(done_n: int, total: int) -> None:
+            job.progress["current"] = done_n
+            job.progress["total"] = total
+
+        parent = await run_concurrency_sweep(
+            pool, model_id, levels=levels, window_s=window,
+            max_tokens=spec["max_tokens"], prompt=spec["prompt"],
+            should_stop=job.cancel_event.is_set, on_level=_lvl)
+        if job.cancel_event.is_set():
+            return parent, []  # cancelled: keep partial numbers, record nothing
+        run_ids: list[str] = []
+        for child in parent["children"]:
+            extras = {"percentiles": child.get("percentiles"),
+                      "cv_itl": child.get("cv_itl"),
+                      "n_requests": child.get("n_requests"),
+                      "device_count": 1}
+            rid = await _record_benchmark(
+                child, concurrency=child["concurrency"],
+                params={"mode": "concurrency_sweep", "level": child["concurrency"],
+                        "window_s": window, "max_tokens": spec["max_tokens"],
+                        "device": device},
+                share=spec.get("share"), model_id=model_id, extras=extras)
+            run_ids.append(rid)
+        # the parent frontier is a history-level artifact, not a community row
+        parent_id = uuid.uuid4().hex[:12]
+        append_benchmark({"t": time.time(), "model": model_id, "run_id": parent_id,
+                          "params": {"mode": "concurrency_sweep", "levels": levels,
+                                     "window_s": window, "device": device},
+                          "result": {k: v for k, v in parent.items() if k != "children"},
+                          "system": _sysinfo()})
+        parent["run_id"] = parent_id
+        parent["child_run_ids"] = run_ids
+        return parent, run_ids
 
     async def _run_single_bench_job(job, *, devices: list, tp: int) -> tuple:
         """Single device or tensor-parallel group: exactly one run, one record.
@@ -1160,6 +1222,12 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             "device": req.device, "share": req.share,
             "devices": devices or None,
             "parallelism": ({"tp": tp} if tp >= 2 else None),
+            "levels": (lambda ls: ls or None)([
+                max(1, min(int(x), 64)) for x in (req.levels or [])[:8]
+                if isinstance(x, (int, float)) or (isinstance(x, str) and x.isdigit())
+            ]),
+            "window_s": (max(0.2, min(float(req.window_s), 120.0))
+                         if req.window_s else None),
         })
         # Data-parallel jobs take one slot per card sub-run inside the runner,
         # so the manager must not also hold a job-wide slot for them.
@@ -1224,6 +1292,9 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             settings.max_queued_requests = max(0, int(patch.max_queued_requests))
             gate.configure(max_queue=settings.max_queued_requests)  # live
             changed.append("max_queued_requests")
+        if patch.slo_p99_ttft_s is not None:
+            settings.slo_p99_ttft_s = max(0.01, float(patch.slo_p99_ttft_s))
+            changed.append("slo_p99_ttft_s")
         if patch.kv_hot_capacity is not None:
             settings.kv_hot_capacity = max(0, int(patch.kv_hot_capacity))
             changed.append("kv_hot_capacity")
