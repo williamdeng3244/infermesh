@@ -29,6 +29,7 @@ class Settings:
     backend: str = "mock"                 # default backend when a spec doesn't force one
     max_concurrent_requests: int = 8     # control-plane admission cap (enforced via AdmissionController)
     slo_p99_ttft_s: float = 2.0          # capacity SLO: p99 TTFT bound; goodput is derived read-side against this
+    compare_threshold_pct: float = 2.0   # |Δ%| below this counts as "same" in /api/compare
     max_queued_requests: int = 0         # 0 => unbounded admission queue; >0 => reject (503) once this many wait
     idle_timeout: float = 0.0             # seconds; 0 => never idle-unload
     max_process_memory: str = "80%"       # "80%" | "12GB" | "512MB" | bare MB

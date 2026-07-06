@@ -73,6 +73,7 @@ from infermesh.core.history import (
     truncate_on_startup,
 )
 from infermesh.core.backend import UnsupportedModelError
+from infermesh.core import analysis as _analysis
 from infermesh.core import community as _community
 from infermesh.core import specs as _specs
 from infermesh.dashboard import DASHBOARD_HTML
@@ -122,6 +123,7 @@ class SettingsPatch(BaseModel):
     max_concurrent_requests: Optional[int] = None  # admission cap (live)
     max_queued_requests: Optional[int] = None      # admission queue bound (0 => unbounded)
     slo_p99_ttft_s: Optional[float] = None         # capacity SLO for read-side goodput (live)
+    compare_threshold_pct: Optional[float] = None  # /api/compare "same" band (live)
     kv_hot_capacity: Optional[int] = None
     kv_cold_dir: Optional[str] = None
     hf_endpoint: Optional[str] = None
@@ -1269,6 +1271,39 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         accepted = bench_jobs.request_cancel(job_id)
         return {"ok": accepted, "state": job.state}
 
+    # ---------------- read-side analysis (derived, 5 s TTL cache) ---------------- #
+    @app.get("/api/analysis/efficiency")
+    async def api_analysis_efficiency(_: None = Depends(require_auth)):
+        return await asyncio.to_thread(_analysis.efficiency)
+
+    @app.get("/api/analysis/frontier")
+    async def api_analysis_frontier(chips: str = "", slo: Optional[float] = None,
+                                    _: None = Depends(require_auth)):
+        return await asyncio.to_thread(
+            _analysis.frontier, chips,
+            float(slo) if slo is not None else settings.slo_p99_ttft_s)
+
+    @app.get("/api/analysis/scaling")
+    async def api_analysis_scaling(model: str = "", quant: str = "",
+                                   _: None = Depends(require_auth)):
+        return await asyncio.to_thread(_analysis.scaling, model, quant)
+
+    @app.get("/api/analysis/timeline")
+    async def api_analysis_timeline(chip: str = "", metric: str = "tg",
+                                    _: None = Depends(require_auth)):
+        if metric not in _analysis.TIMELINE_METRICS:
+            raise HTTPException(status_code=400,
+                                detail=f"metric must be one of {sorted(_analysis.TIMELINE_METRICS)}")
+        return await asyncio.to_thread(_analysis.timeline, chip, metric)
+
+    @app.get("/api/compare")
+    async def api_compare(a: str, b: str, _: None = Depends(require_auth)):
+        res = await asyncio.to_thread(_analysis.compare, a, b,
+                                      settings.compare_threshold_pct)
+        if res is None:
+            raise HTTPException(status_code=404, detail="unknown run id(s)")
+        return res
+
     # --------------------------- chip spec registry --------------------------- #
     @app.get("/api/specs")
     async def api_get_specs(_: None = Depends(require_auth)):
@@ -1309,6 +1344,9 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         if patch.slo_p99_ttft_s is not None:
             settings.slo_p99_ttft_s = max(0.01, float(patch.slo_p99_ttft_s))
             changed.append("slo_p99_ttft_s")
+        if patch.compare_threshold_pct is not None:
+            settings.compare_threshold_pct = max(0.0, float(patch.compare_threshold_pct))
+            changed.append("compare_threshold_pct")
         if patch.kv_hot_capacity is not None:
             settings.kv_hot_capacity = max(0, int(patch.kv_hot_capacity))
             changed.append("kv_hot_capacity")
