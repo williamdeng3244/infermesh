@@ -24,6 +24,18 @@ from infermesh.core.backend import (
 )
 
 
+def _mock_token_ids(prompt: str, n: int) -> list[int]:
+    """Deterministic pseudo token ids for a prompt (sha256-derived, stable
+    across processes). The mock's "greedy decode" — and what
+    ``scripts/gen_reference.py --backend mock`` writes as its reference — so
+    the correctness harness is exercisable end-to-end with no model."""
+    return [
+        int.from_bytes(hashlib.sha256(f"{prompt}:{i}".encode("utf-8")).digest()[:4], "big")
+        % 32000
+        for i in range(n)
+    ]
+
+
 def _hash_embed(text: str, dim: int = 16) -> list[float]:
     """A deterministic, L2-normalized pseudo-embedding (sha256-derived).
 
@@ -119,6 +131,12 @@ class MockEchoBackend(InferenceBackend):
             union = q | d
             scores.append(len(q & d) / len(union) if union else 0.0)
         return scores
+
+    async def greedy_decode(self, prompt: str, max_new_tokens: int = 128) -> Optional[dict]:
+        if not self._loaded:
+            return None
+        return {"token_ids": _mock_token_ids(prompt, max_new_tokens),
+                "top_logprobs": None}
 
     def get_power_w(self) -> Optional[float]:
         # Synthetic ~100 W sinusoid once loaded, so benchmark jobs can

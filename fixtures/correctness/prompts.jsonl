@@ -1,0 +1,20 @@
+{"id": "p01", "tags": ["multilingual", "zh"], "prompt": "把下面这句话翻译成英文，只输出译文：分布式系统的难点在于部分失败。"}
+{"id": "p02", "tags": ["multilingual", "ja"], "prompt": "次の文を中国語に翻訳してください。訳文のみを出力してください：推論サーバーはスループットとレイテンシのバランスを取る必要があります。"}
+{"id": "p03", "tags": ["multilingual", "fr"], "prompt": "Traduis la phrase suivante en anglais, réponds uniquement avec la traduction : La quantification réduit la mémoire nécessaire au prix d'une légère perte de précision."}
+{"id": "p04", "tags": ["multilingual", "zh"], "prompt": "用一句话解释成语「刻舟求剑」的含义。"}
+{"id": "p05", "tags": ["multilingual", "de"], "prompt": "Übersetze ins Englische, gib nur die Übersetzung aus: Der Scheduler verteilt Anfragen auf mehrere Beschleunigerkarten."}
+{"id": "p06", "tags": ["code", "python"], "prompt": "Write a Python function `median(xs)` that returns the median of a non-empty list of numbers. Output only the code."}
+{"id": "p07", "tags": ["code", "sql"], "prompt": "Write a single SQL query that returns the top 3 chips by median tg_tps from a table runs(chip TEXT, tg_tps REAL). Output only SQL."}
+{"id": "p08", "tags": ["code", "regex"], "prompt": "Give a regular expression that matches an IPv4 address, and nothing else. Output only the regex."}
+{"id": "p09", "tags": ["code", "debug"], "prompt": "This Python has a bug: `def avg(xs): return sum(xs) / len(xs) if xs else 0`. What input breaks the intended behavior of returning 0 for empty input? Answer in one sentence."}
+{"id": "p10", "tags": ["code", "js"], "prompt": "Write a JavaScript function `clamp(x, lo, hi)` that clamps x into [lo, hi]. Output only the code."}
+{"id": "p11", "tags": ["math", "arithmetic"], "prompt": "A benchmark sends 240 requests over 96 seconds. What is the average requests per second? Answer with just the number."}
+{"id": "p12", "tags": ["math", "algebra"], "prompt": "Solve for x: 3x + 7 = 25. Answer with just the number."}
+{"id": "p13", "tags": ["math", "geometry"], "prompt": "A rectangle has perimeter 36 and width 4. What is its area? Answer with just the number."}
+{"id": "p14", "tags": ["math", "reasoning"], "prompt": "What is the smallest prime number greater than 90? Answer with just the number."}
+{"id": "p15", "tags": ["math", "percentage"], "prompt": "A model's peak memory drops from 14.5 GB to 11.6 GB after quantization. What is the percentage reduction? Answer with just the number followed by %."}
+{"id": "p16", "tags": ["long-dependency"], "prompt": "Remember this list in order: amber, cobalt, violet, pink, slate. Now remove the second item and append 'jade'. Output the final list, comma-separated."}
+{"id": "p17", "tags": ["long-dependency"], "prompt": "Alice hands the token to Bob. Bob hands it to Carol. Carol hands it back to the person who first held it. Who holds the token now? Answer with just the name."}
+{"id": "p18", "tags": ["long-dependency"], "prompt": "Follow all steps: (1) take the word 'benchmark'; (2) drop the last four letters; (3) uppercase the result. Output only the final string."}
+{"id": "p19", "tags": ["long-dependency"], "prompt": "Count the occurrences of the letter 'e' in the sentence: 'The reference decoder emits deterministic sequences.' Answer with just the number."}
+{"id": "p20", "tags": ["long-dependency"], "prompt": "I will define terms: a 'node' is one server; a 'fleet' is all nodes together. Using exactly those definitions, is one GPU inside a server a node or part of a node? Answer in one short sentence."}

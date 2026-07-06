@@ -170,6 +170,8 @@ class BenchmarkRequest(BaseModel):
     # and the per-level measurement window
     levels: Optional[list] = None
     window_s: Optional[float] = None
+    # run the numeric-correctness harness after the benchmark (single-run jobs)
+    correctness: Optional[bool] = False
 
 
 class SpecsPutRequest(BaseModel):
@@ -1147,9 +1149,20 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         if device_count > 1:  # nvidia-smi topo (to_thread) or the specs registry
             interconnect = await asyncio.to_thread(
                 detect_interconnect, result.get("vendor"), result.get("device_name"))
+        correctness_summary = None
+        if spec.get("correctness"):
+            from infermesh.core.correctness import run_correctness
+            job.progress["phase"] = "correctness"
+            correctness_summary = await run_correctness(pool, model_id)
         extras = {"device_count": device_count, "parallelism": parallelism,
-                  "interconnect": interconnect}
+                  "interconnect": interconnect,
+                  # community row keeps the verdict, not the per-prompt detail
+                  "correctness": ({k: v for k, v in correctness_summary.items()
+                                   if k != "per_prompt"}
+                                  if correctness_summary else None)}
         result = dict(result, **extras)
+        if correctness_summary is not None:
+            result["correctness"] = correctness_summary  # full detail in the job result
         run_id = await _record_benchmark(
             result, concurrency=spec["concurrency"],
             params={**{k: spec[k] for k in ("requests", "concurrency", "max_tokens", "mode", "device")},
@@ -1228,6 +1241,7 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             ]),
             "window_s": (max(0.2, min(float(req.window_s), 120.0))
                          if req.window_s else None),
+            "correctness": bool(req.correctness),
         })
         # Data-parallel jobs take one slot per card sub-run inside the runner,
         # so the manager must not also hold a job-wide slot for them.

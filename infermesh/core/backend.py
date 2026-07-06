@@ -195,3 +195,12 @@ class InferenceBackend(ABC):
         """Opaque vendor hardware-counter snapshot (cache hit rates, DMA
         stalls, …), or None when unsupported. Shape is backend-defined."""
         return None
+
+    async def greedy_decode(self, prompt: str, max_new_tokens: int = 128) -> Optional[dict]:
+        """Greedy (argmax) decode exposing raw token ids, for the numeric
+        correctness harness. Returns ``{"token_ids": [int, ...],
+        "top_logprobs": [[(token_id, logprob) × k], ...] | None}`` or None when
+        the backend cannot expose token ids (the control plane itself has no
+        tokenizer, so correctness checks are only possible where the engine
+        can report them)."""
+        return None

@@ -259,6 +259,32 @@ class TransformersBackend(InferenceBackend):
         decoded = self._processor.batch_decode(gen.unsqueeze(0), skip_special_tokens=True)[0]
         return decoded, in_len, int(gen.shape[0])
 
+    async def greedy_decode(self, prompt: str, max_new_tokens: int = 128) -> Optional[dict]:
+        """Argmax decode with raw token ids + top-20 logprobs per step, for
+        the numeric-correctness harness. None until a text model is loaded."""
+        if not self._loaded or self._tokenizer is None or self._model is None:
+            return None
+
+        def _run() -> dict:
+            import torch
+            toks = self._tokenizer(prompt, return_tensors="pt").to(self._model.device)
+            with torch.no_grad():
+                out = self._model.generate(
+                    **toks, do_sample=False, num_beams=1,
+                    max_new_tokens=int(max_new_tokens),
+                    output_scores=True, return_dict_in_generate=True)
+            new_ids = out.sequences[0][toks["input_ids"].shape[1]:].tolist()
+            tops: list = []
+            for sc in (out.scores or []):
+                lp = torch.log_softmax(sc[0].float(), dim=-1)
+                v, ix = lp.topk(20)
+                tops.append([[int(i), round(float(x), 6)]
+                             for i, x in zip(ix.tolist(), v.tolist())])
+            return {"token_ids": [int(x) for x in new_ids],
+                    "top_logprobs": tops or None}
+
+        return await asyncio.to_thread(_run)
+
     async def unload(self) -> None:
         self._loaded = False
         model, self._model, self._tokenizer = self._model, None, None
