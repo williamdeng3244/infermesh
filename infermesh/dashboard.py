@@ -131,6 +131,23 @@ tbody tr:hover{background:var(--card2)}
 .mref-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:6px}
 .mref-item{border:1px solid var(--border);border-radius:8px;padding:11px 13px;background:var(--card2)}
 .mref-h{font-size:13px;margin-bottom:6px}.mref-h .muted{font-size:11px;font-weight:500}
+/* ---- v2 analysis/compare — instrument-bench plot components ---- */
+.plotwrap{background:var(--panel2);border:1px solid var(--line);border-radius:var(--r);padding:6px 4px 2px;background-image:radial-gradient(var(--dot) 1px,transparent 1.4px);background-size:22px 22px;background-position:11px 9px}
+.plotwrap svg{display:block;width:100%;height:auto}
+.axis{font:500 10.5px var(--mono);fill:var(--dim)}
+.tooltip{position:fixed;z-index:99;pointer-events:none;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:9px 11px;font:11.5px/1.5 var(--mono);color:var(--text);box-shadow:0 12px 30px -12px rgba(0,0,0,.7);opacity:0;transform:translateY(3px);transition:opacity .1s,transform .1s;max-width:280px}
+.tooltip.show{opacity:1;transform:none}
+.fchip{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;border:1px solid var(--line2);background:var(--panel2);color:var(--muted);font:500 12px var(--sans);cursor:pointer}
+.fchip.on{color:var(--text);background:var(--panel)}
+.fchip .sw,.antag .sw{width:9px;height:9px;border-radius:3px;display:inline-block}
+.antag{font:600 11.5px var(--mono);letter-spacing:.2px;display:inline-flex;align-items:center;gap:6px}
+.hint{font-size:11.5px;color:var(--dim);margin-top:8px;line-height:1.6}
+.eyebrow{color:var(--muted);font:600 10.5px var(--sans);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+.kpi .ro{font:600 24px/1.15 var(--mono);font-variant-numeric:tabular-nums;margin-top:6px}
+.kpi .ro small{font-size:12px;color:var(--muted);font-weight:500;margin-left:4px}
+.angrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:14px}
+.angrid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(390px,1fr));gap:14px;margin-bottom:14px}
+.anrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
 .mref-en{font-size:12px;color:var(--muted);line-height:1.5}
 .mref-zh{font-size:12px;color:var(--dim);line-height:1.6;margin-top:4px}
 .bm-term{margin-top:14px}
@@ -227,6 +244,8 @@ tr.cm-det>td{background:rgba(127,127,127,.04);padding:0}
       <button data-sec="download" aria-label="Download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg> <span data-i18n="Download">Download</span></button>
       <button data-sec="benchmark" aria-label="Benchmark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19a9 9 0 1 1 15 0"/><path d="M12 14l3.5-3.5"/></svg> <span data-i18n="Benchmark">Benchmark</span></button>
       <button data-sec="explorer" aria-label="Explorer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="20" x2="3" y2="11"/><line x1="9" y1="20" x2="9" y2="4"/><line x1="15" y1="20" x2="15" y2="13"/><line x1="21" y1="20" x2="21" y2="7"/></svg> <span data-i18n="Explorer">Explorer</span></button>
+      <button data-sec="analysis" aria-label="Hardware Analysis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M3 21V6m0 15L10 8l4 6 7-11"/><path d="M3 6h8M14 21V10" opacity=".4"/></svg> <span data-i18n="Hardware Analysis">Hardware Analysis</span></button>
+      <button data-sec="compare" aria-label="Compare A/B"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v16M15 4v16M4 9l3 3-3 3M20 9l-3 3 3 3"/></svg> <span data-i18n="Compare A/B">Compare A/B</span></button>
       <button data-sec="community" aria-label="Community"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> <span data-i18n="Community">Community</span></button>
       <button data-sec="settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg> <span data-i18n="Settings">Settings</span></button>
     </nav>
@@ -523,6 +542,14 @@ tr.cm-det>td{background:rgba(127,127,127,.04);padding:0}
         </div>
       </section>
 
+      <section class="section" id="sec-analysis">
+        <div id="anRoot"></div>
+      </section>
+
+      <section class="section" id="sec-compare">
+        <div id="cpRoot"></div>
+      </section>
+
       <section class="section" id="sec-community">
         <div class="panel" style="padding:13px 14px;margin-bottom:14px">
           <div class="cm-filters">
@@ -658,10 +685,11 @@ tr.cm-det>td{background:rgba(127,127,127,.04);padding:0}
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let active='models', logsPaused=false, lastBench=null;
-const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',devices:'Devices',download:'Download',benchmark:'Benchmark',explorer:'Explorer',community:'Community',settings:'Settings'};
+const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',devices:'Devices',download:'Download',benchmark:'Benchmark',explorer:'Explorer',analysis:'Hardware Analysis',compare:'Compare A/B',community:'Community',settings:'Settings'};
 /* ---- i18n: keys are the English text; only ZH needs entries. Units (tok/s, ms, %, MB) + proper nouns stay. ---- */
 const I18N={
 "Models":"模型","Chat":"对话","Logs":"日志","Metrics":"指标","Devices":"设备","Download":"下载","Benchmark":"基准测试","Settings":"设置",
+"Hardware Analysis":"硬件分析","Compare A/B":"A/B 对比",
 "Refresh":"刷新","API key (if enabled)":"API 密钥（如启用）","Toggle theme":"切换主题",
 "Load on device":"加载到设备","applies to the next Load (Transformers backend)":"应用于下次加载（Transformers 后端）",
 "Model":"模型","Type":"类型","Backend":"后端","Status":"状态","Mem MB":"内存 MB","Gen tps":"生成 tps","Leases":"租约","Actions":"操作","loading…":"加载中…",
@@ -773,6 +801,8 @@ function switchSection(sec){
   if(sec==='metrics'){ refreshMetrics(); refreshStats(); }
   if(sec==='benchmark'){ loadBenchModels(); loadBenchDevices(); refreshBenchHistory(); }
   if(sec==='explorer') loadExplorer();
+  if(sec==='analysis') loadAnalysis();
+  if(sec==='compare') loadCompare();
   if(sec==='community') loadCommunity();
   if(sec==='devices') refreshDevices();
   if(sec==='download'){ refreshDownloads(); if(!dlLoaded){ dlLoaded=true; runHfSearch(); } }
@@ -1551,9 +1581,399 @@ async function tick(){
   if(active==='download') refreshDownloads();
 }
 setInterval(tick,2000); tick();
+/* ================= Hardware Analysis + Compare A/B (ported from docs/design/console-redesign-v2.html; data: /api/analysis/* + /api/compare) ================= */
+function niceTicks(min,max,count){count=count||5;
+  if(min===max){max=min+1;}
+  const span=max-min, step0=span/count, mag=Math.pow(10,Math.floor(Math.log10(step0)));
+  const norm=step0/mag; const step=(norm<1.5?1:norm<3?2:norm<7?5:10)*mag;
+  const lo=Math.floor(min/step)*step, hi=Math.ceil(max/step)*step;
+  const ticks=[]; for(let v=lo;v<=hi+step*0.5;v+=step) ticks.push(+v.toFixed(10));
+  return {lo,hi,ticks};
+}
+const lg10=Math.log10;
+function lgX(v,mn,mx,p0,p1){return p0+(lg10(v)-lg10(mn))/(lg10(mx)-lg10(mn))*(p1-p0);}
+function showTT(html,e){const el=$('#tt'); if(!el)return; el.innerHTML=html; el.classList.add('show');
+  const r=el.getBoundingClientRect();
+  el.style.left=Math.min(e.clientX+14,window.innerWidth-r.width-8)+'px';
+  el.style.top=Math.min(e.clientY+14,window.innerHeight-r.height-8)+'px';}
+function hideTT(){const el=$('#tt'); if(el)el.classList.remove('show');}
+function bindTTs(scope){
+ (scope||document).querySelectorAll('[data-tt]').forEach(el=>{
+   el.addEventListener('mousemove',e=>showTT(decodeURIComponent(el.dataset.tt),e));
+   el.addEventListener('mouseleave',hideTT);
+ });
+}
+function chipHexes(){const cs=getComputedStyle(document.documentElement);
+  return ['--c1','--c2','--c3','--c4','--c5'].map(v=>cs.getPropertyValue(v).trim()||'#FFB224');}
+function fmtN(v,d){return (v==null||isNaN(v))?'—':(+v).toFixed(d==null?1:d);}
+function paramsFromModel(m){ if(!m)return null; const mm=String(m).match(/(\d+(?:\.\d+)?)\s*[bB](?![a-zA-Z0-9])/); return mm?parseFloat(mm[1])*1e9:null; }
+const BPP_UI={fp16:2,bf16:2,int8:1,'8bit':1,int4:.5,'4bit':.5,fp32:4};
+
+/* roofline: registry roofs + this chip's measured decode/prefill points */
+function rooflineSVG(sel,ref){
+ const W=920,H=430,L=70,R=26,PT=26,PB=52,mnx=.5,mxx=8192,mny=.5,mxy=512;
+ const X=v=>lgX(Math.min(Math.max(v,mnx),mxx),mnx,mxx,L,W-R),
+       Y=v=>H-PB-(lg10(Math.min(Math.max(v,mny),mxy))-lg10(mny))/(lg10(mxy)-lg10(mny))*(H-PT-PB);
+ const roof=(bw,tf)=>{const ridge=tf*1000/bw;
+   return 'M'+X(mnx)+' '+Y(bw*mnx/1000)+' L '+X(ridge)+' '+Y(tf)+' L '+X(mxx)+' '+Y(tf);};
+ let g='';
+ for(const e of [1,10,100]){for(let m=1;m<10;m++){const v=e*m;if(v<mny||v>mxy)continue;
+   g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="${m===1?1:.4}" opacity="${m===1?.8:.35}"/>`;
+   if(m===1)g+=`<text x="${L-8}" y="${Y(v)+4}" text-anchor="end" class="axis">${v}</text>`;}}
+ for(const e of [1,10,100,1000]){for(let m=1;m<10;m++){const v=e*m;if(v<mnx||v>mxx)continue;
+   g+=`<line y1="${PT}" y2="${H-PB}" x1="${X(v)}" x2="${X(v)}" stroke="var(--line)" stroke-width="${m===1?1:.4}" opacity="${m===1?.8:.35}"/>`;
+   if(m===1)g+=`<text x="${X(v)}" y="${H-PB+18}" text-anchor="middle" class="axis">${v>=1000?(v/1000)+'k':v}</text>`;}}
+ if(ref&&ref.spec)g+=`<path d="${roof(ref.spec.peak_bw_gbps,ref.spec.peak_tflops_fp16)}" fill="none" stroke="${ref.hex}" stroke-width="1.4" stroke-dasharray="5 5" opacity=".45"/>`;
+ if(sel.spec)g+=`<path d="${roof(sel.spec.peak_bw_gbps,sel.spec.peak_tflops_fp16)}" fill="none" stroke="${sel.hex}" stroke-width="2.4"/>`;
+ let pts='';
+ const row=sel.row, params=sel.params;
+ if(row&&params){
+  const bpp=BPP_UI[String(row.quant||'fp16').toLowerCase()]||2;
+  if(row.tg_tps!=null){
+   const ix=2/bpp, perf=2*params*row.tg_tps/1e12;
+   pts+=`<circle cx="${X(ix)}" cy="${Y(perf)}" r="7" fill="${sel.hex}" stroke="var(--bg)" stroke-width="2" data-tt="${encodeURIComponent(`<b>decode · ${esc(row.quant||'fp16')}</b><br>${perf.toFixed(3)} TFLOP/s @ ${ix} FLOP/B${row.mbu!=null?`<br>MBU ${(row.mbu*100).toFixed(1)}%`:''}`)}"/>`;
+   pts+=`<text x="${X(ix)}" y="${Y(perf)-12}" text-anchor="middle" class="axis" fill="${sel.hex}">${esc(row.quant||'fp16')}</text>`;
+  }
+  if(row.pp_tps!=null){
+   const ixp=2048*2/bpp, perfp=2*params*row.pp_tps/1e12;
+   pts+=`<rect x="${X(ixp)-6.5}" y="${Y(perfp)-6.5}" width="13" height="13" rx="2.5" fill="${sel.hex}" stroke="var(--bg)" stroke-width="2" data-tt="${encodeURIComponent(`<b>prefill</b><br>${perfp.toFixed(2)} TFLOP/s${row.mfu!=null?`<br>MFU ${(row.mfu*100).toFixed(1)}%`:''}`)}"/>`;
+   pts+=`<text x="${X(ixp)}" y="${Y(perfp)-13}" text-anchor="middle" class="axis" fill="${sel.hex}">prefill</text>`;
+  }
+ }
+ return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+  <text x="${L-46}" y="${PT-8}" class="axis">TFLOP/s</text>
+  <text x="${W-R}" y="${H-8}" text-anchor="end" class="axis">FLOP/byte (log)</text>${g}${pts}</svg>`;
+}
+
+function frontierSVG(list,slo){
+ const W=920,H=400,L=64,R=24,PT=24,PB=50;
+ let mxThr=0; list.forEach(s=>(s.points||[]).forEach(p=>{if(p.throughput!=null)mxThr=Math.max(mxThr,p.throughput);}));
+ if(!mxThr)mxThr=1;
+ const mny=.08,mxy=60;
+ const X=v=>L+v/(mxThr*1.08)*(W-L-R),
+       Y=v=>H-PB-(lg10(Math.min(Math.max(v,mny),mxy))-lg10(mny))/(lg10(mxy)-lg10(mny))*(H-PT-PB);
+ let g='';
+ for(const v of [0.1,0.5,1,2,5,10,30]){g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width=".6" opacity=".5"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end" class="axis">${v}</text>`;}
+ const xt=niceTicks(0,mxThr*1.08,6).ticks;
+ for(const v of xt){if(!v)continue;g+=`<line y1="${PT}" y2="${H-PB}" x1="${X(v)}" x2="${X(v)}" stroke="var(--line)" stroke-width=".6" opacity=".5"/><text x="${X(v)}" y="${H-PB+18}" text-anchor="middle" class="axis">${v}</text>`;}
+ g+=`<line x1="${L}" x2="${W-R}" y1="${Y(slo)}" y2="${Y(slo)}" stroke="var(--warn)" stroke-width="1.6" stroke-dasharray="7 5"/><text x="${W-R}" y="${Y(slo)-6}" text-anchor="end" class="axis" fill="var(--warn)">SLO p99 ≤ ${slo}s</text>`;
+ for(const s of list){
+  const F=(s.points||[]).filter(p=>p.p99_ttft_s!=null&&p.throughput!=null);
+  if(!F.length)continue;
+  g+=`<path d="M ${F.map(p=>X(p.throughput)+' '+Y(p.p99_ttft_s)).join(' L ')}" fill="none" stroke="${s.hex}" stroke-width="2.2" opacity=".9"/>`;
+  for(const p of F){const knee=!!s.goodput&&p.concurrency===s.goodput_concurrency;
+   g+=`<circle cx="${X(p.throughput)}" cy="${Y(p.p99_ttft_s)}" r="${knee?7:4.5}" fill="${knee?'var(--bg)':s.hex}" stroke="${s.hex}" stroke-width="${knee?3:0}" data-tt="${encodeURIComponent(`<b>${esc(s.chip)}</b> · c=${p.concurrency}<br>${fmtN(p.throughput,1)} tok/s · p99 TTFT ${fmtN(p.p99_ttft_s,2)}s${knee?'<br><b>goodput point</b>':''}`)}"/>`;}
+ }
+ return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+  <text x="${L-40}" y="${PT-6}" class="axis">p99 TTFT s (log)</text>
+  <text x="${W-R}" y="${H-6}" text-anchor="end" class="axis">tok/s</text>${g}</svg>`;
+}
+
+function scalingSVG(points,hex){
+ const W=920,H=380,L=64,R=24,PT=24,PB=48;
+ const usable=points.filter(p=>p.speedup!=null);
+ const mx=Math.max(2,...points.map(p=>p.device_count));
+ const mxsp=Math.max(2,...usable.map(p=>p.speedup),Math.min(mx,8));
+ const X=v=>L+(v-1)/((mx-1)||1)*(W-L-R), Y=v=>H-PB-(v/(mxsp*1.05))*(H-PT-PB);
+ let g=`<path d="M ${X(1)} ${Y(1)} L ${X(Math.min(mx,mxsp))} ${Y(Math.min(mx,mxsp))}" stroke="var(--dim)" stroke-width="1.4" stroke-dasharray="6 5" fill="none"/>`;
+ for(const v of niceTicks(0,mxsp,5).ticks){ if(v<=0)continue;
+  g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width=".6" opacity=".5"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end" class="axis">${v}×</text>`;}
+ for(const p of points){ g+=`<text x="${X(p.device_count)}" y="${H-PB+18}" text-anchor="middle" class="axis">${p.device_count}</text>`;}
+ if(usable.length){
+  g+=`<path d="M ${usable.map(p=>X(p.device_count)+' '+Y(p.speedup)).join(' L ')}" fill="none" stroke="${hex}" stroke-width="2.2"/>`;
+  for(const p of usable){ g+=`<circle cx="${X(p.device_count)}" cy="${Y(p.speedup)}" r="5" fill="${hex}" data-tt="${encodeURIComponent(`<b>${p.device_count}×</b><br>speedup ${p.speedup.toFixed(2)}× · efficiency ${(p.efficiency*100).toFixed(0)}%<br>n=${p.n_runs}`)}"/>`;
+   if(p.device_count>1)g+=`<text x="${X(p.device_count)}" y="${Y(p.speedup)-11}" text-anchor="middle" class="axis" fill="${hex}">${(p.efficiency*100).toFixed(0)}%</text>`;}
+ }
+ return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+  <text x="${L-40}" y="${PT-6}" class="axis">speedup</text>
+  <text x="${W-R}" y="${H-6}" text-anchor="end" class="axis">devices</text>${g}</svg>`;
+}
+
+function timelineSVG(points,hex){
+ const W=920,H=300,L=64,R=24,PT=26,PB=46;
+ const vals=points.map(p=>p.median);
+ const mn=Math.min(...vals)*0.9, mx=(Math.max(...vals)*1.08)||1;
+ const X=i=>L+(points.length===1?((W-L-R)/2):i/(points.length-1)*(W-L-R)),
+       Y=v=>H-PB-(v-mn)/((mx-mn)||1)*(H-PT-PB);
+ let g='';
+ for(const v of niceTicks(mn,mx,5).ticks){g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width=".6" opacity=".5"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end" class="axis">${v}</text>`;}
+ g+=`<path d="M ${points.map((p,i)=>X(i)+' '+Y(p.median)).join(' L ')}" fill="none" stroke="${hex}" stroke-width="2.4"/>`;
+ points.forEach((p,i)=>{
+  g+=`<circle cx="${X(i)}" cy="${Y(p.median)}" r="${p.regression?7:5}" fill="${p.regression?'var(--err)':hex}" data-tt="${encodeURIComponent(`<b>${esc(p.driver_version)}</b><br>median ${fmtN(p.median,1)}${p.delta_pct!=null?`<br>Δ ${(p.delta_pct>=0?'+':'')+p.delta_pct.toFixed(1)}%`:''}${p.regression?'<br><b>regression</b>':''}`)}"/>`;
+  g+=`<text x="${X(i)}" y="${H-PB+18}" text-anchor="middle" class="axis">${esc(p.driver_version)}</text>`;
+  if(p.regression)g+=`<text x="${X(i)}" y="${Y(p.median)-13}" text-anchor="middle" class="axis" fill="var(--err)">▼ ${p.delta_pct.toFixed(1)}%</text>`;
+ });
+ return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">${g}</svg>`;
+}
+
+function pctBarsSVG(points,hex){
+ const W=440,H=150,L=8,PB=20;
+ const vals=[]; points.forEach(p=>{const q=(p.percentiles||{}).ttft||{}; if(q.p99!=null)vals.push(q.p99);});
+ const mx=Math.max(1,...vals);
+ const bw=(W-L-8)/Math.max(points.length,1);
+ let g='';
+ points.forEach((p,i)=>{const q=(p.percentiles||{}).ttft||{}; if(q.p50==null)return;
+   const x=L+i*bw, h99=(q.p99||0)/mx*(H-PB-16), h50=(q.p50||0)/mx*(H-PB-16);
+   g+=`<rect x="${x+3}" y="${H-PB-h99}" width="${Math.max(4,bw*0.5-6)}" height="${h99}" rx="2" fill="${hex}" opacity=".35" data-tt="${encodeURIComponent(`<b>c=${p.concurrency}</b><br>TTFT p99 ${fmtN(q.p99,1)} ms`)}"/>`;
+   g+=`<rect x="${x+bw*0.5}" y="${H-PB-h50}" width="${Math.max(4,bw*0.45-6)}" height="${h50}" rx="2" fill="${hex}" data-tt="${encodeURIComponent(`<b>c=${p.concurrency}</b><br>TTFT p50 ${fmtN(q.p50,1)} ms`)}"/>`;
+   g+=`<text x="${x+bw/2}" y="${H-6}" text-anchor="middle" class="axis">c=${p.concurrency}</text>`;});
+ g+=`<text x="2" y="12" class="axis">${esc(T('TTFT p50 vs p99 (ms)'))}</text>`;
+ return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">${g}</svg>`;
+}
+
+/* ---- analysis state + loaders ---- */
+let AN={tab:'eff',chip:null,dist:null,slo:null,model:'',quant:''};
+try{Object.assign(AN,JSON.parse(localStorage.getItem('infermesh-an')||'{}'));}catch(e){}
+function anSave(){try{localStorage.setItem('infermesh-an',JSON.stringify({tab:AN.tab,slo:AN.slo,model:AN.model,quant:AN.quant}));}catch(e){}}
+let anData=null;
+async function loadAnalysis(){
+  const root=$('#anRoot'); if(!root)return;
+  root.innerHTML='<div class="hint">'+T('loading…')+'</div>';
+  try{
+    const both=await Promise.all([api('/api/analysis/efficiency'),api('/api/specs')]);
+    let frontier=null,scaling=null;
+    if(AN.tab==='cap'||AN.tab==='dist') frontier=await api('/api/analysis/frontier'+(AN.slo?('?slo='+AN.slo):''));
+    if(AN.tab==='scale') scaling=await api('/api/analysis/scaling?model='+encodeURIComponent(AN.model||'')+'&quant='+encodeURIComponent(AN.quant||''));
+    anData={eff:both[0].chips||[],specs:both[1].specs||{},frontier:frontier,scaling:scaling};
+    renderAnalysis();
+  }catch(e){root.innerHTML='<div class="hint">'+esc(String(e))+'</div>';}
+}
+function anChips(){const hex=chipHexes();return anData.eff.map((c,i)=>Object.assign({},c,{hex:hex[i%5]}));}
+function chipPickRow(list,cur,attr){
+  return `<div class="anrow">${list.map(c=>`<button class="fchip ${c.chip===cur?'on':''}" data-${attr}="${esc(c.chip)}"><span class="sw" style="background:${c.hex}"></span>${esc(c.chip)}</button>`).join('')}</div>`;
+}
+function renderAnalysis(){
+  const root=$('#anRoot');
+  const tabs=[['eff','Efficiency'],['cap','Capacity'],['scale','Scaling'],['dist','Distributions']];
+  let body='';
+  if(AN.tab==='eff')body=anEffT(); else if(AN.tab==='cap')body=anCapT(); else if(AN.tab==='scale')body=anScaleT(); else body=anDistT();
+  root.innerHTML=`<div class="anrow"><div class="seg">${tabs.map(([k,lb])=>`<button class="seg-btn ${AN.tab===k?'active':''}" data-antab="${k}">${esc(T(lb))}</button>`).join('')}</div></div>`+body;
+  root.querySelectorAll('[data-antab]').forEach(b=>b.onclick=()=>{AN.tab=b.dataset.antab;anSave();loadAnalysis();});
+  root.querySelectorAll('[data-anchip]').forEach(b=>b.onclick=()=>{AN.chip=b.dataset.anchip;renderAnalysis();});
+  root.querySelectorAll('[data-andist]').forEach(b=>b.onclick=()=>{AN.dist=b.dataset.andist;renderAnalysis();});
+  root.querySelectorAll('[data-anslo]').forEach(b=>b.onclick=()=>{AN.slo=+b.dataset.anslo;anSave();loadAnalysis();});
+  const mf=root.querySelector('#anModelF'), qf=root.querySelector('#anQuantF');
+  if(mf)mf.onchange=()=>{AN.model=mf.value;anSave();loadAnalysis();};
+  if(qf)qf.onchange=()=>{AN.quant=qf.value;anSave();loadAnalysis();};
+  bindTTs(root);
+}
+function anEffT(){
+  const list=anChips();
+  if(!list.length)return `<div class="card"><div class="hint">${esc(T('no runs in the community store yet — run a benchmark first'))}</div></div>`;
+  if(!AN.chip||!list.some(c=>c.chip===AN.chip))AN.chip=list[0].chip;
+  const sel=list.find(c=>c.chip===AN.chip);
+  const spec=sel.spec_key?anData.specs[sel.spec_key]:null;
+  const refc=list.find(c=>c.chip!==sel.chip&&c.spec_key&&anData.specs[c.spec_key]);
+  const params=paramsFromModel(sel.model);
+  const kpi=(lbl,val,unit)=>`<div class="card kpi"><div class="k">${esc(T(lbl))}</div><div class="ro">${val}<small>${unit}</small></div></div>`;
+  const rows=list.map(x=>`<tr><td><span class="antag" style="color:${x.hex}"><span class="sw" style="background:${x.hex}"></span>${esc(x.chip)}</span></td><td class="mono">${esc(x.quant||'—')}</td>
+    <td class="num">${x.mbu!=null?(x.mbu*100).toFixed(1)+'%':'—'}</td><td class="num">${x.mfu!=null?(x.mfu*100).toFixed(1)+'%':'—'}</td>
+    <td class="num">${x.tok_j!=null?x.tok_j.toFixed(3)+(x.tok_j_basis==='tdp'?' <span class="muted">(TDP)</span>':''):'—'}</td>
+    <td class="num" style="color:${(x.soak_delta_pct!=null&&x.soak_delta_pct<=-5)?'var(--err)':'var(--muted)'}">${x.soak_delta_pct!=null?x.soak_delta_pct.toFixed(1)+'%':'—'}</td></tr>`).join('');
+  return chipPickRow(list,AN.chip,'anchip')+
+  `<div class="angrid">
+    ${kpi('decode MBU',sel.mbu!=null?(sel.mbu*100).toFixed(1):'—','% · '+esc(sel.quant||''))}
+    ${kpi('prefill MFU',sel.mfu!=null?(sel.mfu*100).toFixed(1):'—','%')}
+    ${kpi('tokens per joule',sel.tok_j!=null?sel.tok_j.toFixed(3):'—',sel.tok_j_basis==='tdp'?'tok/J (TDP)':'tok/J')}
+    ${kpi('runs recorded',sel.n_runs,'')}
+  </div>
+  <div class="panel" style="padding:16px;margin-bottom:14px">
+    <div class="eyebrow">${esc(T('Roofline — where each workload sits'))} · ${esc(sel.chip)}${spec?` · ${spec.peak_bw_gbps} GB/s · ${spec.peak_tflops_fp16} TFLOPS fp16`:''}</div>
+    ${(spec&&params)?`<div class="plotwrap">${rooflineSVG({spec:spec,hex:sel.hex,row:sel,params:params},refc?{spec:anData.specs[refc.spec_key],hex:refc.hex}:null)}</div>
+    <div class="hint">${esc(T('Solid roof = selected chip. Dashed = reference. Circle = decode at its quant, square = prefill. Hover for MBU/MFU.'))}</div>`
+    :`<div class="hint">${esc(T(spec?'model name carries no parameter count — MBU/MFU need it':'no spec for this chip — add peak BW / TFLOPS / TDP via the chip-spec registry'))}</div>`}
+  </div>
+  <div class="panel" style="padding:16px;margin-bottom:14px">
+    <div class="eyebrow">${esc(T('Efficiency across chips'))}</div>
+    <table><thead><tr><th>${esc(T('chip'))}</th><th>${esc(T('quant'))}</th><th>${esc(T('MBU decode'))}</th><th>${esc(T('MFU prefill'))}</th><th>tok/J</th><th>${esc(T('soak Δ'))}</th></tr></thead><tbody>${rows}</tbody></table>
+  </div>
+  <div class="hint">${esc(T('Spec-sheet denominators — edit per-chip peak BW / TFLOPS / TDP via the chip-spec registry; MBU & MFU derive from them plus measured throughput. No hardware counters required.'))}</div>`;
+}
+function anCapT(){
+  const fr=(anData.frontier&&anData.frontier.series)||[];
+  const slo=anData.frontier?anData.frontier.slo_p99_ttft_s:2;
+  const hex=chipHexes();
+  const list=fr.map((s,i)=>Object.assign({},s,{hex:hex[i%5]}));
+  const segs=`<div class="seg">${[1,2,5,10].map(v=>`<button class="seg-btn ${slo===v?'active':''}" data-anslo="${v}">p99 ≤ ${v}s</button>`).join('')}</div>`;
+  const head=`<div class="anrow"><span class="muted">${esc(T('SLO p99 TTFT'))}</span>${segs}</div>`;
+  if(!list.length)return head+`<div class="card"><div class="hint">${esc(T('no sweep data yet — run a concurrency-sweep benchmark to draw the frontier'))}</div></div>`;
+  const rows=list.map(s=>{
+    const tag=`<span class="antag" style="color:${s.hex}"><span class="sw" style="background:${s.hex}"></span>${esc(s.chip)}</span>`;
+    if(!s.goodput)return `<tr><td>${tag}</td><td class="num muted" colspan="3">${esc(T('does not meet SLO at any concurrency (prefill-bound)'))}</td></tr>`;
+    const pt=s.points.find(p=>p.concurrency===s.goodput_concurrency)||{};
+    return `<tr><td>${tag}</td><td class="num">${fmtN(s.goodput,1)}</td><td class="num">${s.goodput_concurrency}</td><td class="num">${fmtN(pt.p99_ttft_s,2)} s</td></tr>`;}).join('');
+  return head+
+  `<div class="panel" style="padding:16px;margin-bottom:14px">
+    <div class="eyebrow">${esc(T('Throughput–latency frontier'))}</div>
+    <div class="plotwrap">${frontierSVG(list,slo)}</div>
+    <div class="hint">${esc(T('Ring = goodput point: highest throughput still meeting the SLO. Hover points for concurrency.'))}</div>
+  </div>
+  <div class="panel" style="padding:16px">
+    <div class="eyebrow">${esc(T('Goodput @ SLO'))} · p99 TTFT ≤ ${slo}s</div>
+    <table><thead><tr><th>${esc(T('chip'))}</th><th>goodput tok/s</th><th>${esc(T('max conc'))}</th><th>${esc(T('p99 at that point'))}</th></tr></thead><tbody>${rows}</tbody></table>
+  </div>`;
+}
+function anScaleT(){
+  const sc=anData.scaling||{points:[]};
+  const hex=chipHexes()[0];
+  const pts=sc.points||[];
+  const filters=`<div class="anrow">
+    <div class="bm-field"><label>${esc(T('model filter'))}</label><input id="anModelF" value="${esc(AN.model||'')}" placeholder="Qwen…" style="width:190px"/></div>
+    <div class="bm-field"><label>${esc(T('quant filter'))}</label><input id="anQuantF" value="${esc(AN.quant||'')}" placeholder="fp16" style="width:100px"/></div>
+  </div>`;
+  if(!pts.length)return filters+`<div class="card"><div class="hint">${esc(T('no runs match — record 1-device and multi-device runs to see scaling'))}</div></div>`;
+  const rows=pts.map(p=>`<tr><td class="num">${p.device_count}×</td><td class="num">${fmtN(p.median_throughput,1)}</td><td class="num">${p.speedup!=null?p.speedup.toFixed(2)+'×':'—'}</td><td class="num">${p.efficiency!=null?(p.efficiency*100).toFixed(0)+'%':'—'}</td><td class="num">${p.n_runs}</td></tr>`).join('');
+  return filters+
+  `<div class="panel" style="padding:16px;margin-bottom:14px">
+    <div class="eyebrow">${esc(T('Multi-GPU scaling'))}${sc.model?` · ${esc(sc.model)}`:''}${sc.quant?` · ${esc(sc.quant)}`:''}</div>
+    <div class="plotwrap">${scalingSVG(pts,hex)}</div>
+    <div class="hint">${esc(T('Ideal = linear. Labels show parallel efficiency. Baseline: median of 1-device runs.'))}</div>
+  </div>
+  <div class="panel" style="padding:16px">
+    <table><thead><tr><th>${esc(T('device count'))}</th><th>${esc(T('median throughput'))}</th><th>${esc(T('speedup'))}</th><th>${esc(T('efficiency'))}</th><th>${esc(T('runs'))}</th></tr></thead><tbody>${rows}</tbody></table>
+  </div>`;
+}
+function anDistT(){
+  const fr=(anData.frontier&&anData.frontier.series)||[];
+  const hex=chipHexes();
+  const list=fr.map((s,i)=>Object.assign({},s,{hex:hex[i%5]}));
+  if(!list.length)return `<div class="card"><div class="hint">${esc(T('no sweep data yet — run a concurrency-sweep benchmark to draw the frontier'))}</div></div>`;
+  if(!AN.dist||!list.some(c=>c.chip===AN.dist))AN.dist=list[0].chip;
+  const sel=list.find(c=>c.chip===AN.dist);
+  const row=p=>{const q=(p.percentiles||{}), tt=q.ttft||{}, it=q.itl||{};
+    return `<tr><td class="num">c=${p.concurrency}</td>
+    <td class="num">${fmtN(tt.p50,0)}</td><td class="num">${fmtN(tt.p90,0)}</td><td class="num">${fmtN(tt.p99,0)}</td><td class="num">${fmtN(tt.p999,0)}</td>
+    <td class="num">${fmtN(it.p50,1)}</td><td class="num">${fmtN(it.p99,1)}</td>
+    <td class="num">${p.cv_itl!=null?(p.cv_itl*100).toFixed(1)+'%':'—'}</td>
+    <td class="num">${p.n_requests!=null?p.n_requests:'—'}</td></tr>`;};
+  const last=sel.points[sel.points.length-1]||{};
+  const lt=((last.percentiles||{}).ttft)||{};
+  const tail=(lt.p99&&lt.p50)?(lt.p99/lt.p50):null;
+  return chipPickRow(list,AN.dist,'andist')+
+  `<div class="angrid2">
+    <div class="panel" style="padding:16px">
+      <div class="eyebrow">${esc(T('Latency distributions'))} · ${esc(sel.chip)}</div>
+      <table><thead><tr><th></th><th>TTFT p50</th><th>p90</th><th>p99</th><th>p99.9</th><th>ITL p50</th><th>ITL p99</th><th>CV</th><th>n</th></tr></thead>
+      <tbody>${sel.points.map(row).join('')}</tbody></table>
+      <div class="hint">${esc(T('per level: TTFT / ITL percentiles (ms) from the latest sweep'))}</div>
+    </div>
+    <div class="panel" style="padding:16px">
+      <div class="eyebrow">TTFT · ${esc(sel.chip)}</div>
+      <div class="plotwrap" style="padding:10px 12px">${pctBarsSVG(sel.points,sel.hex)}</div>
+      <div class="angrid" style="margin-top:12px;margin-bottom:0">
+        <div class="card kpi"><div class="k">${esc(T('tail ratio p99/p50'))}</div><div class="ro">${tail?tail.toFixed(2):'—'}<small>×</small></div></div>
+        <div class="card kpi"><div class="k">ITL CV</div><div class="ro">${last.cv_itl!=null?(last.cv_itl*100).toFixed(1):'—'}<small>%</small></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="hint">${esc(T('Medians lie. Tail ratio and CV are the first fingerprints of scheduler stalls, allocator pauses and kernel-launch gaps.'))}</div>`;
+}
+
+/* ---- compare A/B ---- */
+let CP={a:null,b:null,runs:[]};
+async function loadCompare(){
+  const root=$('#cpRoot'); if(!root)return;
+  root.innerHTML='<div class="hint">'+T('loading…')+'</div>';
+  try{
+    const d=await api('/api/community/runs?sort=recent&limit=100');
+    CP.runs=d.runs||[];
+    if(!CP.runs.length){root.innerHTML='<div class="card"><div class="hint">'+esc(T('no runs in the community store yet — run a benchmark first'))+'</div></div>';return;}
+    if(!CP.a||!CP.runs.some(r=>r.id===CP.a))CP.a=CP.runs[Math.min(1,CP.runs.length-1)].id;
+    if(!CP.b||!CP.runs.some(r=>r.id===CP.b))CP.b=CP.runs[0].id;
+    const cmp=await api('/api/compare?a='+encodeURIComponent(CP.a)+'&b='+encodeURIComponent(CP.b));
+    let tl=null;
+    try{ if(cmp.a.chip){const t2=await api('/api/analysis/timeline?chip='+encodeURIComponent(cmp.a.chip)+'&metric=tg'); if(t2.points&&t2.points.length>1)tl=t2;} }catch(e){}
+    renderCompare(cmp,tl);
+  }catch(e){root.innerHTML='<div class="hint">'+esc(String(e))+'</div>';}
+}
+function runLabel(r){const d=new Date((r.created_at||0)*1000);
+  return (r.chip||'—')+' · '+(r.model||'—')+' · '+(r.quant||'—')+' · c'+(r.batch_size||'—')+' · '+d.toISOString().slice(0,16).replace('T',' ');}
+function renderCompare(cmp,tl){
+  const root=$('#cpRoot');
+  const selHtml=(side,cur)=>`<select class="mono" style="max-width:100%" data-cpsel="${side}">${CP.runs.map(r=>`<option value="${esc(r.id)}" ${r.id===cur?'selected':''}>${esc(runLabel(r))}</option>`).join('')}</select>`;
+  const ORDER=[['tg_tps','tg (decode)','tok/s',1],['pp_tps','pp (prefill)','tok/s',0],['total_throughput','total throughput','tok/s',1],['ttft_ms','TTFT p50','ms',0],['tpot_ms','TPOT','ms',1],['e2e_latency_s','E2E p50','s',2],['peak_mem_gb','peak mem','GB',2],['power_avg_w','power','W',0],['energy_j','energy','J',0],['cv_itl','ITL CV','',3]];
+  let reg=0,imp=0;
+  const rows=ORDER.map(pair=>{
+    const k=pair[0],lb=pair[1],un=pair[2],dd=pair[3];
+    const e=cmp.deltas[k]; if(!e||(e.a==null&&e.b==null))return '';
+    if(e.verdict==='worse')reg++; if(e.verdict==='better')imp++;
+    const col=e.verdict==='worse'?'var(--err)':e.verdict==='better'?'var(--ok)':'var(--muted)';
+    return `<tr><td>${esc(T(lb))}</td><td class="mono muted">${un}</td>
+     <td class="num">${e.a==null?'—':(+e.a).toFixed(dd)}</td><td class="num">${e.b==null?'—':(+e.b).toFixed(dd)}</td>
+     <td class="num" style="color:${col};font-weight:650">${e.delta_pct==null?'—':(e.delta_pct>=0?'+':'')+e.delta_pct.toFixed(1)+'%'}</td></tr>`;}).join('');
+  const verdicts=(reg?`<span class="antag" style="color:var(--err)">${reg} ${esc(T('regressions'))}</span> `:'')+(imp?`<span class="antag" style="color:var(--ok)">${imp} ${esc(T('improvements'))}</span> `:'')+((!reg&&!imp)?`<span class="antag" style="color:var(--muted)">${esc(T('within noise'))}</span>`:'');
+  const corr=r=>{if(!r||!r.correctness||r.correctness.greedy_match==null)return '';
+    const c=r.correctness, col=c.grade==='pass'?'var(--ok)':c.grade==='warn'?'var(--warn)':'var(--err)';
+    return `<tr><td>${esc(r.chip||'')}</td><td class="mono">${esc(r.quant||'')}</td><td class="num">${(c.greedy_match*100).toFixed(1)}%</td><td class="num">${c.mean_kl!=null?c.mean_kl.toFixed(4):'—'}</td><td><span class="antag" style="color:${col}">${esc(String(c.grade||'—').toUpperCase())}</span></td></tr>`;};
+  const corrRows=corr(cmp.a)+corr(cmp.b);
+  const hexes=chipHexes();
+  root.innerHTML=`
+  <div class="angrid2">
+   <div class="panel" style="padding:14px"><div class="eyebrow">${esc(T('Run A'))}</div>${selHtml('a',CP.a)}</div>
+   <div class="panel" style="padding:14px"><div class="eyebrow">${esc(T('Run B'))}</div>${selHtml('b',CP.b)}</div>
+  </div>
+  <div class="panel" style="padding:16px;margin-bottom:14px">
+   <div class="eyebrow">${esc(T('metric'))} · A → B · ${verdicts}</div>
+   <table><thead><tr><th>${esc(T('metric'))}</th><th></th><th>A · ${esc(cmp.a.chip||'')} ${esc(cmp.a.driver_version||'')}</th><th>B · ${esc(cmp.b.chip||'')} ${esc(cmp.b.driver_version||'')}</th><th>Δ%</th></tr></thead><tbody>${rows}</tbody></table>
+   <div class="hint">|Δ| > ${cmp.threshold_pct}% ${esc(T('is colored; smaller moves are treated as run-to-run noise. The threshold is configurable in Settings.'))}</div>
+  </div>
+  ${tl?`<div class="panel" style="padding:16px;margin-bottom:14px">
+   <div class="eyebrow">${esc(T('Driver / SDK timeline'))} · ${esc(cmp.a.chip||'')}</div>
+   <div class="plotwrap">${timelineSVG(tl.points,hexes[0])}</div>
+   <div class="hint">${esc(T('Red = regression vs previous version. This is why driver fingerprints belong in the benchmark schema.'))}</div>
+  </div>`:''}
+  ${corrRows?`<div class="panel" style="padding:16px">
+   <div class="eyebrow">${esc(T('Numerical correctness vs fp16 reference'))}</div>
+   <table><thead><tr><th>${esc(T('chip'))}</th><th>${esc(T('quant'))}</th><th>${esc(T('greedy match'))}</th><th>${esc(T('mean logit KL'))}</th><th>${esc(T('status'))}</th></tr></thead><tbody>${corrRows}</tbody></table>
+  </div>`:''}`;
+  root.querySelectorAll('[data-cpsel]').forEach(s=>s.onchange=()=>{CP[s.dataset.cpsel]=s.value;loadCompare();});
+  bindTTs(root);
+}
+
+/* v2 i18n additions (analysis + compare); nav-level keys live in the main dict */
+Object.assign(I18N,{
+"Efficiency":"效率","Capacity":"容量","Scaling":"扩展","Distributions":"分布",
+"decode MBU":"decode 带宽利用率 MBU","prefill MFU":"prefill 算力利用率 MFU",
+"tokens per joule":"每焦耳 token 数","runs recorded":"已记录运行数",
+"Roofline — where each workload sits":"Roofline — 每个负载卡在哪里",
+"Solid roof = selected chip. Dashed = reference. Circle = decode at its quant, square = prefill. Hover for MBU/MFU.":"实线屋顶 = 当前芯片，虚线 = 参照。圆点 = 该量化档 decode，方块 = prefill。悬停查看 MBU/MFU。",
+"model name carries no parameter count — MBU/MFU need it":"模型名中没有参数量（如 7B）—— MBU/MFU 需要它才能推导",
+"no spec for this chip — add peak BW / TFLOPS / TDP via the chip-spec registry":"该芯片没有规格登记 —— 请在芯片规格注册表中补充峰值带宽 / TFLOPS / TDP",
+"Efficiency across chips":"各芯片效率对比","chip":"芯片","quant":"量化",
+"MBU decode":"MBU · decode","MFU prefill":"MFU · prefill","soak Δ":"持续负载 Δ",
+"Spec-sheet denominators — edit per-chip peak BW / TFLOPS / TDP via the chip-spec registry; MBU & MFU derive from them plus measured throughput. No hardware counters required.":"分母来自规格登记 —— 各芯片峰值带宽 / TFLOPS / TDP 可在芯片规格注册表中修改；MBU 与 MFU 由它们加实测吞吐推导，第一版无需任何硬件计数器。",
+"SLO p99 TTFT":"SLO p99 TTFT",
+"no sweep data yet — run a concurrency-sweep benchmark to draw the frontier":"暂无扫描数据 —— 先运行一次并发扫描基准即可绘制前沿",
+"does not meet SLO at any concurrency (prefill-bound)":"任何并发下均无法满足该 SLO（受限于 prefill）",
+"Throughput–latency frontier":"吞吐–延迟前沿",
+"Ring = goodput point: highest throughput still meeting the SLO. Hover points for concurrency.":"圆环 = goodput 点：满足 SLO 的最高吞吐。悬停各点查看并发数。",
+"Goodput @ SLO":"SLO 下的 goodput","max conc":"最大并发","p99 at that point":"该点 p99",
+"Multi-GPU scaling":"多卡扩展",
+"Ideal = linear. Labels show parallel efficiency. Baseline: median of 1-device runs.":"虚线为理想线性，标签为并行效率。基线：单卡运行的中位数。",
+"model filter":"模型筛选","quant filter":"量化筛选",
+"no runs match — record 1-device and multi-device runs to see scaling":"没有匹配的运行 —— 记录单卡与多卡运行后即可查看扩展效率",
+"device count":"卡数","median throughput":"中位吞吐","speedup":"加速比","efficiency":"并行效率","runs":"运行数",
+"Latency distributions":"延迟分布","metric":"指标",
+"per level: TTFT / ITL percentiles (ms) from the latest sweep":"每个并发级：最近一次扫描的 TTFT / ITL 百分位（ms）",
+"tail ratio p99/p50":"尾部比 p99/p50",
+"TTFT p50 vs p99 (ms)":"TTFT p50 与 p99（ms）",
+"Medians lie. Tail ratio and CV are the first fingerprints of scheduler stalls, allocator pauses and kernel-launch gaps.":"中位数会骗人。尾部比与 CV 是调度停顿、分配器暂停和 kernel 启动间隙最早的指纹。",
+"Run A":"运行 A","Run B":"运行 B",
+"tg (decode)":"tg（decode）","pp (prefill)":"pp（prefill）","total throughput":"总吞吐",
+"TTFT p50":"TTFT p50","TPOT":"TPOT","E2E p50":"E2E p50","peak mem":"峰值显存","power":"功耗","energy":"能耗","ITL CV":"ITL CV",
+"regressions":"项回归","improvements":"项改善","within noise":"噪声范围内",
+"is colored; smaller moves are treated as run-to-run noise. The threshold is configurable in Settings.":"以上才着色，更小的波动视为运行间噪声。阈值可在设置中调整。",
+"Driver / SDK timeline":"驱动 / SDK 时间线",
+"Red = regression vs previous version. This is why driver fingerprints belong in the benchmark schema.":"红点 = 相对上一版本的回归。这正是基准 schema 需要驱动指纹字段的原因。",
+"Numerical correctness vs fp16 reference":"数值正确性（对照 fp16 参考实现）",
+"greedy match":"贪心一致率","mean logit KL":"平均 logit KL","status":"状态",
+"no runs in the community store yet — run a benchmark first":"社区库还没有运行记录 —— 先跑一次基准测试",
+});
+
 applyLang((function(){try{return localStorage.getItem('infermesh-lang');}catch(e){return null;}})()||'en');
 $('#langBtn').onclick=function(){applyLang(lang==='zh'?'en':'zh');};
 </script>
+<div class="tooltip" id="tt" role="tooltip" aria-hidden="true"></div>
 </body>
 </html>
 """

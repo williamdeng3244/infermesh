@@ -168,6 +168,7 @@ def _frontier(chips: str, slo: float) -> dict:
                          "p99_ttft_s": round(p99 / 1000.0, 4),
                          "cv_itl": r.get("cv_itl"),
                          "n_requests": r.get("n_requests"),
+                         "percentiles": r.get("percentiles"),
                          "run_id": r.get("run_id")}
     out = []
     for chip, levels in per_chip.items():
