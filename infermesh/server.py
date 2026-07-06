@@ -26,6 +26,7 @@ import base64
 import logging
 import struct
 import time
+import uuid
 from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import asdict
@@ -60,6 +61,7 @@ from infermesh.core.pool import (
 )
 from infermesh.core.settings import Settings
 from infermesh.core.scheduler import AdmissionController, Overloaded
+from infermesh.core.bench_jobs import BenchJobManager
 from infermesh.core.model_settings import ModelSettingsStore, SAMPLING_FIELDS
 from infermesh.core.devices import enumerate_devices
 from infermesh.core.stats import StatsAccumulator
@@ -308,7 +310,8 @@ def _detect_quant(pool: "ModelPool", model_id: str) -> Optional[str]:
 
 
 def _community_record(result: dict, params: dict, sysinfo: dict,
-                      submitter: str, quant: str, backend: Optional[str]) -> dict:
+                      submitter: str, quant: str, backend: Optional[str],
+                      run_id: Optional[str] = None) -> dict:
     """Map an infermesh benchmark result into a flat community-store row."""
     import uuid as _uuid
     vendor = result.get("vendor")
@@ -333,7 +336,7 @@ def _community_record(result: dict, params: dict, sysinfo: dict,
         tput = round(((result.get("total_output_tokens") or 0) +
                       (result.get("total_prompt_tokens") or 0)) / wall, 1)
     e2e = (result.get("latency_ms") or {}).get("p50")
-    group = _uuid.uuid4().hex[:12]
+    group = run_id or _uuid.uuid4().hex[:12]
     return {
         "submitter": submitter, "submission_group": group, "run_id": group,
         "chip": chip,
@@ -408,6 +411,8 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     gate = AdmissionController(cap=settings.max_concurrent_requests,
                                max_queue=getattr(settings, "max_queued_requests", 0) or None)
     app.state.gate = gate
+    bench_jobs = BenchJobManager()
+    app.state.bench_jobs = bench_jobs
     pool.default_extra = _kv_defaults(settings)
     from infermesh.core import downloader as _downloader
     _downloader.set_endpoint(settings.hf_endpoint)
@@ -921,8 +926,38 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             logger.warning("pool cleanup after delete failed: %s", exc)
         return res
 
-    @app.post("/api/benchmark")
+    async def _record_benchmark(result: dict, *, concurrency: int, params: dict,
+                                share: Optional[bool], model_id: str) -> str:
+        """Persist one finished benchmark to history (+ community library when
+        enabled). Returns the run id shared by both stores."""
+        run_id = uuid.uuid4().hex[:12]
+        sysinfo = _sysinfo()
+        append_benchmark({
+            "t": time.time(), "model": model_id, "run_id": run_id,
+            "params": params,
+            "result": result,
+            "system": sysinfo,
+        })
+        # auto-publish to the shared community library (per-run opt-out via share)
+        if settings.auto_publish and share is not False:
+            try:
+                submitter = settings.submitter_label or sysinfo.get("hostname") or "anonymous"
+                quant = _detect_quant(pool, model_id) or ("fp32" if result.get("vendor") == "cpu" else "fp16")
+                bk = getattr(getattr(pool.get_entry(model_id), "spec", None), "backend", None) or settings.backend
+                rec = _community_record(result, {"concurrency": concurrency}, sysinfo,
+                                        submitter, quant, bk, run_id=run_id)
+                if settings.hub_url:
+                    await _publish_to_hub(settings.hub_url, rec)
+                else:
+                    await asyncio.to_thread(_community.submit, rec)
+            except Exception as exc:  # publishing must never fail the benchmark
+                logger.warning("community auto-publish failed: %s", exc)
+        return run_id
+
+    @app.post("/api/benchmark", deprecated=True)
     async def api_benchmark(req: BenchmarkRequest, _: None = Depends(require_auth)):
+        """Synchronous benchmark (deprecated — use POST /api/bench/jobs, which
+        runs in the background and respects admission control)."""
         from infermesh.core.benchmark import run_benchmark
         model_id = pool.resolve_model_id(req.model)
         if pool.get_entry(model_id) is None:
@@ -956,28 +991,88 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                 openai_adapter.create_error_response(str(exc), "insufficient_memory", 503),
                 status_code=503,
             )
-        sysinfo = _sysinfo()
-        append_benchmark({
-            "t": time.time(), "model": model_id,
-            "params": {"requests": n, "concurrency": c, "max_tokens": mt,
-                       "mode": req.mode, "device": req.device},
-            "result": result,
-            "system": sysinfo,
-        })
-        # auto-publish to the shared community library (per-run opt-out via req.share)
-        if settings.auto_publish and req.share is not False:
-            try:
-                submitter = settings.submitter_label or sysinfo.get("hostname") or "anonymous"
-                quant = _detect_quant(pool, model_id) or ("fp32" if result.get("vendor") == "cpu" else "fp16")
-                bk = getattr(getattr(pool.get_entry(model_id), "spec", None), "backend", None) or settings.backend
-                rec = _community_record(result, {"concurrency": c}, sysinfo, submitter, quant, bk)
-                if settings.hub_url:
-                    await _publish_to_hub(settings.hub_url, rec)
-                else:
-                    await asyncio.to_thread(_community.submit, rec)
-            except Exception as exc:  # publishing must never fail the benchmark
-                logger.warning("community auto-publish failed: %s", exc)
+        await _record_benchmark(result, concurrency=c,
+                                params={"requests": n, "concurrency": c, "max_tokens": mt,
+                                        "mode": req.mode, "device": req.device},
+                                share=req.share, model_id=model_id)
         return result
+
+    # ------------- background benchmark jobs (admission-gated) ------------- #
+    async def _run_bench_job(job) -> tuple:
+        """Job-runner body: load, benchmark (cancellable, with progress), record."""
+        from infermesh.core.benchmark import run_benchmark
+        spec = job.spec
+        model_id = spec["model_id"]
+        if spec.get("device"):  # pin the model to the chosen accelerator
+            pool.set_device(model_id, spec["device"])
+            await pool.unload_if_idle_unpinned(model_id, force=True)
+        job.progress["phase"] = "load"
+        async with pool.acquire(model_id):  # load up front: unsupported models fail fast
+            pass
+        if job.cancel_event.is_set():
+            return None, []
+
+        job.progress["phase"] = "running"
+
+        def _prog(done_n: int, total: int) -> None:
+            job.progress["current"] = done_n
+            job.progress["total"] = total
+
+        bench = run_benchmark(pool, model_id,
+                              requests=spec["requests"], concurrency=spec["concurrency"],
+                              max_tokens=spec["max_tokens"], prompt=spec["prompt"],
+                              mode=spec["mode"], should_stop=job.cancel_event.is_set,
+                              on_progress=_prog)
+        # device-pinned runs get the same load-hang bound as the sync endpoint
+        result = await (asyncio.wait_for(bench, timeout=240) if spec.get("device") else bench)
+        if job.cancel_event.is_set():
+            return result, []  # cancelled: keep partial numbers, record nothing
+        run_id = await _record_benchmark(
+            result, concurrency=spec["concurrency"],
+            params={k: spec[k] for k in ("requests", "concurrency", "max_tokens", "mode", "device")},
+            share=spec.get("share"), model_id=model_id)
+        return result, [run_id]
+
+    @app.post("/api/bench/jobs", status_code=202)
+    async def api_bench_job_create(req: BenchmarkRequest, _: None = Depends(require_auth)):
+        """Start a benchmark as a background job. The job takes one admission
+        slot while running, so benchmarks share the concurrency budget with
+        live inference instead of stampeding it."""
+        model_id = pool.resolve_model_id(req.model)
+        if pool.get_entry(model_id) is None:
+            return JSONResponse(
+                openai_adapter.create_error_response(f"model '{req.model}' not found", "model_not_found", 404),
+                status_code=404,
+            )
+        job = bench_jobs.create({
+            "model": req.model, "model_id": model_id,
+            "requests": max(1, min(req.requests, 200)),
+            "concurrency": max(1, min(req.concurrency, 32)),
+            "max_tokens": max(1, min(req.max_tokens, 1024)),
+            "prompt": req.prompt, "mode": req.mode,
+            "device": req.device, "share": req.share,
+        })
+        job.task = asyncio.create_task(bench_jobs.run(job, _run_bench_job, gate=gate))
+        return {"job_id": job.job_id, "state": job.state}
+
+    @app.get("/api/bench/jobs")
+    async def api_bench_job_list(_: None = Depends(require_auth)):
+        return {"jobs": bench_jobs.list()}
+
+    @app.get("/api/bench/jobs/{job_id}")
+    async def api_bench_job_get(job_id: str, _: None = Depends(require_auth)):
+        job = bench_jobs.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail=f"unknown job '{job_id}'")
+        return job.to_dict()
+
+    @app.post("/api/bench/jobs/{job_id}/cancel")
+    async def api_bench_job_cancel(job_id: str, _: None = Depends(require_auth)):
+        job = bench_jobs.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail=f"unknown job '{job_id}'")
+        accepted = bench_jobs.request_cancel(job_id)
+        return {"ok": accepted, "state": job.state}
 
     @app.get("/api/settings")
     async def api_get_settings(_: None = Depends(require_auth)):

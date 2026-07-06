@@ -24,7 +24,7 @@ import asyncio
 import subprocess
 import time
 from statistics import mean
-from typing import Optional
+from typing import Callable, Optional
 
 from infermesh.api.adapters.base import InternalMessage, InternalRequest
 
@@ -85,9 +85,15 @@ async def run_benchmark(
     max_tokens: int = 64,
     prompt: str = DEFAULT_PROMPT,
     mode: str = "same",
+    should_stop: Optional[Callable[[], bool]] = None,
+    on_progress: Optional[Callable[[int, int], None]] = None,
 ) -> dict:
     """Fire ``requests`` streaming completions (≤ ``concurrency`` at once) and return
-    latency / TTFT / TPOT / prefill+decode throughput / peak-memory statistics."""
+    latency / TTFT / TPOT / prefill+decode throughput / peak-memory statistics.
+
+    ``should_stop`` is polled at request boundaries (cooperative cancellation:
+    remaining requests are skipped, completed samples still aggregate).
+    ``on_progress(completed, total)`` fires after each request finishes."""
     requests = max(1, requests)
     mode = "different" if str(mode).lower() == "different" else "same"
     sem = asyncio.Semaphore(max(1, concurrency))
@@ -96,6 +102,8 @@ async def run_benchmark(
 
     async def _one(i: int) -> None:
         async with sem:
+            if should_stop and should_stop():
+                return  # cancelled at the request boundary — issue nothing further
             req = InternalRequest(
                 messages=[InternalMessage(role="user", content=_prompt_for(mode, prompt, i))],
                 max_tokens=max_tokens,
@@ -127,6 +135,11 @@ async def run_benchmark(
                 "latency_ms": (time.perf_counter() - start) * 1000.0,
                 "ttft_ms": ttft, "tokens": comp, "prompt_tokens": prompt_toks, "ok": ok,
             })
+            if on_progress:
+                try:
+                    on_progress(len(samples), requests)
+                except Exception:  # noqa: BLE001 - progress reporting is best-effort
+                    pass
 
     # Best-effort peak device-memory sampler: nvidia-smi first, else the backend's
     # own report via pool.get_status() (covers Enflame GCU / any accelerator).
