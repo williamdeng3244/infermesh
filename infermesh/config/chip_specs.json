@@ -1,0 +1,38 @@
+{
+  "s60": {
+    "name": "Enflame S60",
+    "aliases": ["Enflame S60", "enflame", "S60"],
+    "peak_bw_gbps": 800.0,
+    "peak_tflops_fp16": 150.0,
+    "tdp_w": 300.0,
+    "interconnect": "esl",
+    "source": "estimated — vendor has not published full S60 datasheet figures; override in ~/.infermesh/chip_specs.json with measured values"
+  },
+  "a100": {
+    "name": "NVIDIA A100 80GB SXM",
+    "aliases": ["NVIDIA A100", "A100", "NVIDIA A100-SXM4-80GB", "nvidia a100 80gb sxm"],
+    "peak_bw_gbps": 2039.0,
+    "peak_tflops_fp16": 312.0,
+    "tdp_w": 400.0,
+    "interconnect": "nvlink",
+    "source": "datasheet (A100 SXM 80GB: HBM2e 2039 GB/s, FP16 Tensor dense 312 TFLOPS, 400 W)"
+  },
+  "rtx4090": {
+    "name": "NVIDIA GeForce RTX 4090",
+    "aliases": ["RTX 4090", "NVIDIA GeForce RTX 4090", "GeForce RTX 4090"],
+    "peak_bw_gbps": 1008.0,
+    "peak_tflops_fp16": 165.2,
+    "tdp_w": 450.0,
+    "interconnect": "pcie",
+    "source": "datasheet (GDDR6X 1008 GB/s, FP16 Tensor dense 165.2 TFLOPS, 450 W)"
+  },
+  "m3max": {
+    "name": "Apple M3 Max",
+    "aliases": ["M3 Max", "Apple M3 Max"],
+    "peak_bw_gbps": 400.0,
+    "peak_tflops_fp16": 28.0,
+    "tdp_w": 60.0,
+    "interconnect": "uma",
+    "source": "mixed — bandwidth 400 GB/s datasheet (40-core GPU bin); fp16 TFLOPS and package power estimated"
+  }
+}

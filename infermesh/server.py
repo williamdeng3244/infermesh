@@ -74,6 +74,7 @@ from infermesh.core.history import (
 )
 from infermesh.core.backend import UnsupportedModelError
 from infermesh.core import community as _community
+from infermesh.core import specs as _specs
 from infermesh.dashboard import DASHBOARD_HTML
 
 logger = logging.getLogger("infermesh.server")
@@ -159,6 +160,12 @@ class BenchmarkRequest(BaseModel):
     mode: str = "same"  # "same" (shared prompt, prefix-cacheable) | "different"
     device: Optional[str] = None  # run on a specific accelerator (e.g. "gcu:0", "cpu"); None = current
     share: Optional[bool] = True  # publish this run to the shared community library (per-run opt-out)
+
+
+class SpecsPutRequest(BaseModel):
+    """Body for PUT /api/specs — replaces the user chip-spec override file."""
+
+    specs: dict
 
 
 class HFDownloadRequest(BaseModel):
@@ -1073,6 +1080,20 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(status_code=404, detail=f"unknown job '{job_id}'")
         accepted = bench_jobs.request_cancel(job_id)
         return {"ok": accepted, "state": job.state}
+
+    # --------------------------- chip spec registry --------------------------- #
+    @app.get("/api/specs")
+    async def api_get_specs(_: None = Depends(require_auth)):
+        data = await asyncio.to_thread(_specs.load)
+        return {"specs": data, "user_path": str(_specs.user_path())}
+
+    @app.put("/api/specs")
+    async def api_put_specs(body: SpecsPutRequest, _: None = Depends(require_auth)):
+        try:
+            merged = await asyncio.to_thread(_specs.save_user, body.specs)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"specs": merged, "user_path": str(_specs.user_path())}
 
     @app.get("/api/settings")
     async def api_get_settings(_: None = Depends(require_auth)):
