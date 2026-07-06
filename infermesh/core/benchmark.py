@@ -172,6 +172,33 @@ async def run_benchmark(
                 pass
 
     sampler_task = asyncio.ensure_future(_sampler())
+
+    # Optional ~1 Hz power sampling (Milestone 2): started only when the
+    # backend reports power at all — the ABC default returns None.
+    power_samples: list[float] = []
+
+    async def _power_sampler() -> None:
+        while not stop.is_set():
+            try:
+                async with pool.acquire(model_id) as b:
+                    v = b.get_power_w()
+            except Exception:  # noqa: BLE001 - telemetry is best-effort
+                v = None
+            if v is not None:
+                power_samples.append(float(v))
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=1.0)
+            except asyncio.TimeoutError:
+                pass
+
+    supports_power = False
+    try:
+        async with pool.acquire(model_id) as _probe:
+            supports_power = _probe.get_power_w() is not None
+    except Exception:  # noqa: BLE001
+        supports_power = False
+    power_task = asyncio.ensure_future(_power_sampler()) if supports_power else None
+
     t0 = time.perf_counter()
     await asyncio.gather(*[_one(i) for i in range(requests)])
     wall = time.perf_counter() - t0
@@ -180,6 +207,11 @@ async def run_benchmark(
         await sampler_task
     except Exception:  # noqa: BLE001 - sampling is best-effort
         pass
+    if power_task is not None:
+        try:
+            await power_task
+        except Exception:  # noqa: BLE001 - sampling is best-effort
+            pass
 
     ok_s = [s for s in samples if s["ok"]]
     lat = [s["latency_ms"] for s in ok_s]
@@ -224,6 +256,9 @@ async def run_benchmark(
         "total_output_tokens": total_tokens,
         "total_prompt_tokens": total_prompt,
         "peak_mem_mb": (peak[0] or None),
+        # energy: average draw × wall time (rectangle integral of ~1 Hz samples)
+        "power_avg_w": round(mean(power_samples), 1) if power_samples else None,
+        "energy_j": round(mean(power_samples) * wall, 1) if power_samples else None,
         "latency_ms": _stats(lat),
         "ttft_ms": _stats(ttfts),
         "tpot_ms": _stats(tpot),

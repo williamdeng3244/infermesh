@@ -47,6 +47,7 @@ class MockEchoBackend(InferenceBackend):
         self._spec: Optional[ModelSpec] = None
         self._loaded: bool = False
         self._mem_mb: int = 0
+        self._power_phase: int = 0
 
     @property
     def backend_name(self) -> str:
@@ -118,6 +119,14 @@ class MockEchoBackend(InferenceBackend):
             union = q | d
             scores.append(len(q & d) / len(union) if union else 0.0)
         return scores
+
+    def get_power_w(self) -> Optional[float]:
+        # Synthetic ~100 W sinusoid once loaded, so benchmark jobs can
+        # aggregate power_avg_w / energy_j in CI with no hardware.
+        if not self._loaded:
+            return None
+        self._power_phase += 1
+        return 100.0 + 15.0 * math.sin(self._power_phase / 3.0)
 
     def stats(self) -> EngineStats:
         return EngineStats(

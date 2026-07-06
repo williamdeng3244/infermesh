@@ -181,3 +181,17 @@ class InferenceBackend(ABC):
     @abstractmethod
     def stats(self) -> EngineStats:
         ...
+
+    # ---- optional hardware telemetry (defaults: unsupported => None) ----
+    def get_power_w(self) -> Optional[float]:
+        """Instantaneous board power draw in watts, or None when the backend
+        cannot report it. Benchmark jobs sample this at ~1 Hz (only when the
+        first probe is non-None) and aggregate ``power_avg_w`` / ``energy_j``.
+        An in-house card's backend implements this and energy metrics light up
+        with zero control-plane changes."""
+        return None
+
+    def hw_counters(self) -> Optional[dict]:
+        """Opaque vendor hardware-counter snapshot (cache hit rates, DMA
+        stalls, …), or None when unsupported. Shape is backend-defined."""
+        return None
