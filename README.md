@@ -38,7 +38,29 @@ the gateway never sees vendor tensors.
 
 ## Install
 
-With [uv](https://docs.astral.sh/uv/) (recommended):
+**Users** — one line with [pipx](https://pipx.pypa.io) (isolated env, `infermesh` lands on PATH):
+
+```bash
+pipx install infermesh                        # or: pip install infermesh
+infermesh start --backend mock --model-dir ~/models
+# dashboard → http://127.0.0.1:8000
+```
+
+Extras — install only what your hardware needs:
+`infermesh[transformers]` local HuggingFace models on CUDA / CPU / Apple MPS ·
+`infermesh[vllm]` production NVIDIA serving · `infermesh[downloader]` in-dashboard
+HuggingFace search & download · `infermesh[modelscope]` ModelScope source ·
+`infermesh[mcp]` agent (MCP) server:
+
+```bash
+pipx install 'infermesh[transformers,downloader]'
+```
+
+The dashboard ships a bilingual (EN / 中文) **Guide** tab: system overview, GPU
+hookup (NVIDIA / Enflame GCU / CPU), model download & loading, and team
+shared-library setup.
+
+**Developers** — editable install with [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```bash
 uv venv
@@ -436,6 +458,18 @@ infermesh/
 │   └── cli.py       # `infermesh serve …`
 └── tests/           # green with the mock backend (no GPU)
 ```
+
+## Releasing (maintainers)
+
+```bash
+uv build       # → dist/infermesh-X.Y.Z-py3-none-any.whl + .tar.gz
+uv publish     # upload to PyPI — needs UV_PUBLISH_TOKEN (a PyPI API token)
+```
+
+Bump `version` in `pyproject.toml` **and** `infermesh/__init__.py` together —
+the dashboard sidebar and the system fingerprint report `__version__` at runtime.
+To verify a wheel before publishing: install it into a fresh venv and smoke-test
+`infermesh start --backend mock` (no GPU needed).
 
 ## License
 

@@ -748,10 +748,12 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
             raise HTTPException(status_code=404, detail=f"model '{model_id}' not found")
         return {"model": mid, "pinned": False}
 
+    dashboard_html = DASHBOARD_HTML.replace("__INFERMESH_VERSION__", __version__)
+
     @app.get("/", include_in_schema=False)
     @app.get("/admin", include_in_schema=False)
     async def admin_dashboard():
-        return HTMLResponse(DASHBOARD_HTML)
+        return HTMLResponse(dashboard_html)
 
     @app.get("/health")
     async def health():

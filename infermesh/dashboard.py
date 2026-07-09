@@ -248,10 +248,11 @@ tr.cm-det>td{background:rgba(127,127,127,.04);padding:0}
       <button data-sec="compare" aria-label="Compare A/B"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v16M15 4v16M4 9l3 3-3 3M20 9l-3 3 3 3"/></svg> <span data-i18n="Compare A/B">Compare A/B</span></button>
       <button data-sec="community" aria-label="Community"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> <span data-i18n="Community">Community</span></button>
       <button data-sec="settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg> <span data-i18n="Settings">Settings</span></button>
+      <button data-sec="guide" aria-label="Guide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> <span data-i18n="Guide">Guide</span></button>
     </nav>
     <div class="sb-foot">
       <span id="sb-health" class="pill"><span class="dot"></span> connecting</span>
-      <span id="sb-ver">v0.6.0 · mock / vllm / openai / transformers</span>
+      <span id="sb-ver">v__INFERMESH_VERSION__ · mock / vllm / openai / transformers</span>
     </div>
   </aside>
 
@@ -555,6 +556,67 @@ tr.cm-det>td{background:rgba(127,127,127,.04);padding:0}
         <div id="cpRoot"></div>
       </section>
 
+      <section class="section" id="sec-guide">
+        <div class="panel" style="padding:16px 18px;margin-bottom:14px">
+          <div class="eyebrow">infermesh</div>
+          <div class="mref-en">A hardware-agnostic LLM inference bench — install it, point it at your accelerator and your models, measure, and pool the results with your team. Everything below is bilingual; commands are copy-paste ready.</div>
+          <div class="mref-zh">硬件无关的大模型推理测量台 —— 安装、接上你的加速卡和模型、开始测量，并与团队共享结果。以下内容中英对照，命令可直接复制。</div>
+        </div>
+
+        <div class="panel" style="padding:16px 18px;margin-bottom:14px">
+          <h3 style="margin:0 0 8px" data-i18n="Install">Install</h3>
+          <div class="mref-en">One-line install with pipx (isolated environment, on your PATH) — or plain pip. Python ≥ 3.11.</div>
+          <div class="mref-zh">用 pipx 一行安装（独立环境、自动加入 PATH），或直接 pip。需要 Python ≥ 3.11。</div>
+          <pre class="term">pipx install infermesh              # or: pip install infermesh
+infermesh start --backend mock --model-dir ~/models
+# dashboard → http://127.0.0.1:8000    (--port to change 换端口)
+infermesh status · infermesh stop · infermesh restart</pre>
+          <div class="mref-en">Optional extras — install only what your hardware needs: <b>infermesh[transformers]</b> local HuggingFace models on CUDA / CPU / Apple MPS · <b>infermesh[vllm]</b> production NVIDIA serving · <b>infermesh[downloader]</b> in-dashboard HuggingFace search &amp; download · <b>infermesh[modelscope]</b> ModelScope downloads.</div>
+          <div class="mref-zh">可选附加依赖 —— 按硬件按需安装：<b>infermesh[transformers]</b> 本地 HuggingFace 模型（CUDA / CPU / Apple MPS）· <b>infermesh[vllm]</b> NVIDIA 生产级推理 · <b>infermesh[downloader]</b> 仪表盘内搜索下载 HuggingFace 模型 · <b>infermesh[modelscope]</b> ModelScope 下载源。</div>
+          <pre class="term">pipx install 'infermesh[transformers,downloader]'    # pick your extras 按需选择</pre>
+        </div>
+
+        <div class="panel" style="padding:16px 18px;margin-bottom:14px">
+          <h3 style="margin:0 0 8px" data-i18n="System overview">System overview</h3>
+          <div class="mref-en">One gateway speaks both OpenAI and Anthropic protocols. A multi-model pool loads, evicts and pins models (LRU + TTL) behind an admission gate, so benchmarks and live traffic share one concurrency budget instead of trampling each other. The control plane never imports a vendor SDK — compute lives in pluggable backends (mock / transformers / vLLM / hosted providers). Every benchmark lands in local history and, when sharing is on, in the team community library.</div>
+          <div class="mref-zh">一个网关同时兼容 OpenAI 与 Anthropic 协议。多模型池负责加载/淘汰/固定（LRU + TTL），准入闸门让基准测试与线上流量共享同一并发预算、互不践踏。控制面永不 import 厂商 SDK —— 计算全部在可插拔后端里（mock / transformers / vLLM / 托管提供商）。每次基准测试写入本机历史，开启共享后同时进入团队社区库。</div>
+          <div class="mref-grid" style="margin-top:10px">
+            <div class="mref-item"><div class="mref-h"><b>Models · Chat · Logs</b></div><div class="mref-en">Load / pin / per-model overrides; talk to a loaded model; live log tail.</div><div class="mref-zh">加载/固定/按模型覆盖；与已加载模型对话；日志实时跟踪。</div></div>
+            <div class="mref-item"><div class="mref-h"><b>Devices · Download</b></div><div class="mref-en">Detected accelerators + a per-model GPU picker; HuggingFace / ModelScope downloads with progress.</div><div class="mref-zh">检测到的加速卡与按模型选卡；HuggingFace / ModelScope 带进度下载。</div></div>
+            <div class="mref-item"><div class="mref-h"><b>Benchmark · Metrics</b></div><div class="mref-en">Background benchmark jobs with live progress and cancel; request stats plus latency / throughput charts.</div><div class="mref-zh">后台基准任务（实时进度、可取消）；请求统计与延迟/吞吐图表。</div></div>
+            <div class="mref-item"><div class="mref-h"><b>Explorer · Analysis · Compare · Community</b></div><div class="mref-en">Box-plot compare across context lengths; MBU / MFU, roofline and the throughput–latency frontier; baseline + N-column regression check; everyone's runs in one place.</div><div class="mref-zh">跨上下文长度的箱线图对比；MBU/MFU、roofline、吞吐–延迟前沿；基线+多列回归判定；全团队的测试记录。</div></div>
+          </div>
+        </div>
+
+        <div class="panel" style="padding:16px 18px;margin-bottom:14px">
+          <h3 style="margin:0 0 8px" data-i18n="Connect a GPU">Connect a GPU</h3>
+          <div class="mref-en"><b>NVIDIA.</b> 1) Check the driver — if <code>nvidia-smi</code> lists your card, you are ready. 2) Install a compute backend: <b>[transformers]</b> (flexible, CUDA/CPU) or <b>[vllm]</b> (fastest serving). 3) Start with that backend. The card shows up on the Devices tab; assign a model to it on the Models tab ("Load on device").</div>
+          <div class="mref-zh"><b>NVIDIA。</b>1) 查驱动 —— <code>nvidia-smi</code> 能列出显卡即就绪。2) 安装计算后端：<b>[transformers]</b>（灵活，CUDA/CPU）或 <b>[vllm]</b>（推理最快）。3) 用该后端启动。显卡会出现在「设备」页；在「模型」页为模型指定设备（加载到设备）。</div>
+          <pre class="term">nvidia-smi                                    # driver check 查驱动
+pipx install 'infermesh[transformers]'        # or [vllm]
+infermesh start --backend transformers --model-dir ~/models</pre>
+          <div class="mref-en"><b>Enflame GCU.</b> Install the vendor torch_gcu build first, then use the transformers backend — a GCU-specific crash guard is built in. <b>CPU / Apple MPS.</b> No accelerator needed: transformers falls back to CPU (slow, fine for smoke tests); the mock backend needs nothing at all.</div>
+          <div class="mref-zh"><b>燧原 GCU。</b>先安装厂商 torch_gcu 版本，再用 transformers 后端 —— 已内置 GCU 崩溃防护。<b>CPU / Apple MPS。</b>无需加速卡：transformers 自动回退 CPU（慢，冒烟测试够用）；mock 后端则什么都不需要。</div>
+        </div>
+
+        <div class="panel" style="padding:16px 18px;margin-bottom:14px">
+          <h3 style="margin:0 0 8px" data-i18n="Connect a model">Connect a model</h3>
+          <div class="mref-en">Use the <b>Download</b> tab: search HuggingFace (sort by trending / downloads, filter by task) and one-click download into your <code>--model-dir</code> — a background job with progress, auto-registered when finished. ModelScope works by model ID (needs <b>[modelscope]</b>). On a restricted network, set a mirror under Settings → HuggingFace endpoint. Then on <b>Models</b>: Load (or pick a device) and Pin to keep it resident; say hi on <b>Chat</b> to verify; measure it on <b>Benchmark</b>.</div>
+          <div class="mref-zh">用「<b>下载</b>」页：搜索 HuggingFace（按趋势/下载量排序、按任务筛选）一键下载到 <code>--model-dir</code> —— 后台任务带进度，完成后自动注册。ModelScope 按模型 ID 下载（需 <b>[modelscope]</b>）。内网受限时在 设置 → HuggingFace 端点 填镜像。之后在「<b>模型</b>」页：加载（或选卡加载）、固定常驻；到「<b>对话</b>」页发条消息验证；再到「<b>基准测试</b>」页测量。</div>
+          <pre class="term"># a model is just a folder under --model-dir 模型即目录
+~/models/Qwen2.5-0.5B-Instruct/     # downloaded, or copied by hand 下载或手动拷贝</pre>
+        </div>
+
+        <div class="panel" style="padding:16px 18px;margin-bottom:14px">
+          <h3 style="margin:0 0 8px" data-i18n="Team shared library">Team shared library</h3>
+          <div class="mref-en">Pick one always-on machine as the <b>hub</b> (add <code>--api-key</code> if it is reachable beyond your team). Each teammate then points at it: Settings → Shared library → display name + hub URL (+ hub API key if the hub enforces one) → Save. From then on completed benchmarks auto-publish, and Explorer / Community / Compare read the pooled library. Leave hub URL blank to keep runs local — that machine can itself be the hub.</div>
+          <div class="mref-zh">选一台常开的机器当 <b>hub</b>（若团队之外也能访问，加 <code>--api-key</code>）。每位同事在自己机器上：设置 → 共享库 → 填显示名称 + Hub URL（hub 开鉴权则再填 hub API key）→ 保存。之后完成的基准测试自动发布，性能浏览器 / 社区基准 / A/B 对比读取的都是汇聚后的库。Hub URL 留空 = 记录只存本机 —— 该机器自身即可作为 hub。</div>
+          <pre class="term"># hub — one machine 一台机器
+infermesh start --host 0.0.0.0 --port 8000 --api-key TEAMKEY
+# teammates 同事端 → Settings → Shared library → http://hub-host:8000 (+ TEAMKEY)</pre>
+        </div>
+      </section>
+
       <section class="section" id="sec-community">
         <div class="panel" style="padding:13px 14px;margin-bottom:14px">
           <div class="cm-filters">
@@ -692,11 +754,12 @@ tr.cm-det>td{background:rgba(127,127,127,.04);padding:0}
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let active='models', logsPaused=false, lastBench=null;
-const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',devices:'Devices',download:'Download',benchmark:'Benchmark',explorer:'Explorer',analysis:'Hardware Analysis',compare:'Compare A/B',community:'Community',settings:'Settings'};
+const TITLES={models:'Models',chat:'Chat',logs:'Logs',metrics:'Metrics',devices:'Devices',download:'Download',benchmark:'Benchmark',explorer:'Explorer',analysis:'Hardware Analysis',compare:'Compare A/B',community:'Community',settings:'Settings',guide:'Guide'};
 /* ---- i18n: keys are the English text; only ZH needs entries. Units (tok/s, ms, %, MB) + proper nouns stay. ---- */
 const I18N={
 "Models":"模型","Chat":"对话","Logs":"日志","Metrics":"指标","Devices":"设备","Download":"下载","Benchmark":"基准测试","Settings":"设置",
-"Hardware Analysis":"硬件分析","Compare A/B":"A/B 对比",
+"Hardware Analysis":"硬件分析","Compare A/B":"A/B 对比","Guide":"指南",
+"Install":"安装","System overview":"系统介绍","Connect a GPU":"连接显卡（GPU）","Connect a model":"连接大模型","Team shared library":"团队共享库",
 "Refresh":"刷新","API key (if enabled)":"API 密钥（如启用）","Toggle theme":"切换主题",
 "Load on device":"加载到设备","applies to the next Load (Transformers backend)":"应用于下次加载（Transformers 后端）",
 "Model":"模型","Type":"类型","Backend":"后端","Status":"状态","Mem MB":"内存 MB","Gen tps":"生成 tps","Leases":"租约","Actions":"操作","loading…":"加载中…",

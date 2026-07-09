@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "infermesh"
-version = "0.7.0"
+version = "0.8.0"
 description = "Hardware-agnostic LLM inference serving platform. Protocol adapters and model-pool orchestration adapted from jundot/omlx (Apache-2.0); compute backends are pluggable behind a single interface."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -26,6 +26,11 @@ dependencies = [
     "regex>=2023.0.0",
     "jsonschema>=4.18",
 ]
+
+[project.urls]
+Homepage = "https://github.com/williamdeng3244/infermesh"
+Repository = "https://github.com/williamdeng3244/infermesh"
+Issues = "https://github.com/williamdeng3244/infermesh/issues"
 
 [project.optional-dependencies]
 # Hardware/engine backends declare their own heavy deps as extras so the
