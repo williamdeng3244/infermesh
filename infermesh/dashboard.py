@@ -473,7 +473,12 @@ tr.cm-det>td{background:rgba(127,127,127,.04);padding:0}
               <label class="ex-check" style="margin-left:4px" title="auto-publish this run to the shared library"><input type="checkbox" id="bmShare" checked/> <span data-i18n="Share to library">Share to library</span></label>
             </div>
           </div>
-          <div id="bmStatus" class="muted" style="font-size:12px;margin-top:11px;min-height:16px"></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:11px;min-height:16px">
+            <div id="bmStatus" class="muted" style="font-size:12px"></div>
+            <div class="bar" id="bmProg" style="display:none;flex:1;max-width:360px;margin-top:0"><i id="bmProgBar" style="width:0%"></i></div>
+            <span id="bmProgTxt" class="muted" style="display:none;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap"></span>
+            <button class="btn sm" id="bmCancel" style="display:none" data-i18n="Cancel">Cancel</button>
+          </div>
         </div>
         <div class="cards" id="bmCards"></div>
         <div class="panel" id="bmDetail" style="display:none;padding:18px">
@@ -717,6 +722,7 @@ const I18N={
 "Repo":"仓库","Progress":"进度","Size":"大小","no downloads yet":"暂无下载","Download jobs":"下载任务",
 "Concurrency":"并发","Max tokens":"最大令牌","Mode":"模式","same prompt":"相同提示","different":"不同",
 "Run benchmark":"运行基准测试","Single request":"单次请求",
+"Cancel":"取消","running":"运行中","queued":"排队中","waiting for a slot":"等待空闲槽位","loading model":"加载模型中","correctness check":"正确性校验","benchmark cancelled":"基准测试已取消","benchmark failed":"基准测试失败","cancel requested":"已请求取消","cancel failed":"取消失败",
 "Latency / E2E (ms)":"延迟 / E2E（ms）","Time to first token (ms)":"首令牌时间（ms）","Time per output token (ms)":"每输出令牌时间（ms）","Latency percentiles":"延迟百分位",
 "Past runs — persisted across restarts":"历史运行 — 重启后保留","When":"时间","Req×Conc":"请求×并发","no past runs":"暂无历史运行",
 "Runtime-editable":"运行时可编辑","Idle timeout (seconds)":"空闲超时（秒）","Save":"保存","0 disables auto-unload. Applies live to the TTL reaper.":"0 表示禁用自动卸载。实时应用于 TTL 回收器。",
@@ -1168,14 +1174,50 @@ async function loadBenchDevices(){
     if(cur) sel.value=cur;
   }catch(e){}
 }
+let benchJobId=null;   // active benchmark job (null = idle)
+function benchProgUI(on){
+  $('#bmProg').style.display=on?'':'none'; $('#bmProgTxt').style.display=on?'':'none'; $('#bmCancel').style.display=on?'':'none';
+  if(!on){ $('#bmProgBar').style.width='0%'; $('#bmProgTxt').textContent=''; }
+}
+const BENCH_PHASES={queued:'queued',waiting:'waiting for a slot',load:'loading model',running:'running',correctness:'correctness check'};
+function benchPct(job){
+  const pr=job.progress||{}, ph=(pr.phase||'').split(' ')[0];
+  if(job.state==='done') return 100;
+  if(ph==='correctness') return 96;
+  if(job.state==='running'&&pr.total) return Math.max(8,Math.min(96,Math.round((pr.current||0)*100/pr.total)));
+  if(ph==='load') return 8;
+  return 3;   // queued / waiting for an admission slot
+}
+async function pollBenchJob(id){
+  let misses=0;   // tolerate brief poll hiccups — the job keeps running server-side
+  for(;;){
+    let job=null;
+    try{ job=await api('/api/bench/jobs/'+id); misses=0; }
+    catch(e){ if(++misses>=5) throw e; }
+    if(job){
+      const pr=job.progress||{}, ph=(pr.phase||'').split(' ')[0];
+      $('#bmProgBar').style.width=benchPct(job)+'%';
+      const lbl=BENCH_PHASES[ph]?T(BENCH_PHASES[ph]):ph;
+      $('#bmProgTxt').textContent=((job.state==='running'&&pr.total)?(pr.current||0)+'/'+pr.total+' · ':'')+lbl;
+      if(job.state==='done'||job.state==='failed'||job.state==='cancelled') return job;
+    }
+    await new Promise(res=>setTimeout(res,500));
+  }
+}
 async function runBenchmark(){
   const model=$('#bmModel').value;
   if(!model){ $('#bm-err').textContent='pick a model'; return; }
   const body={model:model, requests:(+$('#bmReq').value||20), concurrency:(+$('#bmConc').value||4), max_tokens:(+$('#bmTok').value||64), mode:($('#bmMode')?$('#bmMode').value:'same'), device:(($('#bmDevice')&&$('#bmDevice').value)||null), share:($('#bmShare')?$('#bmShare').checked:true)};
-  $('#bm-err').textContent=''; $('#bmStatus').textContent='running '+body.requests+'×'+body.concurrency+(body.device?(' on '+body.device):'')+'… (real models take a few s)';
-  $('#bmRun').disabled=true;
+  $('#bm-err').textContent=''; $('#bmStatus').textContent=T('running')+' '+body.requests+'×'+body.concurrency+(body.device?(' on '+body.device):'')+'…';
+  $('#bmRun').disabled=true; $('#bmSingle').disabled=true; benchProgUI(true);
   try{
-    const r=await api('/api/benchmark','POST',body);
+    const j=await api('/api/bench/jobs','POST',body);
+    benchJobId=j.job_id;
+    const job=await pollBenchJob(j.job_id);
+    if(job.state==='cancelled'){ $('#bmStatus').textContent=T('benchmark cancelled'); return; }
+    if(job.state!=='done'||!job.result){
+      $('#bm-err').textContent=job.error?String(job.error):T('benchmark failed'); $('#bmStatus').textContent=''; return; }
+    const r=job.result;
     lastBench=r;
     $('#bmStatus').textContent='done · '+(r.model||'')+' on '+(r.device_name||r.device||'cpu')+' · '+r.wall_time_s+'s · mode '+(r.mode||'same');
     loadBenchDevices();
@@ -1198,7 +1240,7 @@ async function runBenchmark(){
     drawBars('bmChart', [['p50',L.p50],['p90',L.p90],['p99',L.p99],['max',L.max]]);
     refreshBenchHistory();
   }catch(e){ $('#bm-err').textContent=String(e); $('#bmStatus').textContent=''; }
-  finally{ $('#bmRun').disabled=false; }
+  finally{ benchJobId=null; benchProgUI(false); $('#bmRun').disabled=false; $('#bmSingle').disabled=false; }
 }
 function drawBars(id, pairs){
   const c=$('#'+id); if(!c) return;
@@ -1214,6 +1256,10 @@ function drawBars(id, pairs){
 }
 $('#bmRun').onclick=runBenchmark;
 $('#bmSingle').onclick=()=>{ $('#bmReq').value=1; $('#bmConc').value=1; runBenchmark(); };
+$('#bmCancel').onclick=async()=>{ if(!benchJobId) return; $('#bmCancel').disabled=true;
+  try{ await api('/api/bench/jobs/'+benchJobId+'/cancel','POST'); toast('cancel requested'); }
+  catch(e){ toast('cancel failed'); }
+  finally{ $('#bmCancel').disabled=false; } };
 $('#bmCopy').onclick=()=>{ if(!lastBench){ toast('run a benchmark first'); return; }
   const txt=JSON.stringify(lastBench,null,2);
   if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(()=>toast('results copied')).catch(()=>toast('copy failed')); }

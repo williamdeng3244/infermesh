@@ -70,3 +70,15 @@ def test_dashboard_has_benchmark_modes(client):
                    "Prefill (PP)", "Decode (TG)",
                    "bm-exp", "function bmDetail", "bm-det-", "Single-request latency"):
         assert marker in html, marker
+
+
+def test_dashboard_benchmark_uses_jobs_api(client):
+    """The Benchmark tab drives the background jobs API (progress bar +
+    cancel) instead of the deprecated synchronous /api/benchmark."""
+    html = client.get("/admin").text
+    for marker in ("api('/api/bench/jobs'", 'id="bmProg"', 'id="bmProgBar"',
+                   'id="bmCancel"', "/cancel'", "function pollBenchJob"):
+        assert marker in html, marker
+    # the page must no longer *call* the deprecated sync endpoint — it may
+    # still appear inside the copy-paste curl reproduction strings
+    assert "api('/api/benchmark'" not in html
