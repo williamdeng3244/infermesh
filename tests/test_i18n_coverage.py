@@ -65,3 +65,10 @@ def test_no_external_urls_in_dashboard():
     # zero-CDN rule: the page must render offline (GCU deployments are walled)
     assert not re.search(r'src="https?://|href="https?://', DASHBOARD_HTML)
     assert "@import" not in DASHBOARD_HTML
+
+
+def test_compare_page_is_multiway():
+    """Compare = baseline A + N addable/removable comparison columns, each
+    with its own Δ%/verdict vs the baseline (user decision, 2026-07-09)."""
+    for marker in ("data-cpadd", "data-cprm", "CP.sel", "Promise.all"):
+        assert marker in DASHBOARD_HTML, marker

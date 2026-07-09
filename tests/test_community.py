@@ -127,3 +127,44 @@ def test_dashboard_has_community_ui(client):
                    'id="bmShare"', 'id="setSubmitter"', 'id="setAutoPub"',
                    'id="saveCommunity"'):
         assert marker in html, marker
+
+
+async def test_publish_to_hub_sends_bearer_key(monkeypatch):
+    """A spoke pushing to a keyed hub must authenticate (hub_key setting) —
+    without it, submissions to an auth-enabled hub 401 and are dropped."""
+    import urllib.request
+
+    from infermesh.server import _publish_to_hub
+
+    seen = {}
+
+    class _Resp:
+        def read(self):
+            return b"{}"
+
+    def fake_urlopen(req, timeout=10):
+        seen["url"] = req.full_url
+        seen["auth"] = req.get_header("Authorization")
+        return _Resp()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    await _publish_to_hub("http://hub:8000/", {"x": 1}, key="sekrit")
+    assert seen["url"] == "http://hub:8000/api/community/submit"
+    assert seen["auth"] == "Bearer sekrit"
+
+    await _publish_to_hub("http://hub:8000/", {"x": 1})   # keyless hub: no header
+    assert seen["auth"] is None
+
+
+def test_hub_key_setting_roundtrip(client, monkeypatch):
+    from infermesh.core.settings import Settings
+
+    monkeypatch.setattr(Settings, "save", lambda self, *a, **k: None)  # no disk write
+    r = client.put("/api/settings", json={"hub_key": "k1"})
+    d = r.json()
+    assert "hub_key" in d["updated"]
+    assert d["settings"]["hub_key"] is True          # redacted: set/unset only
+    assert client.get("/api/settings").json()["hub_key"] is True
+    r2 = client.put("/api/settings", json={"hub_key": ""})
+    assert r2.json()["settings"]["hub_key"] is False

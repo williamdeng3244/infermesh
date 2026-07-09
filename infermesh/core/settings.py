@@ -46,6 +46,7 @@ class Settings:
     submitter_label: Optional[str] = None    # display name for shared community submissions (None => hostname)
     auto_publish: bool = True                # auto-submit completed benchmarks to the community library
     hub_url: Optional[str] = None            # remote community hub to submit to (None/"" => store locally / be the hub)
+    hub_key: Optional[str] = None            # bearer key for that hub, if it enforces auth (sent as Authorization header)
 
     @classmethod
     def load(cls, path: Path = SETTINGS_PATH) -> "Settings":

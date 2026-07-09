@@ -653,6 +653,8 @@ tr.cm-det>td{background:rgba(127,127,127,.04);padding:0}
             <div class="hint" data-i18n="Completed benchmarks are submitted to the shared library so colleagues can compare. Hub URL blank = this server is the hub.">Completed benchmarks are submitted to the shared library so colleagues can compare. Hub URL blank = this server is the hub.</div>
             <div class="row" style="margin-top:8px">
               <input id="setHubUrl" type="text" placeholder="hub URL — blank = this server is the hub" data-i18n-ph="hub URL — blank = this server is the hub" style="width:430px" autocomplete="off"/>
+              <input id="setHubKey" type="password" placeholder="hub API key — blank = keep unchanged" data-i18n-ph="hub API key — blank = keep unchanged" style="width:270px" autocomplete="new-password"/>
+              <span class="muted" id="hubKeyState" style="font-size:12px"></span>
             </div>
           </div>
           <h3 style="margin-top:26px"><span data-i18n="Startup">Startup</span> <span class="badge warn" data-i18n="restart to apply">restart to apply</span></h3>
@@ -749,7 +751,7 @@ const I18N={
 "Visualize and compare model performance across context lengths — all data from the shared library.":"可视化并对比不同上下文长度下的模型性能 — 全部数据来自共享库。",
 "No data yet — run a benchmark (auto-published) or pick a comparison above.":"暂无数据 — 运行一次基准测试（会自动发布），或在上方选择一个对比。",
 "all chips":"全部芯片","all variants":"全部厂商","search model…":"搜索模型…","all quants":"全部量化","all contexts":"全部上下文","Min pp":"最小 pp","Min TG":"最小 TG","Highest pp":"pp 最高","Highest TG":"TG 最高","no benchmarks yet":"暂无基准测试记录",
-"Shared library":"共享库","Display name — how your runs appear in the Community library":"显示名称 — 你的测试在社区库中如何显示","blank = hostname":"留空 = 主机名","Auto-publish benchmarks":"自动发布基准测试","Completed benchmarks are submitted to the shared library so colleagues can compare. Hub URL blank = this server is the hub.":"完成的基准测试会提交到共享库，方便同事对比。Hub URL 留空 = 本服务器即为 Hub。","hub URL — blank = this server is the hub":"Hub URL — 留空 = 本服务器即为 Hub","community settings saved":"已保存共享库设置",
+"Shared library":"共享库","Display name — how your runs appear in the Community library":"显示名称 — 你的测试在社区库中如何显示","blank = hostname":"留空 = 主机名","Auto-publish benchmarks":"自动发布基准测试","Completed benchmarks are submitted to the shared library so colleagues can compare. Hub URL blank = this server is the hub.":"完成的基准测试会提交到共享库，方便同事对比。Hub URL 留空 = 本服务器即为 Hub。","hub URL — blank = this server is the hub":"Hub URL — 留空 = 本服务器即为 Hub","hub API key — blank = keep unchanged":"Hub API 密钥 — 留空 = 保持不变","community settings saved":"已保存共享库设置",
 "chart data copied":"已复制图表数据","no data to copy":"暂无数据可复制","runs":"条记录","samples":"样本","Reset":"重置",
 "Context length":"上下文长度","all":"全部","Raw command & results (terminal)":"原始命令 & 结果（终端）","benchmark command":"基准测试命令",
 "No comparisons yet — click + Add comparison.":"暂无对比 — 点击「+ 添加对比」。",
@@ -930,6 +932,8 @@ async function loadSettings(){
     gv('#setHost',s.host); gv('#setPort',s.port); gv('#setBackend',s.backend); gv('#setMaxMem',s.max_process_memory); gv('#setModelDir',s.model_dir);
     gv('#setConc',s.max_concurrent_requests); gv('#setQueue',s.max_queued_requests);
     gv('#setSubmitter',s.submitter_label); gv('#setHubUrl',s.hub_url); if($('#setAutoPub')) $('#setAutoPub').checked=(s.auto_publish!==false);
+    if($('#setHubKey')) $('#setHubKey').value='';                       // never echo the key back
+    if($('#hubKeyState')) $('#hubKeyState').textContent=s.hub_key?'set':'unset';
     $('#keyState').textContent=s.api_key?'set':'unset';
     const order=['backend','model_dir','host','port','max_concurrent_requests','max_queued_requests','idle_timeout','max_process_memory','ttl_check_interval','sse_keepalive_interval','kv_hot_capacity','kv_cold_dir','hf_endpoint','gen_temperature','gen_top_p','gen_top_k','gen_max_tokens','api_key'];
     $('#settingsKv').innerHTML=order.filter(k=>k in s).map(k=>'<dt>'+k+'</dt><dd>'+(k==='api_key'?(s[k]?'set':'unset'):esc(s[k]==null?'—':s[k]))+'</dd>').join('');
@@ -1460,7 +1464,10 @@ function renderCommunity(){
 ['#cmModel','#cmMinPp','#cmMinTg'].forEach(id=>{ const e=$(id); if(e) e.oninput=()=>{ clearTimeout(cmTimer); cmTimer=setTimeout(()=>refreshCommunity(false),300); }; });
 $('#cmExport')&&($('#cmExport').onclick=()=>exportCsv(cmQuery()));
 async function saveCommunity(){
-  try{ await api('/api/settings','PUT',{submitter_label:$('#setSubmitter').value, auto_publish:$('#setAutoPub').checked, hub_url:$('#setHubUrl').value});
+  try{ const cm={submitter_label:$('#setSubmitter').value, auto_publish:$('#setAutoPub').checked, hub_url:$('#setHubUrl').value};
+    const hk=$('#setHubKey')?$('#setHubKey').value.trim():'';
+    if(hk)cm.hub_key=hk;                                  // blank = keep the stored key
+    await api('/api/settings','PUT',cm);
     toast('community settings saved'); loadSettings();
   }catch(e){ $('#settings-err').textContent=String(e); }
 }
@@ -1916,7 +1923,8 @@ function anDistT(){
 }
 
 /* ---- compare A/B ---- */
-let CP={a:null,b:null,runs:[]};
+let CP={a:null,sel:[],runs:[]};
+const CP_MAX=6;   // comparison-column cap — keeps the delta table readable
 async function loadCompare(){
   const root=$('#cpRoot'); if(!root)return;
   root.innerHTML='<div class="hint">'+T('loading…')+'</div>';
@@ -1924,47 +1932,59 @@ async function loadCompare(){
     const d=await api('/api/community/runs?sort=recent&limit=100');
     CP.runs=d.runs||[];
     if(!CP.runs.length){root.innerHTML='<div class="card"><div class="hint">'+esc(T('no runs in the community store yet — run a benchmark first'))+'</div></div>';return;}
-    if(!CP.a||!CP.runs.some(r=>r.id===CP.a))CP.a=CP.runs[Math.min(1,CP.runs.length-1)].id;
-    if(!CP.b||!CP.runs.some(r=>r.id===CP.b))CP.b=CP.runs[0].id;
-    const cmp=await api('/api/compare?a='+encodeURIComponent(CP.a)+'&b='+encodeURIComponent(CP.b));
+    const ids=new Set(CP.runs.map(r=>r.id));
+    if(!CP.a||!ids.has(CP.a))CP.a=CP.runs[Math.min(1,CP.runs.length-1)].id;
+    CP.sel=(CP.sel||[]).filter(id=>ids.has(id)&&id!==CP.a).slice(0,CP_MAX);
+    if(!CP.sel.length){const first=CP.runs.find(r=>r.id!==CP.a)||CP.runs[0];CP.sel=[first.id];}
+    const cmps=await Promise.all(CP.sel.map(id=>api('/api/compare?a='+encodeURIComponent(CP.a)+'&b='+encodeURIComponent(id))));
     let tl=null;
-    try{ if(cmp.a.chip){const t2=await api('/api/analysis/timeline?chip='+encodeURIComponent(cmp.a.chip)+'&metric=tg'); if(t2.points&&t2.points.length>1)tl=t2;} }catch(e){}
-    renderCompare(cmp,tl);
+    try{ const chip=cmps[0]&&cmps[0].a?cmps[0].a.chip:null;
+      if(chip){const t2=await api('/api/analysis/timeline?chip='+encodeURIComponent(chip)+'&metric=tg'); if(t2.points&&t2.points.length>1)tl=t2;} }catch(e){}
+    renderCompare(cmps,tl);
   }catch(e){root.innerHTML='<div class="hint">'+esc(String(e))+'</div>';}
 }
 function runLabel(r){const d=new Date((r.created_at||0)*1000);
   return (r.chip||'—')+' · '+(r.model||'—')+' · '+(r.quant||'—')+' · c'+(r.batch_size||'—')+' · '+d.toISOString().slice(0,16).replace('T',' ');}
-function renderCompare(cmp,tl){
+function renderCompare(cmps,tl){
   const root=$('#cpRoot');
+  const base=cmps[0].a;
   const selHtml=(side,cur)=>`<select class="mono" style="max-width:100%" data-cpsel="${side}">${CP.runs.map(r=>`<option value="${esc(r.id)}" ${r.id===cur?'selected':''}>${esc(runLabel(r))}</option>`).join('')}</select>`;
   const ORDER=[['tg_tps','tg (decode)','tok/s',1],['pp_tps','pp (prefill)','tok/s',0],['total_throughput','total throughput','tok/s',1],['ttft_ms','TTFT p50','ms',0],['tpot_ms','TPOT','ms',1],['e2e_latency_s','E2E p50','s',2],['peak_mem_gb','peak mem','GB',2],['power_avg_w','power','W',0],['energy_j','energy','J',0],['cv_itl','ITL CV','',3]];
-  let reg=0,imp=0;
+  const counts=cmps.map(c=>{let reg=0,imp=0;ORDER.forEach(p=>{const e=c.deltas[p[0]];if(!e)return;if(e.verdict==='worse')reg++;if(e.verdict==='better')imp++;});return {reg:reg,imp:imp};});
+  const cnt=i=>{const c=counts[i];
+    if(!c.reg&&!c.imp)return `<span style="color:var(--muted);font-weight:400">${esc(T('within noise'))}</span>`;
+    return (c.reg?`<span style="color:var(--err)">${c.reg}↓</span>`:'')+((c.reg&&c.imp)?' ':'')+(c.imp?`<span style="color:var(--ok)">${c.imp}↑</span>`:'');};
   const rows=ORDER.map(pair=>{
     const k=pair[0],lb=pair[1],un=pair[2],dd=pair[3];
-    const e=cmp.deltas[k]; if(!e||(e.a==null&&e.b==null))return '';
-    if(e.verdict==='worse')reg++; if(e.verdict==='better')imp++;
-    const col=e.verdict==='worse'?'var(--err)':e.verdict==='better'?'var(--ok)':'var(--muted)';
-    return `<tr><td>${esc(T(lb))}</td><td class="mono muted">${un}</td>
-     <td class="num">${e.a==null?'—':(+e.a).toFixed(dd)}</td><td class="num">${e.b==null?'—':(+e.b).toFixed(dd)}</td>
-     <td class="num" style="color:${col};font-weight:650">${e.delta_pct==null?'—':(e.delta_pct>=0?'+':'')+e.delta_pct.toFixed(1)+'%'}</td></tr>`;}).join('');
-  const verdicts=(reg?`<span class="antag" style="color:var(--err)">${reg} ${esc(T('regressions'))}</span> `:'')+(imp?`<span class="antag" style="color:var(--ok)">${imp} ${esc(T('improvements'))}</span> `:'')+((!reg&&!imp)?`<span class="antag" style="color:var(--muted)">${esc(T('within noise'))}</span>`:'');
+    const es=cmps.map(c=>c.deltas[k]);
+    if(es.every(e=>!e||(e.a==null&&e.b==null)))return '';
+    const aE=es.find(e=>e&&e.a!=null);
+    const cells=es.map(e=>{
+      if(!e||e.b==null)return '<td class="num">—</td><td class="num">—</td>';
+      const col=e.verdict==='worse'?'var(--err)':e.verdict==='better'?'var(--ok)':'var(--muted)';
+      return `<td class="num">${(+e.b).toFixed(dd)}</td><td class="num" style="color:${col};font-weight:650">${e.delta_pct==null?'—':(e.delta_pct>=0?'+':'')+e.delta_pct.toFixed(1)+'%'}</td>`;
+    }).join('');
+    return `<tr><td>${esc(T(lb))}</td><td class="mono muted">${un}</td><td class="num">${aE&&aE.a!=null?(+aE.a).toFixed(dd):'—'}</td>${cells}</tr>`;}).join('');
+  const heads=cmps.map((c,i)=>`<th>B${cmps.length>1?i+1:''} · ${esc(c.b.chip||'')} ${esc(c.b.driver_version||'')} ${cnt(i)}</th><th>Δ%</th>`).join('');
   const corr=r=>{if(!r||!r.correctness||r.correctness.greedy_match==null)return '';
     const c=r.correctness, col=c.grade==='pass'?'var(--ok)':c.grade==='warn'?'var(--warn)':'var(--err)';
     return `<tr><td>${esc(r.chip||'')}</td><td class="mono">${esc(r.quant||'')}</td><td class="num">${(c.greedy_match*100).toFixed(1)}%</td><td class="num">${c.mean_kl!=null?c.mean_kl.toFixed(4):'—'}</td><td><span class="antag" style="color:${col}">${esc(String(c.grade||'—').toUpperCase())}</span></td></tr>`;};
-  const corrRows=corr(cmp.a)+corr(cmp.b);
+  const corrRows=corr(base)+cmps.map(c=>corr(c.b)).join('');
   const hexes=chipHexes();
+  const selList=CP.sel.map((id,i)=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><span class="mono muted" style="font-size:11px">B${i+1}</span><div style="flex:1">${selHtml(String(i),id)}</div><button class="btn sm" data-cprm="${i}" title="${esc(T('remove'))}" ${CP.sel.length<=1?'disabled':''}>✕</button></div>`).join('');
   root.innerHTML=`
   <div class="angrid2">
-   <div class="panel" style="padding:14px"><div class="eyebrow">${esc(T('Run A'))}</div>${selHtml('a',CP.a)}</div>
-   <div class="panel" style="padding:14px"><div class="eyebrow">${esc(T('Run B'))}</div>${selHtml('b',CP.b)}</div>
+   <div class="panel" style="padding:14px"><div class="eyebrow">${esc(T('Baseline'))} A</div>${selHtml('a',CP.a)}</div>
+   <div class="panel" style="padding:14px"><div class="eyebrow">${esc(T('Comparisons'))}</div>${selList}
+    <button class="btn sm" data-cpadd ${CP.sel.length>=CP_MAX?'disabled':''}>${esc(T('+ Add comparison'))}</button></div>
   </div>
   <div class="panel" style="padding:16px;margin-bottom:14px">
-   <div class="eyebrow">${esc(T('metric'))} · A → B · ${verdicts}</div>
-   <table><thead><tr><th>${esc(T('metric'))}</th><th></th><th>A · ${esc(cmp.a.chip||'')} ${esc(cmp.a.driver_version||'')}</th><th>B · ${esc(cmp.b.chip||'')} ${esc(cmp.b.driver_version||'')}</th><th>Δ%</th></tr></thead><tbody>${rows}</tbody></table>
-   <div class="hint">|Δ| > ${cmp.threshold_pct}% ${esc(T('is colored; smaller moves are treated as run-to-run noise. The threshold is configurable in Settings.'))}</div>
+   <div class="eyebrow">${esc(T('metric'))} · ${esc(T('vs baseline A'))}</div>
+   <div style="overflow-x:auto"><table><thead><tr><th>${esc(T('metric'))}</th><th></th><th>A · ${esc(base.chip||'')} ${esc(base.driver_version||'')}</th>${heads}</tr></thead><tbody>${rows}</tbody></table></div>
+   <div class="hint">↓ ${esc(T('regressions'))} · ↑ ${esc(T('improvements'))} · |Δ| > ${cmps[0].threshold_pct}% ${esc(T('is colored; smaller moves are treated as run-to-run noise. The threshold is configurable in Settings.'))}</div>
   </div>
   ${tl?`<div class="panel" style="padding:16px;margin-bottom:14px">
-   <div class="eyebrow">${esc(T('Driver / SDK timeline'))} · ${esc(cmp.a.chip||'')}</div>
+   <div class="eyebrow">${esc(T('Driver / SDK timeline'))} · ${esc(base.chip||'')}</div>
    <div class="plotwrap">${timelineSVG(tl.points,hexes[0])}</div>
    <div class="hint">${esc(T('Red = regression vs previous version. This is why driver fingerprints belong in the benchmark schema.'))}</div>
   </div>`:''}
@@ -1972,7 +1992,10 @@ function renderCompare(cmp,tl){
    <div class="eyebrow">${esc(T('Numerical correctness vs fp16 reference'))}</div>
    <table><thead><tr><th>${esc(T('chip'))}</th><th>${esc(T('quant'))}</th><th>${esc(T('greedy match'))}</th><th>${esc(T('mean logit KL'))}</th><th>${esc(T('status'))}</th></tr></thead><tbody>${corrRows}</tbody></table>
   </div>`:''}`;
-  root.querySelectorAll('[data-cpsel]').forEach(s=>s.onchange=()=>{CP[s.dataset.cpsel]=s.value;loadCompare();});
+  root.querySelectorAll('[data-cpsel]').forEach(s=>s.onchange=()=>{const k=s.dataset.cpsel; if(k==='a'){CP.a=s.value;}else{CP.sel[+k]=s.value;} loadCompare();});
+  root.querySelectorAll('[data-cprm]').forEach(b=>b.onclick=()=>{CP.sel.splice(+b.dataset.cprm,1);loadCompare();});
+  const add=root.querySelector('[data-cpadd]');
+  if(add)add.onclick=()=>{const used=new Set([CP.a].concat(CP.sel));const nxt=CP.runs.find(r=>!used.has(r.id));CP.sel.push((nxt||CP.runs[0]).id);loadCompare();};
   bindTTs(root);
 }
 
@@ -2005,6 +2028,7 @@ Object.assign(I18N,{
 "TTFT p50 vs p99 (ms)":"TTFT p50 与 p99（ms）",
 "Medians lie. Tail ratio and CV are the first fingerprints of scheduler stalls, allocator pauses and kernel-launch gaps.":"中位数会骗人。尾部比与 CV 是调度停顿、分配器暂停和 kernel 启动间隙最早的指纹。",
 "Run A":"运行 A","Run B":"运行 B",
+"Baseline":"基线","Comparisons":"对比对象","vs baseline A":"对比基线 A",
 "tg (decode)":"tg（decode）","pp (prefill)":"pp（prefill）","total throughput":"总吞吐",
 "TTFT p50":"TTFT p50","TPOT":"TPOT","E2E p50":"E2E p50","peak mem":"峰值显存","power":"功耗","energy":"能耗","ITL CV":"ITL CV",
 "regressions":"项回归","improvements":"项改善","within noise":"噪声范围内",

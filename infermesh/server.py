@@ -139,6 +139,7 @@ class SettingsPatch(BaseModel):
     submitter_label: Optional[str] = None   # community display name ("" clears => hostname)
     auto_publish: Optional[bool] = None      # auto-submit benchmarks to the shared library
     hub_url: Optional[str] = None            # remote community hub ("" => store locally / be the hub)
+    hub_key: Optional[str] = None            # bearer key sent when publishing to hub_url ("" => none)
 
 
 class ModelSettingsPatch(BaseModel):
@@ -378,16 +379,19 @@ def _community_record(result: dict, params: dict, sysinfo: dict,
     }
 
 
-async def _publish_to_hub(hub_url: str, rec: dict) -> None:
-    """POST one record to a remote community hub (when this node isn't the hub)."""
+async def _publish_to_hub(hub_url: str, rec: dict, key: Optional[str] = None) -> None:
+    """POST one record to a remote community hub (when this node isn't the hub).
+    ``key`` authenticates against a hub that enforces an API key."""
     import json as _json
     import urllib.request as _ur
 
     def _post():
         url = hub_url.rstrip("/") + "/api/community/submit"
         body = _json.dumps(rec).encode()
-        req = _ur.Request(url, data=body, method="POST",
-                          headers={"Content-Type": "application/json"})
+        headers = {"Content-Type": "application/json"}
+        if key:
+            headers["Authorization"] = "Bearer " + key
+        req = _ur.Request(url, data=body, method="POST", headers=headers)
         _ur.urlopen(req, timeout=10).read()
 
     await asyncio.to_thread(_post)
@@ -975,7 +979,7 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                 if extras:
                     rec.update({k: v for k, v in extras.items() if v is not None})
                 if settings.hub_url:
-                    await _publish_to_hub(settings.hub_url, rec)
+                    await _publish_to_hub(settings.hub_url, rec, key=settings.hub_key)
                 else:
                     await asyncio.to_thread(_community.submit, rec)
             except Exception as exc:  # publishing must never fail the benchmark
@@ -1322,6 +1326,7 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
     async def api_get_settings(_: None = Depends(require_auth)):
         data = asdict(settings)
         data["api_key"] = bool(settings.api_key)  # redact: only expose whether set
+        data["hub_key"] = bool(settings.hub_key)
         return data
 
     @app.put("/api/settings")
@@ -1400,6 +1405,9 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
         if patch.hub_url is not None:
             settings.hub_url = patch.hub_url.strip() or None
             changed.append("hub_url")
+        if patch.hub_key is not None:
+            settings.hub_key = patch.hub_key.strip() or None
+            changed.append("hub_key")
         if "kv_hot_capacity" in changed or "kv_cold_dir" in changed:
             pool.default_extra = _kv_defaults(settings)
         if changed:
@@ -1409,6 +1417,7 @@ def create_app(pool: ModelPool, settings: Optional[Settings] = None) -> FastAPI:
                 logger.error("settings save failed: %s", exc)
         data = asdict(settings)
         data["api_key"] = bool(settings.api_key)
+        data["hub_key"] = bool(settings.hub_key)
         restart_fields = {"host", "port", "model_dir", "backend", "max_process_memory"}
         return {"updated": changed, "settings": data,
                 "restart_required": [c for c in changed if c in restart_fields]}
