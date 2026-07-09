@@ -43,7 +43,8 @@ the gateway never sees vendor tensors.
 ```bash
 pipx install infermesh                        # or: pip install infermesh
 infermesh start --backend mock --model-dir ~/models
-# dashboard → http://127.0.0.1:8000
+# → dashboard opens at http://127.0.0.1:8000 (--no-open to disable)
+infermesh desktop-install                     # optional: Linux app-menu launcher
 ```
 
 Extras — install only what your hardware needs:

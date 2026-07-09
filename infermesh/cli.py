@@ -19,6 +19,7 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -72,10 +73,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command")
     _add_serve_args(sub.add_parser("serve", help="Run the gateway in the foreground"))
-    _add_serve_args(sub.add_parser("start", help="Start the gateway in the background (pidfile)"))
-    _add_serve_args(sub.add_parser("restart", help="Restart the background gateway"))
+    start = sub.add_parser("start", help="Start the gateway in the background (pidfile)")
+    _add_serve_args(start)
+    restart = sub.add_parser("restart", help="Restart the background gateway")
+    _add_serve_args(restart)
+    for p in (start, restart):
+        p.add_argument("--no-open", action="store_true",
+                       help="Do not open the dashboard in a browser once healthy")
     sub.add_parser("stop", help="Stop the background gateway")
     sub.add_parser("status", help="Show background gateway status + health")
+    desk = sub.add_parser("desktop-install",
+                          help="Install a Linux app-menu launcher (.desktop): launching "
+                               "starts the service and opens the dashboard")
+    desk.add_argument("--apps-dir", default=None,
+                      help="Applications directory (default: ~/.local/share/applications)")
     mcp = sub.add_parser("mcp", help="Run an MCP server (stdio) so agents can drive infermesh")
     mcp.add_argument("--base-url", default="http://127.0.0.1:8000", help="infermesh gateway base URL")
     mcp.add_argument("--api-key", default=None, help="Gateway API key, if auth is enabled")
@@ -337,6 +348,50 @@ def cmd_start(args: argparse.Namespace) -> int:
         time.sleep(0.3)
     print(f"infermesh started (pid {proc.pid}) on {settings.host}:{settings.port} "
           f"[health: {health}]\n  logs: {log_path}")
+    if health == "ok" and not getattr(args, "no_open", False):
+        _open_dashboard(settings.host, settings.port)
+    return 0
+
+
+def _open_dashboard(host: object, port: object) -> None:
+    """Best-effort browser open — must never fail startup (headless box, SSH)."""
+    shown = "127.0.0.1" if host in (None, "", "0.0.0.0") else host
+    url = f"http://{shown}:{port}/"
+    try:
+        import webbrowser
+        if webbrowser.open(url):
+            print(f"  dashboard: {url} (opened in your browser)")
+            return
+    except Exception:  # noqa: BLE001 - a missing browser must not kill `start`
+        pass
+    print(f"  dashboard: {url}")
+
+
+_ICON_SRC = Path(__file__).resolve().parent / "assets" / "icon.svg"
+
+
+def cmd_desktop_install(args: argparse.Namespace) -> int:
+    """Write an XDG launcher so infermesh appears in the Linux app menu; the
+    entry runs ``infermesh start``, which auto-opens the dashboard."""
+    apps_dir = Path(args.apps_dir) if args.apps_dir else (
+        Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local" / "share"))
+        / "applications")
+    exe = shutil.which("infermesh")
+    exec_line = f'"{exe}" start' if exe else f'"{sys.executable}" -m infermesh.cli start'
+    apps_dir.mkdir(parents=True, exist_ok=True)
+    dest = apps_dir / "infermesh.desktop"
+    dest.write_text(
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        "Name=infermesh\n"
+        "Comment=Hardware-agnostic LLM inference bench\n"
+        f"Exec={exec_line}\n"
+        f"Icon={_ICON_SRC}\n"
+        "Terminal=false\n"
+        "Categories=Development;Utility;\n"
+    )
+    print(f'installed: {dest}\n  find "infermesh" in your app menu — launching starts '
+          f"the service and opens the dashboard")
     return 0
 
 
@@ -398,6 +453,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     dispatch = {
         "serve": cmd_serve, "start": cmd_start, "stop": cmd_stop,
         "restart": cmd_restart, "status": cmd_status, "mcp": cmd_mcp,
+        "desktop-install": cmd_desktop_install,
     }
     handler = dispatch.get(args.command)
     if handler is None:

@@ -569,7 +569,8 @@ tr.cm-det>td{background:rgba(127,127,127,.04);padding:0}
           <div class="mref-zh">用 pipx 一行安装（独立环境、自动加入 PATH），或直接 pip。需要 Python ≥ 3.11。</div>
           <pre class="term">pipx install infermesh              # or: pip install infermesh
 infermesh start --backend mock --model-dir ~/models
-# dashboard → http://127.0.0.1:8000    (--port to change 换端口)
+# dashboard opens automatically 浏览器自动打开 (--no-open to disable)
+infermesh desktop-install           # Linux app-menu icon 应用菜单图标（双击即启动）
 infermesh status · infermesh stop · infermesh restart</pre>
           <div class="mref-en">Optional extras — install only what your hardware needs: <b>infermesh[transformers]</b> local HuggingFace models on CUDA / CPU / Apple MPS · <b>infermesh[vllm]</b> production NVIDIA serving · <b>infermesh[downloader]</b> in-dashboard HuggingFace search &amp; download · <b>infermesh[modelscope]</b> ModelScope downloads.</div>
           <div class="mref-zh">可选附加依赖 —— 按硬件按需安装：<b>infermesh[transformers]</b> 本地 HuggingFace 模型（CUDA / CPU / Apple MPS）· <b>infermesh[vllm]</b> NVIDIA 生产级推理 · <b>infermesh[downloader]</b> 仪表盘内搜索下载 HuggingFace 模型 · <b>infermesh[modelscope]</b> ModelScope 下载源。</div>
